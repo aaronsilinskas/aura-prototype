@@ -44,7 +44,7 @@ app/          Wires the engine to the hardware and runs a scene on a device
 examples/     Entry points: a desktop terminal demo and the on-device scene runner
 scripts/      Deploy and maintenance scripts that run on the desktop
 electronics/  Circuit board designs (rough sketches only, so far)
-docs/         Domain map, glossary, and hardware measurements
+docs/         Domain map and architecture decision records (the glossary is GLOSSARY.md)
 ```
 
 A few words used throughout the code:
@@ -118,13 +118,9 @@ required; there are no built-in defaults.
   [`examples/aura-device.simulated.json`](examples/aura-device.simulated.json)
   is for the test-only Simulated device, not for flashing to a board.
 - **`aura-boot.json`** picks the scene to boot, by its folder name under
-  `packs/scenes/`:
-
-  ```json
-  {
-    "default_scene": "red_light_green_light"
-  }
-  ```
+  `packs/scenes/`, as in
+  [`examples/aura-boot.json`](examples/aura-boot.json):
+  `{"default_scene": "hardware_test"}`.
 
   If the device has an SD card, a scene saved to the card's `aura-state.json`
   takes priority over `default_scene`.
@@ -202,37 +198,36 @@ The example file also shows the `accelerometer`, `magnetometer`, `haptics`, `rad
 (InputEvent | NetworkEvent)
         │
         ▼
-   SceneRun               one per scene: its GameState + rules in dispatch order
+   SceneRun               one per running scene: its GameState + rules in dispatch order
         │  run.tick(elapsed)
         ▼
    GameRule.handle_event(event, state)
-        │  rules read/write state.data, queue new events,
+        │  rules read/write state.get/state.set, queue new events,
         │  call state.effect_controls, call state.scene_controls
         ▼
    EffectManager          routes effects to EffectOutput by scope
         │
         ▼
-   EffectOutput           hardware: RGB strip, audio, haptic
+   EffectOutput           hardware: lights, audio, haptics
 ```
 
-Rules are stateless — all mutable game data lives in `GameState.data`. Rules
-read and write `state.data`, fire effects via `state.effect_controls`, and
-trigger scene transitions via `state.scene_controls`.
+Rules are stateless: all mutable game data lives in the scene's `GameState`.
+Rules fire effects through `state.effect_controls`, read Settings through
+`state.settings`, and leave or cover the scene through `state.scene_controls`.
 
-### Packs
+### Packs and scenes
 
-A **pack** is a directory containing a **pack manifest** and one `.py` file per
-item. `scan_pack_roots` (`engine/pack_catalog.py`) discovers every pack and
-scene under the pack roots in one scan; `PackRegistry` imports items lazily on
-first use.
+Each folder under `packs/` with a manifest is a pack, and each folder under
+`packs/scenes/` is a scene. One scan at boot finds them all and checks every
+declaration, so a bad pack or scene fails before anything runs. Pack items are
+imported only when first used.
 
-- **Effect pack** — manifest `effects.json`; each `.py` file exports `BUILD`: a
-  `(config) → Effect` callable. Effect names use `"pack.effect"` format (e.g. `"elements.fire"`).
-- **Rule pack** — manifest `rules.json`; each `.py` file exports `RULE`: a `GameRule` instance.
-
-The manifest is a JSON object stating the pack's version and, optionally,
-declaring the pack's **Settings** and, for a Rule pack, the **Capabilities**
-it requires:
+- **Effect pack**: manifest `effects.json`; each `.py` file exports `BUILD`, a
+  `(config) → Effect` callable. Effects are named `"pack.effect"`, e.g.
+  `"elements.fire"`.
+- **Rule pack**: manifest `rules.json`; each `.py` file exports `RULE`, a
+  `GameRule` instance. Its manifest can also declare **Settings** and the
+  **Capabilities** the rules need:
 
 ```json
 {
@@ -244,57 +239,7 @@ it requires:
 }
 ```
 
-A Setting's `type` is `int`, `float` (an `int` value is accepted), `bool`,
-`str` or `list`. A `list` is checked at the top level only; the pack's code
-checks what is inside it. A Setting with no `default` is required: every scene declaring the pack
-must set it. A scene sets a pack's Settings inline, in that pack's reference
-in `scene.json` (see [Scenes](#scenes)); the scan checks each override and
-resolves every Setting (the default, then the scene's override, then any
-`setting_overrides` passed to the scan), raising `SettingOverrideError` naming
-the scene, pack and Setting. Rules read them through
-`state.settings.get(<pack>, <name>)` or its typed forms (`get_int`,
-`get_float`, `get_bool`, `get_str`), which have no default argument and no
-write path. Settings never enter `GameState`'s `get`/`set` store.
-
-A folder without a manifest is not a pack and is skipped. A manifest that is
-not a JSON object, or declares a Setting with an unknown type or a default of
-the wrong type, fails the scan with `MalformedManifestError`.
-
-A pack's Settings are part of its versioned interface: adding a Setting with a
-default is a minor bump; adding a required Setting, or removing, renaming or
-retyping one, is a major bump. The scan does not enforce this.
-
-#### Capabilities
-
-A **Capability** is hardware a device has, named from a fixed vocabulary:
-
-- `button.A` … `button.Z` — the button with that label (labels follow the order
-  `buttons` declares them in the device config)
-- `ir.line`, `ir.cone`, `ir.area_of_effect` — that IR emitter
-- `ir.receive` — any IR receiver
-- `radio`, `storage`, `accelerometer`, `magnetometer`
-
-Pixels, audio and haptics are not Capabilities: effects already cope without
-them. A device has a Capability only when Device assembly built it, never
-merely because the config declares it.
-
-A Rule pack's optional `requires` list names the Capabilities its rules cannot
-run without; an effect pack cannot list one (`MalformedManifestError`). A name
-outside the vocabulary fails the scan with `UnknownCapabilityError`, and a
-`requires` that is not a list with `MalformedManifestError`. The scan checks
-only the names, never the device: see [Scenes](#scenes) for when they are
-compared with what the device has.
-
-A Rule pack's `requires` is part of its versioned interface: adding a
-Capability is a major bump, and removing one is a minor bump. The scan does
-not enforce this.
-
-Version format is `MAJOR.MINOR`. A `Scene` declares minimum required versions;
-the catalog scan checks them at boot (same-major, installed-minor ≥ required-minor).
-
-### Scenes
-
-A **Scene** is a declarative bundle, described by its `scene.json`:
+A scene is described by its `scene.json`:
 
 ```json
 {
@@ -305,41 +250,43 @@ A **Scene** is a declarative bundle, described by its `scene.json`:
   ],
   "settings": {
     "window_seconds": {"type": "float", "default": 3.0, "description": "Seconds per window."}
-  }
+  },
+  "requires": ["accelerometer"],
+  "ir_codec": "aura"
 }
 ```
 
-- `version` — the scene's own `MAJOR.MINOR` version
-- `effect_packs` — ordered `{"name": ..., "version": ...}` objects; `version` is the minimum compatible version, same major, checked at scan. An effect pack takes no Setting overrides: a `settings` object here fails the scan with `MalformedSceneError`
-- `rule_packs` — the same object form, plus an optional `settings` object holding that pack's Setting overrides, checked at scan; all rules loaded and appended in declared order
-- Optional `settings` — the scene's own Setting declarations, in the manifest's shape; rules
-  read them in the `scene` namespace, and a Scene Config builds from them with the typed reads
-  (`state.settings.get_float("scene", "window_seconds")`). A bad declaration fails the scan
-  with `MalformedSceneError`
-- Optional `ir_codec` — the IR codec the scene runs (default `"aura"`)
-- Optional `requires` — the [Capabilities](#capabilities) the scene cannot be
-  played without, e.g. `["accelerometer", "button.A"]`. The scene's **Required
-  capabilities** are this list plus the `requires` of every rule pack it
-  declares. A name outside the vocabulary fails the scan with
-  `UnknownCapabilityError`; a value that is not a list with `MalformedSceneError`
+| Key | Meaning |
+|-----|---------|
+| `version` | The scene's own `MAJOR.MINOR` version |
+| `effect_packs`, `rule_packs` | Packs in load order. Each `version` is the minimum compatible one: same major, installed minor at least this. A rule pack reference may override that pack's Settings |
+| `settings` | Optional. The scene's own Settings, in the manifest's shape |
+| `requires` | Optional. Capabilities the scene can't be played without, on top of its rule packs' |
+| `ir_codec` | Optional. The infrared message format: `"aura"` (default) or `"tag"` |
 
-Any other key fails the scan with `MalformedSceneError`.
+A Setting's `type` is `int`, `float`, `bool`, `str` or `list`. One with no
+`default` must be set by every scene that uses the pack. Rules read Settings with
+`state.settings.get_float("scene", "window_seconds")` and its siblings, by
+namespace (`"scene"` or the pack's name).
 
-Required capabilities are compared with the device only for the scene about to
-run. At boot, a Persisted scene the device can't run is skipped (and logged,
-but left on the card) in favour of the flash `default_scene`; boot raises
-`MissingCapabilityError` when neither fits. `overlay`, `reboot_into`
-and `reboot_to_previous` raise `MissingCapabilityError` for a scene the device
-can't run, before anything is recorded, persisted or reset;
-`state.scene_controls.can_run(name)` asks the same without raising. A scene
-that copes without some hardware leaves it out of `requires` and asks
-`state.capabilities.has(name)` before using it. A scene carries no
-starting data: rules seed their own runtime state through `state.get`/`state.set`.
+A **Capability** is hardware a scene can depend on: `button.A` … `button.Z`
+(labelled in the order `buttons` lists them), `ir.line`, `ir.cone`,
+`ir.area_of_effect`, `ir.receive`, `radio`, `storage`, `accelerometer`,
+`magnetometer`. A scene is checked against the device only when it is about to
+run. A scene that copes without some hardware leaves it out of `requires` and
+asks `state.capabilities.has(name)` instead.
 
-Scenes switch only by **Reboot**; an **Overlay** covers a scene for a while and gives it
-back intact. How each works is in the **SceneControls**, **Overlay**, **SceneManager** and
-**Reboot** entries of [`GLOSSARY.md`](GLOSSARY.md) and in
-[ADR-0005](docs/adr/0005-scenes-switch-only-by-reboot.md).
+Scenes switch only by rebooting the device into the next one. An **Overlay**
+covers a scene for a while and hands it back intact.
+
+The meaning of each term, the versioning rules, and the reasoning behind these
+choices are in [`GLOSSARY.md`](GLOSSARY.md) and the ADRs in
+[`docs/adr/`](docs/adr/), notably
+[ADR-0003](docs/adr/0003-settings-are-declared-as-data-and-checked-at-scan.md)
+(Settings),
+[ADR-0004](docs/adr/0004-capabilities-are-checked-when-a-scene-is-about-to-run.md)
+(Capabilities) and
+[ADR-0005](docs/adr/0005-scenes-switch-only-by-reboot.md) (scene switching).
 
 ---
 

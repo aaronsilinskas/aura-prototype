@@ -51,7 +51,7 @@ engine/           Event-driven game loop (CircuitPython/MicroPython-safe)
                   scan, device, GameState and harness)
   settings.py     Settings (read-only view), Setting declaration parsing and resolution
   version.py      Pack MAJOR.MINOR parsing
-  input.py        ButtonData, AccelerationData, InputEvents
+  input.py        ButtonData, AccelerationData, MagneticData, InputEvents
   namespace.py    ActiveSceneNamespace; NoActiveSceneError, MissingPrefixError, UndeclaredPackError
   network.py      NetworkEvents
   log.py          Board-free, tag-prefixed line logger with an injectable sink
@@ -91,10 +91,8 @@ hardware/         Hardware abstraction layer
                   device_storage, network_controls, scene_selection, ir_transport,
                   ir_transceiver, ir_codecs/ (base, aura, tag), ir_telemetry,
                   radio_transport, radio_transceiver, sd_sync_protocol, sd_sync_server,
-                  device_reboot, device_assembly (the Device assembly, which
-                  owns Boot narration's per-part wording; build_narration
-                  holds its narrate_step/narrate_skip primitives),
-                  device_parts)
+                  device_reboot, device_assembly (the Device assembly),
+                  build_narration, device_parts, polled_part, polled_sensor)
   simulated/      Test-only Simulated device (device: SimulatedHardware; simulated_parts:
                   SimulatedParts, its DeviceParts adapter, whose card is the real
                   DeviceStorage over a card directory) — never deployed
@@ -162,7 +160,7 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `EffectConfig` | `effects/effect.py` | Resolution, options, and listeners for one render pass |
 | `PixelBuffer` | `effects/effect.py` | List-backed in-memory pixel buffer of packed RGB values |
 | `EffectVerb` | `effects/effect.py` | Identity-matched key for `clips` and `patterns`; engine owns `START`/`STOP`, `EffectPixels` subclasses declare custom verbs in `VERBS` |
-| `Effect` | `effects/effect.py` | Base class for all effects; subclasses implement `name`, `update`, `render` |
+| `Effect` | `effects/effect.py` | Descriptor of an effect's modalities (`pixels`, `audio`, `haptic`); builders return plain instances |
 | `Layer` | `effects/layers/layer.py` | Base layer: `update` + `sample` |
 | `Scroll` | `effects/layers/scroll.py` | Scroll base: `update` + `apply` |
 | `LayerRenderer` | `effects/layers/renderer.py` | Single-layer `Effect` |
@@ -172,7 +170,7 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `Palette` / `PaletteLUT256` | `effects/palette.py` | Maps float [0,1] → packed RGB; LUT variant is pre-computed |
 | `Shape` | `effects/shape.py` | Factory for `EffectShapeFunc` callables (gradient, sine, checkers, …) |
 | `EffectControls` | `engine/state.py` | Rule-facing effect seam |
-| `EffectAdmin` | `engine/effects/admin.py` | Scene-transition seam, reserved for `SceneManager`: one step per transition, each installing the `SceneView` it is given into the Active scene namespace. `enter_boot_scene(view)` puts every scope on Split; `cover(view)` → `HeldEffects` (running effects + merge strategies; live set left empty, on Split); `uncover(held, view)` stops the Overlay's own effects and puts the bundle back |
+| `EffectAdmin` | `engine/effects/admin.py` | Scene-transition seam, reserved for `SceneManager`: `enter_boot_scene`, `cover` (→ `HeldEffects`), `uncover`, each installing a `SceneView` |
 | `SceneView` | `engine/effects/admin.py` | A scene's local effects, local sounds and declared effect-pack names: what each `EffectAdmin` step installs |
 | `EffectManager` | `engine/effects/manager.py` | Concrete `EffectControls` + `EffectAdmin`; routes effects to outputs by scope |
 | `EffectOutput` | `engine/effects/output.py` | Abstract hardware output port |
@@ -182,15 +180,15 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `NetworkControls` | `engine/state.py` | Rule-facing send-only network seam; a send on missing hardware raises `MissingCapabilityError` |
 | `ActiveSceneNamespace` | `engine/namespace.py` | Resolves effect names to builders and clip names to WAV paths for the active scene; its Scene view is installed by each `EffectAdmin` step |
 | `ResolvedClip` | `effects/effect.py` | A declared `AudioPlaybackConfig` plus its resolved path, carried on `EffectEvent` |
-| `GameState` | `engine/state.py` | Per-tick game context passed to each rule; `elapsed`/`total` are its scene's own game time, summed from the ticks this state receives, so they stop while an Overlay covers the scene; `settings` is its scene's read-only `Settings`; `capabilities` is the device's read-only `Capabilities` (`has(name)`, raising for a name outside the vocabulary), handed through `SceneManager` from `DeviceHardware.capabilities` |
-| `SceneRun` | `engine/state.py` | A scene's `GameState` plus its rules, fixed at construction, in dispatch order; `tick(elapsed)` sets the state's `elapsed`, adds it to `total`, dispatches every queued event to every rule in order (events queued during dispatch go out in the same tick, `dispatch_count` rising once per event), then empties the queue in place. Holds no clock |
+| `GameState` | `engine/state.py` | Per-tick context passed to each rule: `get`/`set` game data, `queue_event`, the scene's own game time (`elapsed`/`total`), read-only `settings` and `capabilities`, and the control seams |
+| `SceneRun` | `engine/state.py` | A scene's `GameState` plus its rules in dispatch order; the only dispatcher of the scene's queued events, via `tick(elapsed)` |
 | `Capabilities` | `engine/capabilities.py` | Read-only view of the device's Capabilities that rules ask with `has(name)` |
 | `Settings` | `engine/settings.py` | One scene's resolved Settings, read by namespace (`scene` or a Rule pack name) and name; built by the catalog scan |
-| `GameRule` | `engine/engine.py` | Abstract event handler with `name` + `version` |
-| `Scene` | `engine/scene.py` | One scene's complete, read-only record, built once by the scan: effect and rule pack references, version, `ir_codec` name, resolved Settings, Required capabilities (its own plus its Rule packs'), scene-local rule and effect registries and local sound map |
+| `GameRule` | `engine/engine.py` | Base rule: registers per-event-type handlers with `on`; `handle_event` routes by exact event class |
+| `Scene` | `engine/scene.py` | One scene's read-only record, built once by the scan: pack references, version, `ir_codec`, resolved Settings, Required capabilities, scene-local registries and sounds |
 | `SceneControls` | `engine/state.py` | Rule-facing transition seam (`overlay`, `pop`, `reboot_into`, `reboot_to_previous`; no in-process scene switch, see ADR-0005) plus `can_run(name)`, which the `lobby` pack asks to leave out entries the device can't play |
-| `SceneManager` | `engine/scene.py` | The live `SceneControls`. Built from the device's effect and network controls and Capabilities; builds each scene's `GameState` and keeps it with the scene's resolved rules in a `SceneRun` on the stack entry. `update(elapsed)` ticks the top `SceneRun` only (nothing with an empty stack), then applies any pending Overlay or pop. Drives scene transitions, each making one `EffectAdmin` call carrying the top scene's `SceneView`: enter on boot, cover on `overlay`, uncover on `pop` (the held bundle rides in the overlay's stack entry; the IR codec is not touched). Holds no namespace or effect registry; delegates `reboot_into`/`reboot_to_previous` to injected `SceneReboot`. Its own `activate_boot_scene(name)`, off the rule-facing seam, is how the boot composition makes the first scene active (on Split). `activate_boot_scene`, `overlay`, `reboot_into` and `reboot_to_previous` raise `MissingCapabilityError` before recording, persisting or resetting anything when the target's Required capabilities aren't all in its Capabilities; `pop` does not check |
-| `SceneRuntime` | `engine/scene_runtime.py` | The engine's matched set, built from a `PackCatalog`, effect outputs, `NetworkControls`, Capabilities, `SceneReboot` and an optional clock: one `ActiveSceneNamespace`, the `EffectManager` resolving through it and the `SceneManager` (with it as `EffectControls` and `EffectAdmin`). `activate_boot_scene(name)`, `advance_clock()` (once per tick, first, whether or not a scene is active), `queue_event(event)` (dropped with no scene active), `update()` (hands the clock's elapsed time to `SceneManager.update`, which dispatches the top scene and applies any pending Overlay or pop, then updates effects, on one clock it does not advance; nothing below it holds the clock), `has_active_scene`, the clock's `elapsed` and `total` for the tick, `scene_controls`, `namespace`; exposes none of its parts |
+| `SceneManager` | `engine/scene.py` | The live `SceneControls`: keeps the scene stack of `SceneRun`s, ticks the top one, and drives each transition through one `EffectAdmin` call; reboots go through the injected `SceneReboot`. Transitions raise `MissingCapabilityError` before changing anything; `pop` does not check |
+| `SceneRuntime` | `engine/scene_runtime.py` | The engine's matched set built from a `PackCatalog` and what the device offers: one `ActiveSceneNamespace`, the `EffectManager` and the `SceneManager`, on one clock it advances once per tick (`advance_clock()`, then `queue_event`, then `update()`); exposes only `scene_controls` and `namespace` |
 | `SceneReboot` | `engine/state.py` | Board-free port `SceneManager` reboots through; `previous_scene()` names the scene `reboot_to_previous` would boot, so it is checked first; live adapter `DeviceSceneReboot` |
 | `PhaseKey` / `PhaseMachine` | `engine/phase.py` | Identity-typed phase constant; per-scene current-phase holder |
 | `PhaseSlot` | `engine/phase.py` | Per-scene typed accessor for a phase machine's key + initial phase; registry of each phase's owning `PhaseRule` |
@@ -209,28 +207,28 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `MinMaxValue` | `magic/values.py` | Clamped float with dynamic max (via `ValueWithModifiers`) |
 | `ValueWithModifiers` | `magic/values.py` | Base value + temporary multiplier stack |
 | `Duration` | `magic/values.py` | Expiry tracker |
-| `DeviceConfig` | `hardware/shared/device_config.py` | Validated `aura-device.json`; optional `pixels` list plus optional IR/audio/sensor/haptics sections, and **Named bus** maps for I2C and SPI that devices join by name. NeoPixel strip, button, IR, **Named bus**, audio, radio and SD-card pins are recorded as `PinRef`s carrying the field path the parser built (`pixels[i].pin`, `buttons[i]`, `ir.rx` or `ir.rx[i]`, `ir.line`, `i2c.<name>.scl`, `spi.<name>.miso`, `audio.i2s_data`, `radio.reset`, `sdcard.cs`), which the Device assembly passes to `DeviceParts` untouched |
+| `DeviceConfig` | `hardware/shared/device_config.py` | Validated `aura-device.json`: optional `pixels` list, IR/audio/sensor/haptics/radio/SD sections and **Named bus** maps; every pin is recorded as a `PinRef` |
 | `PinRef` | `hardware/shared/device_config.py` | **Pin reference**: a pin name with the `aura-device.json` field it came from, so a pin error names the field to fix; lives with the config so the parser can create it without importing `DeviceParts` |
-| `NeoPixelCurrentBudgetConfig` | `hardware/shared/device_config.py` | Opt-in `neopixel_current_budget` policy; the parser calls `tune_neopixel_brightness` (`hardware/shared/neopixel_current_budget.py`) to fold the tuned brightness into each NeoPixel strip config, and records the estimate/scale for boot narration |
-| `DeviceHardware` | `hardware/shared/device_hardware.py` | Board-free bundle the Device assembly returns (outputs, sensors, network seam, `ir`, radio, storage, `capabilities`: the frozenset of Capabilities read off the parts it built, so a disabled, isolated or absent component is not had, and `polled`: the ordered tuple of **Polled parts** it built (buttons, sensors, radio, IR), each a `PolledPart` (`hardware/shared/polled_part.py`), so a part that is not built is not polled) |
-| `assemble_device` | `hardware/shared/device_assembly.py` | The **Device assembly**: board-free `DeviceConfig` → `DeviceHardware`, owning gating, on-demand bus opening (only buses an enabled device names), build order, **Boot narration** (its per-part wording, over the `narrate_step`/`narrate_skip` primitives in `hardware/shared/build_narration.py`), buttons, IR/radio wiring and network controls; reaches hardware only through `DeviceParts` |
-| `DeviceParts` | `hardware/shared/device_parts.py` | Port the Device assembly builds each part through (one constructor per part), taking config sections and `PinRef`s; a bus crosses it as the checker-only `Bus` alias (`Any`), which each adapter narrows to its platform's bus type; adapters `SimulatedParts` (`hardware/simulated/simulated_parts.py`, which also decides what persists across a reboot) and `CircuitPythonParts` (`hardware/circuitpython/circuitpython_parts.py`) |
-| `PolledSensor` | `hardware/shared/polled_sensor.py` | Board-free **Polled part** owning one sensor's reading (`DeviceHardware.accelerometer` / `.magnetometer`): wraps a `DeviceParts` raw read callable and, on each `update(elapsed)`, hands the raw read to the reading's `assign` (`AccelerationData` / `MagneticData`), which overwrites it in place, so the sensor never knows the reading's shape; keeps the last good reading on a failed read and logs the start and end of each run of failures |
+| `NeoPixelCurrentBudgetConfig` | `hardware/shared/device_config.py` | Opt-in `neopixel_current_budget` policy; parsing folds the tuned brightness (`hardware/shared/neopixel_current_budget.py`) into each NeoPixel strip config |
+| `DeviceHardware` | `hardware/shared/device_hardware.py` | Board-free bundle the Device assembly returns: outputs, sensors, network seam, `ir`, radio, storage, the `capabilities` it built, and its ordered **Polled parts** (`polled`) |
+| `assemble_device` | `hardware/shared/device_assembly.py` | The **Device assembly**: board-free `DeviceConfig` → `DeviceHardware` (gating, bus opening, build order, **Boot narration** over `hardware/shared/build_narration.py`, IR/radio wiring); reaches hardware only through `DeviceParts` |
+| `DeviceParts` | `hardware/shared/device_parts.py` | Port the Device assembly builds each part through; adapters `CircuitPythonParts` (`hardware/circuitpython/circuitpython_parts.py`) and `SimulatedParts` (`hardware/simulated/simulated_parts.py`) |
+| `PolledSensor` | `hardware/shared/polled_sensor.py` | **Polled part** owning one sensor's reading, updated in place each tick; keeps the last good reading on a failed read |
 | `HardwareNetworkControls` | `hardware/shared/network_controls.py` | Concrete, send-only `NetworkControls` adapter; `send_ir` raises `MissingCapabilityError` when IR or the emitter is absent, `send_radio` when the radio is |
-| `InfraredTransceiver` | `hardware/shared/ir_transceiver.py` | Board-free single owner of the IR subsystem (transmitters, an optional receiver, shared transmit gate; `emitters` and `receives` say what is wired); builds its own transmitters, receiver and gate (private to `ir_transport`) from pulse readers, emitter pins and a writer factory, and reports the factory's `writer_kind`, for the device and the Simulated device alike |
+| `InfraredTransceiver` | `hardware/shared/ir_transceiver.py` | Board-free single owner of the IR subsystem: transmitters, an optional receiver and the shared transmit gate, on the device and the Simulated device alike |
 | `RadioTransport` | `hardware/shared/radio_transport.py` | Board-free half-duplex radio port; live adapter `Rfm69RadioTransport` |
 | `RadioTransceiver` | `hardware/shared/radio_transceiver.py` | Board-free single owner of a device's radio subsystem |
 | `build_scene_boot` | `app/scene_composition.py` | The **Scene boot**, the Composition layer's only entry point: boots a `DeviceHardware` into its boot scene and returns a `SceneBoot`; shared by `run_scene` and the Simulated device |
-| `SceneBoot` | `app/scene_composition.py` | What `build_scene_boot` returns: the booted `scene_name`, its `tick`, its `scene_controls` (`SceneControls`) and its Active scene `namespace`. The tick is shared by the device and the Simulated device and drives one `SceneRuntime`: each tick first advances the runtime's clock (`advance_clock()`), then calls `update(elapsed)` on every part in `DeviceHardware.polled` (IR and radio included, whether or not a scene is active) without naming any, using the runtime's `elapsed` for this tick; then queues `InputEvents.Sensors` and the IR/radio received events from the parts' state on the runtime and calls its `update()`; allocates nothing per tick |
+| `SceneBoot` | `app/scene_composition.py` | What `build_scene_boot` returns: the booted `scene_name`, its `tick`, `scene_controls` and `namespace`. The tick advances the runtime clock, updates every **Polled part**, queues their events and updates the runtime; it allocates nothing per tick |
 | `DeviceSceneReboot` | `hardware/shared/device_reboot.py` | Live `SceneReboot` adapter; persists the target, then calls its injected `reset` (`build_scene_boot` wires it; `run_scene` passes `microcontroller.reset`) |
 | `SdSyncServer` | `hardware/shared/sd_sync_server.py` | Board-free device side of the SD-sync protocol |
 | `SdSyncClient` | `scripts/sd_sync_client.py` | Board-free (CPython-only) host side of the SD-sync protocol |
 | `Transport` (SD sync) | `hardware/shared/sd_sync_protocol.py` | Board-free port `SdSyncClient`/`SdSyncServer` exchange base64-framed lines through; live adapters `UsbCdcTransport` (device) / `SerialTransport` (host) |
 | `UsbCdcTransport` | `hardware/circuitpython/usb_cdc_transport.py` | Live `Transport` framing SD-sync lines with a newline delimiter over any `read`/`write` stream (on-device, `usb_cdc.data`); needs no `usb_cdc` import itself, so it is CPython-testable against a fake stream |
 | `SerialTransport` | `scripts/sd_sync_transport.py` | Live host-side `Transport`, framing SD-sync lines the same way as `UsbCdcTransport` but over a host serial port opened via `deploy_watch`'s `SerialHandle`/`_open_serial_with_retry` |
-| `find_data_port` / `select_data_port` | `scripts/sd_sync_transport.py` | Data-channel port resolution for `scripts/sd_sync.py`: auto-detects via `adafruit_board_toolkit.circuitpython_serial.data_comports()`, single match wins, `--port` always overrides, zero/multiple matches raises `SdSyncPortError` |
-| `find_console_port` / `select_console_port` | `scripts/deploy_watch.py` | Console-channel port resolution for `deploy_watch`: auto-detects via `adafruit_board_toolkit.circuitpython_serial.repl_comports()` (imported lazily), single match wins, `--port` overrides without scanning, zero/multiple matches raises `ConsolePortError` |
-| `ship_list` / `ShipList` / `ShipEntry` / `governed_mount_files` | `scripts/ship_list.py` | The **Ship list**: host-only, given a source root it returns a `ShipList` of `modules` (one `ShipEntry` per file that lands at its repo path under a module directory) and `boot` (the board's `boot.py`, which lands on the mount root, or None). Each `ShipEntry` has a `source`, its `device` path on a compiled deploy, `compiled` (to `.mpy`, or copied raw), and `source_device` for a source deploy. It owns `MODULE_DIRS`, the exclusions (`tests`, `__pycache__`, `conftest.py`, and by path the Simulation test harness and the Simulated device), the shipped suffixes, each nested module directory's parent `__init__` (listed once), and `boot.py`'s placement. `code.py` is not in it. `governed_mount_files` returns the mount files under the module directories whose fate the list decides (in source mode, every `.mpy` there too), so deploy can prune those it no longer names. `scripts/build.py` stages the `modules` (compiling or copying each, and pruning staged files the list no longer produces). `scripts/deploy.py` syncs the `modules` to the mount (staged by default, raw sources in source mode), copies `boot` beside `code.py`, and prunes each governed mount file the list no longer names. An import-linter contract keeps every device package from importing `scripts` |
+| `find_data_port` / `select_data_port` | `scripts/sd_sync_transport.py` | Data-channel **Port auto-detect** for `scripts/sd_sync.py`; `--port` overrides |
+| `find_console_port` / `select_console_port` | `scripts/deploy_watch.py` | Console-channel **Port auto-detect** for `deploy_watch`; `--port` overrides |
+| `ship_list` / `ShipList` / `ShipEntry` / `governed_mount_files` | `scripts/ship_list.py` | The **Ship list**: which files land where on a device (`MODULE_DIRS`, exclusions, compiled or raw, `boot.py` placement). `scripts/build.py` stages it; `scripts/deploy.py` syncs it and prunes mount files it no longer names |
 
 ---
 
@@ -242,7 +240,7 @@ Code-facing terms are defined in [`GLOSSARY.md`](../GLOSSARY.md) — the single 
 
 ## Coding constraints (CircuitPython and MicroPython compatibility)
 
-All code in `effects/`, `engine/`, `magic/`, and `rules/` must run on CPython, CircuitPython 10.x, and MicroPython. The general CircuitPython/MicroPython rules (no `dataclasses`, `typing.Protocol` unavailable, guarded `typing` imports, no per-frame hot-path allocation) live in the **code-quality skill's embedded-python guidance** (the `embedded-python.md` reference file) — follow it. If that skill isn't installed locally, look it up and copy that file's rules before working on device code. Project-specific deltas on top:
+All code that ships to a device (`effects/`, `engine/`, `magic/`, `packs/`, `hardware/shared/`, `app/`; see the **Ship list**) must run on CPython, CircuitPython 10.x, and MicroPython; only `hardware/circuitpython/` and `app/run_scene.py` may import CircuitPython-only modules. The general CircuitPython/MicroPython rules (no `dataclasses`, `typing.Protocol` unavailable, guarded `typing` imports, no per-frame hot-path allocation) live in the **code-quality skill's embedded-python guidance** (the `embedded-python.md` reference file) — follow it. If that skill isn't installed locally, look it up and copy that file's rules before working on device code. Project-specific deltas on top:
 
 - **`typing.Protocol` substitute** — use plain base classes with `raise NotImplementedError`; subclass explicitly for type-checker compatibility
 - **`PaletteLUT256` is pre-computed** — never construct inside a render loop
@@ -254,4 +252,4 @@ All code in `effects/`, `engine/`, `magic/`, and `rules/` must run on CPython, C
 
 ## Tests
 
-~2000 tests spread across `tests/` folders under `effects/`, `engine/`, `magic/`, `hardware/`, `packs/`, and `scripts/`. Run with `python -m pytest`. All must pass before commit. Pre-commit hooks run `ruff` (lint), `ruff format`, `import-linter` and `mypy`.
+Over 3,000 tests, in `tests/` folders beside the code they cover. Run with `uv run pytest`. All must pass before commit. Pre-commit hooks run `ruff` (lint), `ruff format`, `import-linter` and `mypy`.

@@ -13,4 +13,4 @@
 - This deliberately reverses the earlier stance that sound overlays were a "separate seam, separate concern" from effects. What both received at a transition was the same active-scene view; only the leaf lookup differed.
 - `EffectEvent` carries a payload (`clip`) that is not part of its identity: equality and hashing stay on `(pack, name, verb)`.
 - import-linter forbids hardware from importing the namespace module, so resolution cannot creep back into outputs.
-- Test helpers that take clip names (`Simulation.is_playing`, `clip_length`) resolve them against whichever scene is active when they are called.
+- Test helpers that take clip names (`SimulatedDevice.is_playing`, `clip_length`) resolve them against whichever scene is active when they are called.

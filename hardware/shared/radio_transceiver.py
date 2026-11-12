@@ -11,7 +11,8 @@ Assembled by the Device assembly (``device_assembly``) and exposed as
 it. This class hands back the raw decoded payload and sender byte rather than
 building a ``NetworkEvents.RadioReceived`` itself — it imports no
 ``engine.network`` vocabulary. The raw packet crosses into game vocabulary
-only later, at ``run_scene``, which builds the event next to the IR block.
+only later, in the Scene boot's tick (``app/scene_composition.py``), which
+builds the event next to the IR one.
 """
 
 from hardware.shared.polled_part import PolledPart

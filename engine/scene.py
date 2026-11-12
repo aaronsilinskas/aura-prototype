@@ -147,8 +147,9 @@ class Scene:
     ``SceneLocalRegistry`` instances for the scene's scene-local rules and
     effects (items export ``RULE`` and ``BUILD``).  ``local_sound_map`` is the
     bare-keyed ``{stem: path}`` map of its scene-local sounds (its ``sounds/``
-    subdirectory).  ``SceneManager`` installs all three as the Scene view on
-    every transition into the scene.
+    subdirectory).  ``SceneManager`` resolves the local rules into the scene's
+    ``SceneRun``; the local effects and sounds go into its Scene view, which the
+    effect system installs on every transition into the scene (ADR-0008).
     """
 
     __slots__ = (

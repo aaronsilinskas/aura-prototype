@@ -52,11 +52,11 @@ A directory whose own name is its top-level import package (flash `packs`, the c
 _Avoid_: pairing a root path with a hand-written import prefix (the prefix is the folder name); two roots with the same folder name; "pack dir" for a root (a pack dir is one pack inside it)
 
 ### PackCatalog
-Everything installed under a device's pack roots, discovered in one scan by `scan_pack_roots`: the effect and rule `PackRegistry`s, the `SceneRegistry` (with each scene's local items and sounds), and the pack sounds map. Every scene's pack declarations and **Setting overrides** are checked, and its **Settings** resolved, before it is returned, so a misconfigured layout, version, declaration or override stops boot; item code is still imported lazily, at first use.
+Everything installed under a device's **Pack roots**, discovered and checked in one scan (`scan_pack_roots`): every scene's pack declarations and **Setting overrides** are checked and its **Settings** resolved before it is returned, so a misconfigured pack or scene stops boot; item code is still imported lazily, at first use.
 _Avoid_: scanning packs, scenes or sounds anywhere else; re-checking scene declarations at load time
 
 ### PackScanError
-The typed `ValueError` family raised while building a `PackCatalog`, when the files on disk are wrong (missing root, duplicate or reserved name, malformed version, `scene.json` or **Pack manifest**, an **Effect pack** declaring Settings or `requires`, or a scene giving one Setting overrides, a scene declaring a pack twice or declaring one that is missing or incompatible, a **Setting override** naming a Rule pack its scene does not declare or an undeclared Setting, giving the wrong type, or leaving a required Setting unset, or a `requires` list naming an unknown **Capability**). Each carries the file, scene, pack or Setting at fault, so tests check the type and those fields, never the wording.
+The typed `ValueError` family raised while building a `PackCatalog` when the files on disk are wrong (layout, versions, **Pack manifests**, `scene.json`, pack declarations, **Setting overrides**, `requires` names). Each carries the file, scene, pack or Setting at fault, so tests check the type and those fields, never the wording.
 _Avoid_: confusing with **Registry lookup errors** (a name not registered, after a good scan); classifying by message text; raising one because the device lacks a scene's **Required capabilities** (the scan never looks at hardware)
 
 ### DynamicValue
@@ -76,14 +76,22 @@ _Avoid_: "compositor"; re-typing a stock render loop in a pack or scene; putting
 ### GameRule
 An event handler; one of a scene's rules, dispatched by its **SceneRun**. **Game-data-stateless** — all game data lives in `GameState`, never as mutable instance attributes (construction-time config is the only permitted instance state).
 
+### Event
+A game-rule event (`engine/events.py`), grouped by `EventGroup`: what a **SceneRun** dispatches to rules, which handle it by exact class (e.g. `InputEvents.Sensors`, `NetworkEvents.IRReceived`).
+_Avoid_: confusing with an **EffectEvent** or an **EffectVerb**
+
 ### GameState
-The game context passed to every rule handler each tick: the control seams, the read-only clock, event queuing, and typed accessors for all mutable game data.
+The game context passed to every rule handler each tick: the control seams, its scene's game time (`elapsed`/`total`, read-only), event queuing, and typed accessors for all mutable game data.
 Rules queue events on it and read game time and the dispatch count, but only its **SceneRun** dispatches the queue or moves its time and count on.
 _Avoid_: `get(key, None)` (use `get_or_none`); storing a **Setting** in it
 
 ### SceneRun
 One run of a scene on the scene stack, from when it is booted or laid on as an **Overlay** until it is popped or the device reboots. It holds the scene's `GameState`, its rules in dispatch order and its game time, and is the only thing that dispatches the scene's queued events: each event goes to every rule in order, events queued during dispatch are dispatched in the same tick, and the dispatch count rises once per event. Only the top run is ticked, so a covered scene's game time stops.
 _Avoid_: "engine", "game engine", "session", "instance", "run unit"; adding or swapping its rules after it is built; holding the clock (it is handed each tick's elapsed time)
+
+### StateSlot
+A typed, get-or-create accessor for one key of `GameState`'s game data (`engine/state.py`): the first read builds the value with its factory, later reads return it checked against its class. How a scene keeps per-scene state and caches its **Scene Config**.
+_Avoid_: bare `state.get`/`state.set` with a repeated string key for typed per-scene state
 
 ### Phase
 A named stage of a scene's game flow (e.g. Tag's Ready/Starting/Playing/Game Over), identified by a `PhaseKey`. A phase starts the moment it is entered, in the same tick, whatever order the scene's rules run in; its handlers first hear the event after the one that entered it.
@@ -122,11 +130,11 @@ The JSON file in an **Effect pack** or **Rule pack** that states the pack's vers
 _Avoid_: `version.txt`
 
 ### Scene Config
-The immutable helper a scene's rules, or a **Rule pack**'s, build once from the scene's **Settings** (the scene's own namespace, or the pack's within it): each Setting it needs as a typed field, plus what derives from them (e.g. Red Light Green Light's durations scaled by **Game Level**) and any check across Settings. One per scene or Rule pack that needs one (Tag's, Red Light Green Light's, the lobby's).
+The immutable helper a scene's rules, or a **Rule pack**'s, build once from the scene's **Settings** (the scene's own namespace, or the pack's within it): each Setting it needs as a typed field, plus what derives from them (e.g. Red Light Green Light's durations scaled by **Game Level**) and any check across Settings. One per scene or Rule pack that needs one.
 _Avoid_: confusing with `EffectConfig`; calling the Settings themselves the Scene Config; re-deriving it every tick (build once, cache); restating a Setting's default in it (its declaration holds it); a second way to build it from loose values
 
 ### Timer
-The scene's clock. Whoever drives the tick advances it exactly once per tick, before anything reads it (`SceneRuntime.advance_clock`, first in the scene tick, whether or not a scene is active), so every **Polled part**, rule and effect in that tick sees the same, current elapsed time. Only `SceneRuntime` reads it below the tick; it hands each tick's elapsed time to the top **SceneRun**. Rules access time only via `state.elapsed`/`state.total`, never by holding a `Timer` reference.
+The scene's clock. Whoever drives the tick advances it exactly once per tick, before anything reads it (see **SceneRuntime**), so every **Polled part**, rule and effect in that tick sees the same, current elapsed time. Only `SceneRuntime` and the effect system it drives read it; it hands the top **SceneRun** each tick's elapsed time. Rules access time only via `state.elapsed`/`state.total`, never by holding a `Timer` reference.
 _Avoid_: advancing it anywhere but `SceneRuntime.advance_clock`; a **SceneRun** or rule holding it; reading it before the tick has advanced it
 
 ### Scene
@@ -142,7 +150,7 @@ The **Capabilities** a scene cannot be played without: its own `requires` list i
 _Avoid_: an "optional" or "uses" list; checking every installed scene at boot; reading a missing capability as a reason to skip game logic in a rule that required it (the check already guaranteed it)
 
 ### Capability errors
-`UnknownCapabilityError`, a **PackScanError** raised when a `requires` list names something outside the **Capability** vocabulary, carrying the file and the name; and `MissingCapabilityError` (a `ValueError`), raised when the device lacks capabilities something needs right now, carrying the missing capabilities and the scene (`None` for a send). Raised by the boot check once every boot candidate has failed, by a transition into a scene the device cannot run (before anything is persisted or reset), and by `send_ir`/`send_radio` when the emitter or radio is absent.
+`UnknownCapabilityError`, a **PackScanError** raised when a `requires` list names something outside the **Capability** vocabulary, carrying the file and the name; and `MissingCapabilityError` (a `ValueError`), raised at boot, on a transition, or on a send when the device lacks what is needed, carrying the missing capabilities and the scene (`None` for a send).
 _Avoid_: classifying by message text; a silent no-op for a send on missing hardware; raising it for a **Persisted scene** the boot can fall back from
 
 ### Scene-local effect / Scene-local rule
@@ -186,7 +194,7 @@ The scene-transition seam rules use (`overlay`, `pop`, `reboot_into`, `reboot_to
 _Avoid_: a rule-facing `load` (a rule changes scene by **Reboot**, which starts the new scene clean)
 
 ### Overlay
-A scene laid temporarily on top of the running scene (a pause, a menu) and removed by `pop`. While it is on top, the scene it covers is suspended: none of its rules run, it hears no events, its game state is kept as it was, and its game time stops, so on `pop` its phases continue from where they were. The covered scene's running effects are set aside, neither drawn nor heard, and given back on `pop` with the same receipts; a looping sound restarts from the top, and a cut-off one-shot is not replayed. An overlay starts on **Split** for every scope, whatever the covered scene chose, and `pop` puts back the covered scene's **Merge strategies**. An overlay runs on the IR codec of the scene it covers, whatever its own `ir_codec` says, so it never breaks the game's traffic. Overlays stack, and each `pop` removes only the top one. It is not a scene switch: the covered scene is still the device's scene.
+A scene laid temporarily on top of the running scene (a pause, a menu) and removed by `pop`. While it is on top, the scene it covers is suspended: none of its rules run, it hears no events, its game state is kept as it was, and its game time stops, so on `pop` its phases continue from where they were. Its running effects are set aside and given back on `pop` (see **EffectAdmin**). An overlay runs on the IR codec of the scene it covers, whatever its own `ir_codec` says, so it never breaks the game's traffic. Overlays stack, and each `pop` removes only the top one. It is not a scene switch: the covered scene is still the device's scene.
 _Avoid_: "scene switch" for it; counting the time spent covered against the covered scene's phases; a "live" overlay running beside the covered scene (a display over live play is the game's own effects); swapping the codec on overlay or pop
 
 ### SceneManager
@@ -202,7 +210,7 @@ The scene a device's card names in `aura-state.json` (`scene`, with its `return_
 _Avoid_: "saved scene", "override" for it; clearing it because this device cannot run it (the card may go back to a prop that can); expecting it to name the running scene right after a `--scene` deploy (the card names none until the next Reboot); treating it as host-authored (only the device writes it)
 
 ### Scene deploy token
-The per-deploy value written as `scene_deploy_token` beside `default_scene` in `aura-boot.json`, new on every write: by `deploy.py --scene` on a device, and by a **Simulated device**'s redeploy in tests, both through the one write rule beside the boot code that reads it. On boot, before the boot scene is resolved, a non-empty token that differs from the one recorded in the card's `aura-state.json` is applied: the **Persisted scene** and its `return_to` are removed and the token recorded, in one write, and one line is logged naming the deployed scene and the Persisted scene it cleared. So each `--scene` deploy wins once, and Reboots made after it keep persisting. The apply never checks the deployed scene against the registry: an unknown one is cleared to, then fails resolution naming the known scenes.
+The value `deploy.py --scene` (or a **Simulated device**'s redeploy) writes as `scene_deploy_token` beside `default_scene` in `aura-boot.json`, new on every write. At boot, a token that differs from the one recorded in the card's `aura-state.json` clears the **Persisted scene** (and its `return_to`) and is recorded, so each `--scene` deploy wins once and later Reboots keep persisting.
 _Avoid_: "nonce", "deploy id" for it; restating its key or how it's written in a writer; comparing scene names instead (a second deploy of the same scene would be mistaken for the first); copying the deployed scene onto the card; a separate inbox file; applying it outside the **Scene boot**
 
 ### SceneReboot
@@ -322,11 +330,11 @@ The top-level `app/` package — the one place allowed to import both engine run
 _Avoid_: importing `hardware.*` from `engine/`, `effects/`, `magic/`, `packs/`; putting board-only code in `scene_composition.py`
 
 ### Scene boot
-The one boot the device and the **Simulated device** share, and the **Composition layer**'s only way in. From the hardware a device built, it applies a pending **Scene deploy token**, then picks the boot scene (the **Persisted scene**, else the flash `default_scene`), skipping one the device lacks the **Required capabilities** for and raising when none fits. It applies that scene's wire-frame codec before the first tick, and hands back the booted scene's name, its tick, its **SceneControls** and its **Active scene namespace**. Card content is scanned exactly like flash content. Each boot builds one tick, whose buffers are allocated once and reused every tick.
+The one boot the device and the **Simulated device** share, and the **Composition layer**'s only way in. From the hardware a device built, it applies a pending **Scene deploy token**, then picks the boot scene (the **Persisted scene**, else the flash `default_scene`), skipping one the device lacks the **Required capabilities** for and raising when none fits. It applies that scene's wire-frame codec before the first tick, and hands back the booted scene's name, its tick, its **SceneControls** and its **Active scene namespace**.
 _Avoid_: sequencing the boot's steps at a call site; a second boot for tests or examples; scanning packs or scenes outside it; copying the tick's body into a harness or entry point; building a tick per frame; reading `ir` or `radio` anywhere but `DeviceHardware`; "startup", "init" for it
 
 ### SceneRuntime
-The engine's matched set for running scenes, built once from the **PackCatalog** and what the device offers (its effect outputs, network controls, **Capabilities** and **SceneReboot**): one **Active scene namespace**, the effect system that resolves through it, and the scene manager that drives transitions. A tick queues its events on it and updates it once; that dispatches the events, applies any pending **Overlay** or pop, then updates effects, on one clock.
+The engine's matched set for running scenes, built once from the **PackCatalog** and what the device offers (its effect outputs, network controls, **Capabilities** and **SceneReboot**): one **Active scene namespace**, the effect system that resolves through it, and the scene manager that drives transitions. Each tick advances its clock first (`advance_clock`, whether or not a scene is active), then queues events on it and updates it once: dispatch, then any pending **Overlay** or pop, then effects.
 _Avoid_: wiring the namespace, effect manager and scene manager by hand; driving its parts separately within a tick; more than one per device; "engine" or "game engine" for it
 
 ### Device assembly
@@ -350,11 +358,11 @@ The device-only entry point that runs **Device assembly** with `CircuitPythonPar
 _Avoid_: returning a bare tuple/dict (return `DeviceHardware`); putting config parsing here (lives in the pure parser); calling it twice in one process
 
 ### DeviceHardware
-The board-free bundle `build_hardware` returns — a data holder for the built outputs, buttons, sensors, network seam, `ir`, `radio`, and storage, plus the **Capabilities** the device has and the ordered **Polled parts**, both worked out once by **Device assembly** from what it built. Ports are typed as their abstract port, never the concrete adapter, keeping the module board-free.
+The board-free bundle `build_hardware` returns: the built parts, the **Capabilities** the device has and its ordered **Polled parts**, both worked out once by **Device assembly** from what it built. Ports are typed as their abstract port, never the concrete adapter.
 _Avoid_: exposing raw transmitters (use `network_controls`/`ir`); exposing the raw `RadioTransport` (use `network_controls`/`radio`); a bare tuple/dict; downcasting `storage` to `SdCardStorage`
 
 ### Simulated device
-A board-free, test-only stand-in for a physical Aura device: a `DeviceHardware` whose inputs are scripted and whose outputs record what the real device would show, play, buzz, and send. Its own emitters light its own receivers; its IR reaches other simulated devices only through the **IR medium**, where it is aimed, and its radio reaches every other one through the **radio medium**. Each has its own radio node, so a receiver can tell senders apart. Its shape comes from a `DeviceConfig` — the harness boots it from `examples/aura-device.simulated.json`, kept capability-equal to every other example config by a sync test. It has its own card, a real directory it can carry scenes and packs on, unless a test makes it card-less, and a **reboot** boots it again at once, within the tick that reset it. A test switches it on into a scene: that seeds its boot values with that scene as `default_scene`, and every boot, the first included, reads those boot values, picking the scene its card names and falling back to that default, as a real device does. A redeploy with a scene replaces that `default_scene` and adds a fresh **Scene deploy token**, then reboots it, as `deploy.py --scene` followed by a reset would; a plain reset keeps the boot values it has. Its reboot is instant: a real device is away for a moment while it boots, and IR aimed at it then is lost, but a simulated one never is. Its reboot also keeps module-level state, which a real reset clears, so shipped code keeps none. When real hardware exposes a bug it missed, the simulated device is extended until that bug is visible.
+A board-free, test-only stand-in for a physical Aura device: a `DeviceHardware` whose inputs are scripted and whose outputs record what the real device would show, play, buzz and send. Its shape comes from `examples/aura-device.simulated.json`, kept capability-equal to the other example configs by a sync test. It has its own card unless made card-less, and reaches other simulated devices only through the **IR medium** (aimed) and the **radio medium** (broadcast, each device its own radio node). It boots exactly as a device does, from boot values a test seeds, including after a **reboot** or a redeploy with a **Scene deploy token**. Its reboot is instant (no IR is lost while it boots) and keeps module-level state, which a real reset clears, so shipped code keeps none. When real hardware exposes a bug it missed, it is extended until that bug is visible.
 _Avoid_: mock device, virtual device, emulator (it does not run CircuitPython); faking the CircuitPython libraries beneath `device_builder`; hard-coding its hardware shape (declare it in the simulated config)
 
 ### Simulation test harness
@@ -383,7 +391,7 @@ _Avoid_: splitting it into send/receive ports; importing `adafruit_rfm69` here (
 
 ### RadioTransceiver
 The board-free single owner of a device's whole radio subsystem, exposed as `DeviceHardware.radio`; the network seam's `send_radio` delegates to it. A send is fire-and-forget on the single channel — no emitter to name, unlike IR — and it builds no game event itself.
-_Avoid_: a transmit pump or pump-before-receive order; a value-returning `update()` (read `received`/`last_sender`); building `NetworkEvents.RadioReceived` here (that's `run_scene`'s job)
+_Avoid_: a transmit pump or pump-before-receive order; a value-returning `update()` (read `received`/`last_sender`); building `NetworkEvents.RadioReceived` here (the **Scene boot**'s tick builds it)
 
 ### Rfm69RadioTransport
 The live CircuitPython `RadioTransport` adapter wrapping `adafruit_rfm69.RFM69` — the only module importing that library.
@@ -469,7 +477,7 @@ The board-free single owner of a device's whole IR subsystem, exposed as `Device
 _Avoid_: importing `NetworkEvents`/game-event vocabulary here (the event is built in the **Scene boot**'s tick); building its transmitters, receiver or gate anywhere else; a value-returning `update()`; calling it a hardware "driver"; exposing the transmitter map as a public collection
 
 ### Wire-frame codec
-An encoder/decoder pair mapping an opaque payload ↔ IR pulse durations, injected into the IR transport; two coexist — the **Aura wire-frame** and the **Tag protocol** — selected by the scene a device boots; an **Overlay** runs on the codec of the scene it covers. Travels as a class pair, so each receiver reader gets its own fresh decoder. A built device's codec is mutable once, at boot, via `InfraredTransceiver.apply_codec`, which hands the installed pair back read-only.
+An encoder/decoder pair mapping an opaque payload ↔ IR pulse durations, injected into the IR transport; two coexist — the **Aura wire-frame** and the **Tag protocol** — selected by the scene a device boots; an **Overlay** runs on the codec of the scene it covers. Travels as a class pair, so each receiver reader gets its own fresh decoder. A built device's codec is applied once, at boot, via `InfraredTransceiver.apply_codec`; `InfraredTransceiver.codec` reads the installed pair back.
 _Avoid_: assuming a single global wire-frame; treating wire-frames as interchangeable across scenes; passing codec instances (one decoder must never be shared between readers)
 
 ### Aura wire-frame
