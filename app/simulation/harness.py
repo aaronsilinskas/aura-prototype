@@ -42,6 +42,7 @@ from hardware.shared.device_config import (
     parse_device_config,
     read_device_config_mapping,
 )
+from hardware.shared.scene_selection import with_scene_deploy
 from hardware.simulated.device import (
     DEFAULT_SWAY_STRENGTH,
     Buzzed,
@@ -446,8 +447,7 @@ class SimulatedDevice:
         once, card-less or not, into *scene*: the new token clears the
         Persisted scene its card held.
         """
-        self._boot_values["default_scene"] = scene
-        self._boot_values["scene_deploy_token"] = secrets.token_hex(8)
+        self._boot_values = with_scene_deploy(self._boot_values, scene, secrets.token_hex(8))
         self.reset()
 
     def reset(self) -> None:
