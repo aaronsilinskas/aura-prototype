@@ -7,16 +7,20 @@ import os
 import pytest
 
 from effects.effect import EffectConfig
+from engine.effects.admin import SceneView
 from engine.effects.builder import EffectBuilder
 from engine.effects.manager import EffectManager
-from engine.engine import GameEngine, GameRule
+from engine.engine import GameRule
+from engine.events import Event, EventGroup
 from engine.namespace import ActiveSceneNamespace
 from engine.pack_catalog import PackCatalog, scan_pack_roots
-from engine.scene import PackReference, Scene, SceneManager, SceneRegistry
-from engine.state import SceneReboot, Scope
+from engine.scene import PackReference, Scene, SceneRegistry
+from engine.scene_runtime import SceneRuntime
+from engine.settings import Settings
+from engine.state import Scope
 from engine.tests.effects.helpers import SpyEffectOutput
+from engine.tests.helpers import RecordingSceneReboot, SpyNetworkControls
 from engine.version import Version
-from packs.rules.debug.event_logger import EventLoggerRule
 
 _PACKS_ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
 
@@ -264,15 +268,16 @@ def test_hardware_test_scene_json_does_not_list_debug_rule_pack(catalog: PackCat
 
 
 def _namespace_with_active(catalog: PackCatalog, scene_name: str) -> ActiveSceneNamespace:
-    """The Active scene namespace with *scene_name* installed, as the game installs it."""
-    scene = catalog.scene_registry.get(scene_name)
-    namespace = ActiveSceneNamespace(catalog.effect_registry, catalog.pack_sounds)
-    namespace.install(
-        scene.local_effect_registry,
-        scene.local_sound_map,
-        frozenset(pack.name for pack in scene.effect_packs),
+    """The Active scene namespace with *scene_name* booted, on a device able to run it."""
+    runtime = SceneRuntime(
+        catalog,
+        [],
+        SpyNetworkControls(),
+        catalog.scene_registry.required_capabilities(scene_name),
+        RecordingSceneReboot(),
     )
-    return namespace
+    runtime.activate_boot_scene(scene_name)
+    return runtime.namespace
 
 
 def _resolve_every_local_clip(catalog: PackCatalog, scene_name: str) -> list[str]:
@@ -324,8 +329,17 @@ def test_a_device_with_no_audio_output_still_resolves_the_clip_of_an_effect_it_s
     The device's one output is a pixel strip; the effect's START still carries the resolved clip.
     """
     strip = SpyEffectOutput(min_resolution=8, scopes=[Scope.PERSONAL])
+    scene = catalog.scene_registry.get("hardware_test")
     effect_manager = EffectManager(
-        namespace=_namespace_with_active(catalog, "hardware_test"), outputs=[strip]
+        namespace=ActiveSceneNamespace(catalog.effect_registry, catalog.pack_sounds),
+        outputs=[strip],
+    )
+    effect_manager.enter_boot_scene(
+        SceneView(
+            scene.local_effect_registry,
+            scene.local_sound_map,
+            frozenset(pack.name for pack in scene.effect_packs),
+        )
     )
 
     effect_manager.set_effect(Scope.PERSONAL, "scene.sfx_test", {})
@@ -421,45 +435,54 @@ def test_red_light_green_light_scene_every_audio_playing_effects_clip_name_resol
     assert len(resolved_clip_names) == 7
 
 
-# --- SceneManager integration ---
+# --- A scene running the debug rule pack ---
 
 
-@pytest.fixture
-def loaded_debug_engine(catalog: PackCatalog):
-    rule_registry = catalog.rule_registry
-    namespace = ActiveSceneNamespace(catalog.effect_registry, catalog.pack_sounds)
-    effect_manager = EffectManager(namespace=namespace, outputs=[])
-    engine = GameEngine(effect_manager)
+def _debug_runtime(catalog: PackCatalog, settings: Settings | None = None) -> SceneRuntime:
+    """A SceneRuntime over the real packs whose booted scene runs only the ``debug`` rule pack."""
     scene_registry = SceneRegistry()
     scene_registry.register(
-        "test_scene",
-        lambda: Scene(effect_packs=[], rule_packs=[PackReference("debug", Version(1, 0))]),
+        "debug_scene",
+        lambda: Scene(
+            effect_packs=[],
+            rule_packs=[PackReference("debug", Version(1, 0))],
+            settings=settings,
+        ),
     )
-    manager = SceneManager(
-        engine,
-        rule_registry,
-        scene_registry,
-        effect_admin=effect_manager,
-        scene_reboot=SceneReboot(),
+    debug_catalog = PackCatalog(
+        catalog.effect_registry, catalog.rule_registry, scene_registry, catalog.pack_sounds
     )
-    manager.activate_boot_scene("test_scene")
-    return engine, rule_registry
+    runtime = SceneRuntime(
+        debug_catalog, [], SpyNetworkControls(), frozenset(), RecordingSceneReboot()
+    )
+    runtime.activate_boot_scene("debug_scene")
+    return runtime
 
 
-def test_boot_scene_wires_event_logger_rule_from_pack(
-    loaded_debug_engine,
+def test_a_booted_scene_runs_the_event_logger_from_the_debug_pack(
+    catalog: PackCatalog, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    engine, _ = loaded_debug_engine
+    runtime = _debug_runtime(catalog, Settings({"debug": {"event_logging_enabled": True}}))
 
-    assert any(isinstance(r, EventLoggerRule) for r in engine.rules)
+    runtime.queue_event(Event(EventGroup("probe"), "ping"))
+    runtime.update()
+
+    assert "PROBE:PING" in capsys.readouterr().out
 
 
-def test_boot_scene_activates_all_rules_from_pack(
-    loaded_debug_engine,
+def test_a_booted_scene_runs_every_rule_of_its_rule_pack(
+    catalog: PackCatalog, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    engine, rule_registry = loaded_debug_engine
+    rule_registry = catalog.rule_registry
+    heard: list[str] = []
+    for item in rule_registry.items("debug"):
+        rule = rule_registry.get("debug", item, GameRule)
+        monkeypatch.setattr(
+            rule, "handle_event", lambda event, state, item=item: heard.append(item)
+        )
+    runtime = _debug_runtime(catalog)
 
-    expected_count = len(rule_registry.items("debug"))
+    runtime.queue_event(Event(EventGroup("probe"), "ping"))
+    runtime.update()
 
-    assert all(isinstance(r, GameRule) for r in engine.rules)
-    assert len(engine.rules) == expected_count
+    assert sorted(heard) == sorted(rule_registry.items("debug")) == ["event_logger", "fps_logger"]
