@@ -42,7 +42,7 @@ from engine.version import Version
 
 try:
     from collections.abc import Callable, Sequence
-    from typing import TypeAlias
+    from typing import Any, TypeAlias
 except ImportError:
     pass  # Not available on CircuitPython
 
@@ -191,63 +191,27 @@ class SettingOverrideError(SceneDeclarationError):
 
 
 class _SceneScan:
-    """What the scan reads for one scene before it can build the ``Scene``.
+    """What the scan holds for one scene until it can build the ``Scene``.
 
-    Holds the scan-only data, the scene's folder and raw Setting
-    declarations, beside the parsed ``scene.json`` fields; ``to_scene``
-    builds the record once Settings are resolved and Required capabilities
-    merged. Never reaches the registry.
+    ``fields`` are the ``Scene`` keyword arguments read from ``scene.json``
+    and the scene folder; the scan adds Settings and Required capabilities
+    once Rule packs are known. ``source_path``, ``declarations`` and
+    ``requires`` are scan-only and never reach the record.
     """
 
-    __slots__ = (
-        "declarations",
-        "effect_packs",
-        "ir_codec",
-        "local_effect_registry",
-        "local_rule_registry",
-        "local_sound_map",
-        "requires",
-        "rule_packs",
-        "source_path",
-        "version",
-    )
+    __slots__ = ("declarations", "fields", "requires", "source_path")
 
     def __init__(
         self,
-        version: Version,
-        effect_packs: Sequence[PackReference],
-        rule_packs: Sequence[PackReference],
+        fields: dict[str, Any],
         source_path: str,
-        ir_codec: str,
-        local_rule_registry: SceneLocalRegistry,
-        local_effect_registry: SceneLocalRegistry,
-        local_sound_map: dict[str, str],
         declarations: dict[str, SettingDeclaration],
         requires: frozenset[str],
     ) -> None:
-        self.version = version
-        self.effect_packs = effect_packs
-        self.rule_packs = rule_packs
+        self.fields = fields
         self.source_path = source_path
-        self.ir_codec = ir_codec
-        self.local_rule_registry = local_rule_registry
-        self.local_effect_registry = local_effect_registry
-        self.local_sound_map = local_sound_map
         self.declarations = declarations
         self.requires = requires
-
-    def to_scene(self, settings: Settings, required_capabilities: frozenset[str]) -> Scene:
-        return Scene(
-            effect_packs=self.effect_packs,
-            rule_packs=self.rule_packs,
-            version=self.version,
-            ir_codec=self.ir_codec,
-            local_rule_registry=self.local_rule_registry,
-            local_effect_registry=self.local_effect_registry,
-            local_sound_map=self.local_sound_map,
-            settings=settings,
-            required_capabilities=required_capabilities,
-        )
 
 
 class PackCatalog:
@@ -360,9 +324,10 @@ def _build_scenes(
     rule_declarations = {entry.name: entry.declarations for entry in rule_packs}
     pack_requires = {entry.name: entry.requires for entry in rule_packs}
     return {
-        scene: entry.to_scene(
-            _resolve_settings(scene, entry, rule_declarations, setting_overrides),
-            _combine_required_capabilities(entry, pack_requires),
+        scene: Scene(
+            **entry.fields,
+            settings=_resolve_settings(scene, entry, rule_declarations, setting_overrides),
+            required_capabilities=_combine_required_capabilities(entry, pack_requires),
         )
         for scene, entry in scenes.items()
     }
@@ -378,7 +343,7 @@ def _resolve_settings(
     values = {
         SCENE_NAMESPACE: _resolve_namespace(scene, SCENE_NAMESPACE, entry.declarations, [own])
     }
-    values.update(_resolve_rule_packs(scene, entry.rule_packs, rule_declarations, rules))
+    values.update(_resolve_rule_packs(scene, entry.fields["rule_packs"], rule_declarations, rules))
     return Settings(values)
 
 
@@ -444,8 +409,8 @@ def _check_declarations(
     installed_effects = {entry.name: entry.version for entry in effect_packs}
     installed_rules = {entry.name: entry.version for entry in rule_packs}
     for scene, entry in scenes.items():
-        _check_kind(scene, "effect", entry.effect_packs, installed_effects)
-        _check_kind(scene, "rule", entry.rule_packs, installed_rules)
+        _check_kind(scene, "effect", entry.fields["effect_packs"], installed_effects)
+        _check_kind(scene, "rule", entry.fields["rule_packs"], installed_rules)
 
 
 def _check_kind(
@@ -466,7 +431,7 @@ def _combine_required_capabilities(
     entry: _SceneScan, pack_requires: dict[str, frozenset[str]]
 ) -> frozenset[str]:
     required = set(entry.requires)
-    for reference in entry.rule_packs:
+    for reference in entry.fields["rule_packs"]:
         required.update(pack_requires[reference.name])
     return frozenset(required)
 
@@ -565,14 +530,16 @@ def _scan_scenes(
         data = _read_scene_json(name, scene_json)
         scene_prefix = root_name + ".scenes." + name
         scenes[name] = _SceneScan(
-            version=_parse_version(data["version"], scene_json),
-            effect_packs=_read_pack_references(name, scene_json, data, "effect_packs"),
-            rule_packs=_read_pack_references(name, scene_json, data, "rule_packs"),
+            fields={
+                "version": _parse_version(data["version"], scene_json),
+                "effect_packs": _read_pack_references(name, scene_json, data, "effect_packs"),
+                "rule_packs": _read_pack_references(name, scene_json, data, "rule_packs"),
+                "ir_codec": _read_ir_codec(name, scene_json, data),
+                "local_rule_registry": _scan_local_items(scene_dir, scene_prefix, "rules"),
+                "local_effect_registry": _scan_local_items(scene_dir, scene_prefix, "effects"),
+                "local_sound_map": _scan_sounds(_path.join(scene_dir, "sounds")),
+            },
             source_path=scene_dir,
-            ir_codec=_read_ir_codec(name, scene_json, data),
-            local_rule_registry=_scan_local_items(scene_dir, scene_prefix, "rules"),
-            local_effect_registry=_scan_local_items(scene_dir, scene_prefix, "effects"),
-            local_sound_map=_scan_sounds(_path.join(scene_dir, "sounds")),
             declarations=_read_scene_declarations(name, scene_json, data),
             requires=_read_scene_requires(name, scene_json, data),
         )
