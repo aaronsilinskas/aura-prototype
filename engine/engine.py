@@ -49,12 +49,16 @@ class GameEngine:
     """Drives the game loop by dispatching queued events to registered rules.
 
     Update model:
-      - Call ``update(state)`` once per frame, passing the active ``GameState``.
+      - Advance the timer, then call ``update(state)`` once per frame, passing the
+        active ``GameState``.
       - All queued events are dispatched to all rules in registration order.
       - Rules may queue additional events during dispatch.
 
-    An optional ``timer`` argument may be injected at construction time for
-    test-time clock control; production code uses the default ``Timer()``.
+    ``update`` reads ``timer`` but never advances it: whoever drives the tick
+    calls ``timer.update()`` first
+    (:meth:`~engine.scene_runtime.SceneRuntime.advance_clock` on device).
+    Omitted, the engine gets a ``Timer`` nobody advances, so game time stays
+    at zero.
 
     Use ``create_state(scene_controls, settings)`` to create a ``GameState``
     pre-wired with this engine's effect controls, the given scene controls and
@@ -111,8 +115,7 @@ class GameEngine:
         )
 
     def update(self, state: GameState) -> None:
-        """Advance the timer, update state time, and dispatch all queued events."""
-        self._timer.update()
+        """Add the timer's elapsed time to *state*'s time, then dispatch all queued events."""
         state._advance_time(self._timer.elapsed)
         i = 0
         while i < state.event_count:

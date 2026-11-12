@@ -756,62 +756,68 @@ class _SteppingTimer(Timer):
         self.total += _STEP
 
 
-def _covered_scene_manager(rule_registry: PackRegistry | None = None, rule_packs=()):
-    """A SceneManager on a ``_SteppingTimer`` with ``base`` (running *rule_packs*) and ``pause``."""
-    engine = GameEngine(effect_controls=_RecordingEffectControls(), timer=_SteppingTimer())
+def _covered_scene_manager(
+    rule_registry: PackRegistry | None = None, rule_packs=()
+) -> tuple[SceneManager, Timer]:
+    """A SceneManager with ``base`` (running *rule_packs*) and ``pause``, and its clock."""
+    clock = _SteppingTimer()
+    engine = GameEngine(effect_controls=_RecordingEffectControls(), timer=clock)
     scene_reg = make_scene_registry(
         ("base", make_scene(rule_packs=list(rule_packs))),
         ("pause", make_scene()),
     )
-    return _make_scene_manager(engine, rule_registry=rule_registry, scene_registry=scene_reg)
+    manager = _make_scene_manager(engine, rule_registry=rule_registry, scene_registry=scene_reg)
+    return manager, clock
 
 
-def _tick(manager: SceneManager, ticks: int) -> None:
+def _tick(manager: SceneManager, clock: Timer, ticks: int) -> None:
+    """Run *ticks* ticks as the scene tick does: advance *clock*, then update *manager*."""
     for _ in range(ticks):
+        clock.update()
         manager.update()
 
 
 def test_a_covered_scenes_game_time_stops_while_covered() -> None:
-    manager = _covered_scene_manager()
+    manager, clock = _covered_scene_manager()
     manager.activate_boot_scene("base")
-    base_state = manager.active_state
-    _tick(manager, 4)
+    base_state = active_state(manager)
+    _tick(manager, clock, 4)
 
     manager.overlay("pause")
-    _tick(manager, 1)  # base's last tick; the overlay arrives at its end
+    _tick(manager, clock, 1)  # base's last tick; the overlay arrives at its end
     covered_at = base_state.total
-    _tick(manager, 10)
+    _tick(manager, clock, 10)
 
     assert base_state.total == covered_at == 5 * _STEP
 
 
 def test_after_pop_a_covered_scenes_game_time_continues_from_where_it_stopped() -> None:
-    manager = _covered_scene_manager()
+    manager, clock = _covered_scene_manager()
     manager.activate_boot_scene("base")
-    base_state = manager.active_state
-    _tick(manager, 4)
+    base_state = active_state(manager)
+    _tick(manager, clock, 4)
     manager.overlay("pause")
-    _tick(manager, 1)
-    _tick(manager, 10)
+    _tick(manager, clock, 1)
+    _tick(manager, clock, 10)
 
     manager.pop()
-    _tick(manager, 1)  # the overlay's last tick; the pop applies at its end
-    _tick(manager, 3)
+    _tick(manager, clock, 1)  # the overlay's last tick; the pop applies at its end
+    _tick(manager, clock, 3)
 
     assert base_state.total == (5 + 3) * _STEP
 
 
 def test_a_covered_scenes_first_tick_after_pop_has_an_ordinary_elapsed() -> None:
-    manager = _covered_scene_manager()
+    manager, clock = _covered_scene_manager()
     manager.activate_boot_scene("base")
-    base_state = manager.active_state
+    base_state = active_state(manager)
     manager.overlay("pause")
-    _tick(manager, 1)
-    _tick(manager, 10)
+    _tick(manager, clock, 1)
+    _tick(manager, clock, 10)
     manager.pop()
-    _tick(manager, 1)
+    _tick(manager, clock, 1)
 
-    _tick(manager, 1)
+    _tick(manager, clock, 1)
 
     assert base_state.elapsed == _STEP
 
@@ -841,33 +847,33 @@ def test_a_phases_elapsed_time_excludes_the_time_its_scene_spent_covered(pack_tr
     rule_registry = pack_tree.scan(
         rule_packs={"timed": {"rule": _PHASE_ELAPSED_RULE}}
     ).rule_registry
-    manager = _covered_scene_manager(rule_registry, rule_packs=[_ref("timed")])
+    manager, clock = _covered_scene_manager(rule_registry, rule_packs=[_ref("timed")])
     manager.activate_boot_scene("base")
-    base_state = manager.active_state
-    _tick(manager, 4)
+    base_state = active_state(manager)
+    _tick(manager, clock, 4)
     manager.overlay("pause")
-    _tick(manager, 1)
-    _tick(manager, 10)
+    _tick(manager, clock, 1)
+    _tick(manager, clock, 10)
     manager.pop()
-    _tick(manager, 1)
-    _tick(manager, 2)
+    _tick(manager, clock, 1)
+    _tick(manager, clock, 2)
 
     base_state.queue_event(Event(_GROUP, "tick"))
-    _tick(manager, 1)
+    _tick(manager, clock, 1)
 
     assert base_state.get("phase_elapsed", -1.0) == (5 + 3) * _STEP
 
 
 def test_an_overlays_game_time_starts_when_the_overlay_arrives() -> None:
-    manager = _covered_scene_manager()
+    manager, clock = _covered_scene_manager()
     manager.activate_boot_scene("base")
-    _tick(manager, 4)
+    _tick(manager, clock, 4)
     manager.overlay("pause")
-    _tick(manager, 1)
+    _tick(manager, clock, 1)
 
-    _tick(manager, 3)
+    _tick(manager, clock, 3)
 
-    assert manager.active_state.total == 3 * _STEP
+    assert active_state(manager).total == 3 * _STEP
 
 
 # ---------------------------------------------------------------------------
@@ -1153,19 +1159,23 @@ class _MergeStrategyRig:
     def act(self, action):
         """Run *action* on the top scene's ``EffectControls`` in one tick; return its result."""
         event = _Act(action)
+        self.runtime.advance_clock()
         self.runtime.queue_event(event)
         self.runtime.update()
         return event.result
 
     def overlay(self, name: str) -> None:
         self.runtime.scene_controls.overlay(name)
+        self.runtime.advance_clock()
         self.runtime.update()
 
     def pop(self) -> None:
         self.runtime.scene_controls.pop()
+        self.runtime.advance_clock()
         self.runtime.update()
 
     def tick(self) -> None:
+        self.runtime.advance_clock()
         self.runtime.update()
 
     def drawn(self) -> list:

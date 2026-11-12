@@ -35,12 +35,9 @@ class SceneRuntime:
 
         runtime.activate_boot_scene(name)
         while True:
+            runtime.advance_clock()     # first, so the whole tick reads its time
             runtime.queue_event(event)  # zero or more per tick
             runtime.update()
-
-    Timing: the clock advances inside ``update`` only while a scene is
-    active, so ``elapsed`` and ``total`` read before an ``update`` are the
-    previous tick's (#1263).
     """
 
     __slots__ = ("_clock", "_effect_manager", "_namespace", "_scene_manager")
@@ -96,6 +93,14 @@ class SceneRuntime:
         if state is not None:
             state.queue_event(event)
 
+    def advance_clock(self) -> None:
+        """Advance the clock to this tick, whether or not a scene is active.
+
+        Call it once per tick, before anything reads ``elapsed`` or ``total``,
+        so everything the tick drives sees the same, current time.
+        """
+        self._clock.update()
+
     def update(self) -> None:
         """Run one tick: dispatch queued events, apply a pending Overlay or pop, update effects."""
         self._scene_manager.update()
@@ -103,12 +108,12 @@ class SceneRuntime:
 
     @property
     def elapsed(self) -> float:
-        """The clock's elapsed time as of the last ``update`` that advanced it."""
+        """The clock's elapsed time for the tick, as of the last :meth:`advance_clock`."""
         return self._clock.elapsed
 
     @property
     def total(self) -> float:
-        """The clock's running total of elapsed time, as of the last ``update`` that advanced it."""
+        """The clock's running total of elapsed time, as of the last :meth:`advance_clock`."""
         return self._clock.total
 
     @property

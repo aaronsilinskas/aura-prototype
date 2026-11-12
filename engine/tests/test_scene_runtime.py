@@ -280,27 +280,37 @@ def test_elapsed_follows_the_clock_given_at_construction(pack_tree) -> None:
     runtime = _runtime(_catalog(pack_tree), clock=_StepClock(0.25))
     runtime.activate_boot_scene("base")
 
-    runtime.update()
+    runtime.advance_clock()
 
     assert runtime.elapsed == 0.25
 
 
-def test_total_accumulates_the_clocks_elapsed_time_across_updates(pack_tree) -> None:
+def test_total_accumulates_the_clocks_elapsed_time_across_ticks(pack_tree) -> None:
     runtime = _runtime(_catalog(pack_tree), clock=_StepClock(0.25))
     runtime.activate_boot_scene("base")
 
-    runtime.update()
-    runtime.update()
+    runtime.advance_clock()
+    runtime.advance_clock()
 
     assert runtime.total == 0.5
 
 
-def test_the_clock_does_not_advance_while_no_scene_is_active(pack_tree) -> None:
+def test_the_clock_advances_while_no_scene_is_active(pack_tree) -> None:
     runtime = _runtime(_catalog(pack_tree), clock=_StepClock(0.25))
+
+    runtime.advance_clock()
+
+    assert (runtime.elapsed, runtime.total) == (0.25, 0.25)
+
+
+def test_update_leaves_the_clock_where_advance_clock_put_it(pack_tree) -> None:
+    runtime = _runtime(_catalog(pack_tree), clock=_StepClock(0.25))
+    runtime.activate_boot_scene("base")
+    runtime.advance_clock()
 
     runtime.update()
 
-    assert runtime.elapsed == 0.0
+    assert runtime.total == 0.25
 
 
 def test_a_scenes_rules_see_the_elapsed_time_the_runtime_reports(pack_tree) -> None:
@@ -310,10 +320,11 @@ def test_a_scenes_rules_see_the_elapsed_time_the_runtime_reports(pack_tree) -> N
     runtime = _runtime(catalog, clock=_StepClock(0.25))
     runtime.activate_boot_scene("base")
 
+    runtime.advance_clock()
     runtime.queue_event(_PAINT)
     runtime.update()
 
-    assert seen == [0.25]
+    assert seen == [runtime.elapsed] == [0.25]
 
 
 # ---------------------------------------------------------------------------
@@ -405,6 +416,7 @@ def test_steady_state_updates_accumulate_no_engine_memory(pack_tree) -> None:
     runtime.update()
     tick = _Tick(_GROUP, "tick")  # heard by no handler, as most ticks' events are
     for _ in range(3):  # let every buffer and queue slot reach its steady size
+        runtime.advance_clock()
         runtime.queue_event(tick)
         runtime.update()
 
@@ -417,10 +429,12 @@ def test_steady_state_updates_accumulate_no_engine_memory(pack_tree) -> None:
         # Traced from here, a list the effect system clears and refills each
         # tick holds one live block; only what accumulates tick on tick counts.
         for _ in range(10):
+            runtime.advance_clock()
             runtime.queue_event(tick)
             runtime.update()
         before = tracemalloc.take_snapshot().filter_traces(engine_files)
         for _ in range(100):
+            runtime.advance_clock()
             runtime.queue_event(tick)
             runtime.update()
         after = tracemalloc.take_snapshot().filter_traces(engine_files)

@@ -132,6 +132,16 @@ class _SteppingTimer(Timer):
         self.total += self._step
 
 
+def test_update_does_not_advance_the_engines_timer() -> None:
+    timer = _SteppingTimer(0.25)
+    engine = GameEngine(effect_controls=_make_effect_controls(), timer=timer)
+    state = engine.create_state(_make_scene_controls())
+
+    engine.update(state)
+
+    assert (timer.elapsed, timer.total) == (0.0, 0.0)
+
+
 def test_elapsed_is_read_only() -> None:
     state = _make_state()
 
@@ -147,19 +157,23 @@ def test_total_is_read_only() -> None:
 
 
 def test_state_elapsed_is_the_engine_timers_elapsed_for_the_tick() -> None:
-    engine = GameEngine(effect_controls=_make_effect_controls(), timer=_SteppingTimer(0.25))
+    timer = _SteppingTimer(0.25)
+    engine = GameEngine(effect_controls=_make_effect_controls(), timer=timer)
     state = engine.create_state(_make_scene_controls())
 
+    timer.update()
     engine.update(state)
 
     assert state.elapsed == 0.25
 
 
 def test_state_total_sums_the_elapsed_of_every_tick_the_state_received() -> None:
-    engine = GameEngine(effect_controls=_make_effect_controls(), timer=_SteppingTimer(0.25))
+    timer = _SteppingTimer(0.25)
+    engine = GameEngine(effect_controls=_make_effect_controls(), timer=timer)
     state = engine.create_state(_make_scene_controls())
 
     for _ in range(3):
+        timer.update()
         engine.update(state)
 
     assert state.total == 0.75
@@ -171,19 +185,24 @@ def test_a_state_given_every_tick_keeps_the_same_total_as_the_engines_timer() ->
     state = engine.create_state(_make_scene_controls())
 
     for _ in range(100):
+        timer.update()
         engine.update(state)
 
     assert state.total == timer.total
 
 
 def test_a_states_total_does_not_count_ticks_given_to_another_state() -> None:
-    engine = GameEngine(effect_controls=_make_effect_controls(), timer=_SteppingTimer(0.25))
+    timer = _SteppingTimer(0.25)
+    engine = GameEngine(effect_controls=_make_effect_controls(), timer=timer)
     state = engine.create_state(_make_scene_controls())
     other = engine.create_state(_make_scene_controls())
+    timer.update()
     engine.update(state)
 
     for _ in range(4):
+        timer.update()
         engine.update(other)
+    timer.update()
     engine.update(state)
 
     assert state.total == 0.5
@@ -191,13 +210,16 @@ def test_a_states_total_does_not_count_ticks_given_to_another_state() -> None:
 
 
 def test_rules_see_the_states_elapsed_and_total_time() -> None:
-    engine = GameEngine(effect_controls=_make_effect_controls(), timer=_SteppingTimer(0.25))
+    timer = _SteppingTimer(0.25)
+    engine = GameEngine(effect_controls=_make_effect_controls(), timer=timer)
     state = engine.create_state(_make_scene_controls())
     rule = _TimeCaptureRule()
     engine.add_rules(rule)
+    timer.update()
     engine.update(state)
     state.queue_event(Event(_GROUP, "tick"))
 
+    timer.update()
     engine.update(state)
 
     assert rule.seen_elapsed == [0.25]

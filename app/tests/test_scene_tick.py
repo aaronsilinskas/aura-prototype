@@ -6,6 +6,7 @@ from engine.input import AccelerationData, ButtonData, InputEvents, MagneticData
 from engine.log import Logger
 from engine.network import NetworkEvents
 from engine.tests.helpers import FrozenTimer, SpyNetworkControls
+from engine.timer import Timer
 from hardware.shared.debounced_buttons import DebouncedButtons
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.polled_part import PolledPart
@@ -192,3 +193,44 @@ def test_no_telemetry_prints_when_the_ir_reports_no_change(probe, capsys):
     tick()
 
     assert capsys.readouterr().out == ""
+
+
+class _ScriptedClock(Timer):
+    """A clock whose successive updates last the scripted *steps*, one per update."""
+
+    def __init__(self, *steps: float) -> None:
+        super().__init__()
+        self._steps = list(steps)
+
+    def update(self) -> None:
+        self.elapsed = self._steps.pop(0)
+        self.total += self.elapsed
+
+
+class _ElapsedRecordingPart(PolledPart):
+    """A Polled part that records the elapsed time of every update it is given."""
+
+    def __init__(self) -> None:
+        self.seen: list[float] = []
+
+    def update(self, elapsed: float) -> None:
+        self.seen.append(elapsed)
+
+
+def test_a_polled_part_is_updated_with_the_elapsed_time_of_the_current_tick(probe):
+    part = _ElapsedRecordingPart()
+    tick = probe.boot(_hw(probe, other_polled=(part,)), timer=_ScriptedClock(0.5, 0.25)).tick
+
+    tick()
+    tick()
+
+    assert part.seen == [0.5, 0.25]
+
+
+def test_the_rules_see_the_same_elapsed_time_the_polled_parts_got_that_tick(probe):
+    part = _ElapsedRecordingPart()
+    tick = probe.boot(_hw(probe, other_polled=(part,)), timer=_ScriptedClock(0.5)).tick
+
+    tick()
+
+    assert probe.state().elapsed == part.seen[-1] == 0.5
