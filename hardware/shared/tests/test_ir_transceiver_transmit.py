@@ -39,7 +39,7 @@ def _build(
     reader = ReplayingPulseReader()
     factory = EmitterWriterFactory(blocking=blocking, echo_to=[reader] if echo else None)
     pins = {emitter: emitter for emitter in emitters or (LINE,)}
-    transceiver = InfraredTransceiver.build([reader], pins, factory)
+    transceiver = InfraredTransceiver([reader], pins, factory)
     return transceiver, factory.writers, reader
 
 
@@ -158,7 +158,7 @@ def test_a_queued_payload_failing_to_encode_raises_from_update_and_the_rest_stil
 
 def test_update_starts_queued_sends_on_every_emitter_even_with_no_receiver() -> None:
     factory = EmitterWriterFactory(blocking=False)
-    transceiver = InfraredTransceiver.build([], {LINE: "GP1", CONE: "GP2"}, factory)
+    transceiver = InfraredTransceiver([], {LINE: "GP1", CONE: "GP2"}, factory)
     for emitter in (LINE, CONE):
         transceiver.send(b"\x01", emitter)
         transceiver.send(b"\x02", emitter)
@@ -260,7 +260,7 @@ def test_a_writer_failing_mid_send_raises_and_does_not_leave_reception_blocked()
             return False
 
     reader = ReplayingPulseReader()
-    transceiver = InfraredTransceiver.build(
+    transceiver = InfraredTransceiver(
         [reader], {LINE: "GP1"}, lambda emitter, pin: (_FailingWriter(), "fake")
     )
 

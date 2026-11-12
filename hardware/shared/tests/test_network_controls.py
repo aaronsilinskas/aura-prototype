@@ -10,17 +10,17 @@ from hardware.shared.ir_codecs.aura import AuraInfraredEncoder
 from hardware.shared.ir_transceiver import InfraredTransceiver
 from hardware.shared.network_controls import HardwareNetworkControls
 from hardware.shared.radio_transceiver import RadioTransceiver
-from hardware.shared.tests.ir_fakes import RecordingPulseWriter
+from hardware.shared.tests.ir_fakes import EmitterPulseWriter
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 
-def _transceiver_wiring(emitter: str) -> tuple[InfraredTransceiver, RecordingPulseWriter]:
+def _transceiver_wiring(emitter: str) -> tuple[InfraredTransceiver, EmitterPulseWriter]:
     """A receiver-less transceiver with only *emitter* wired, and that emitter's writer."""
-    writer = RecordingPulseWriter()
-    transceiver = InfraredTransceiver.build([], {emitter: "GP1"}, lambda _e, _pin: (writer, "fake"))
+    writer = EmitterPulseWriter()
+    transceiver = InfraredTransceiver([], {emitter: "GP1"}, lambda _e, _pin: (writer, "fake"))
     return transceiver, writer
 
 

@@ -72,11 +72,10 @@ class InfraredDecoder:
             Defaults to 0, as above.
     """
 
-    # The IR receive-path telemetry counters this class owns — the read
-    # source ``InfraredReceiver.telemetry()`` sums across every decoder
-    # and the reset source ``reset_telemetry()`` zeroes on every decoder. An
-    # explicit tuple, not derived from ``__slots__``, which also carries this
-    # class's seven private decode-state slots.
+    # The IR receive-path telemetry counters this class owns, which the IR
+    # receiver's ``telemetry()`` sums across every decoder. An explicit tuple,
+    # not derived from ``__slots__``, which also carries this class's seven
+    # private decode-state slots.
     OWNED_TELEMETRY_FIELDS = (
         "packets_started",
         "packets_completed",
@@ -165,22 +164,10 @@ class InfraredDecoder:
         error_ratio = self._last_error_margin / self._error_threshold
         return min(1.0, 1.3 - error_ratio)
 
-    def reset_telemetry(self) -> None:
-        """Zero the shared telemetry counters.
-
-        The base implementation serves every decoder, including
-        ``TagInfraredDecoder``: they all increment these same base-declared
-        counters, so none needs to override this."""
-        self.packets_started = 0
-        self.packets_completed = 0
-        self.preamble_reject = 0
-        self.mark_reject = 0
-        self.space_reject = 0
-
     def reset(self, error_margin: int | None = None) -> None:
         """Return the decoder to idle, discarding any in-progress decode.
 
-        Decode state only — telemetry is untouched (see :meth:`reset_telemetry`).
+        Decode state only — telemetry counters are untouched.
         """
         self._decoder_state = 0
         self._received_data = bytearray()  # MicroPython does not support clear() on bytearray

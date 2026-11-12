@@ -1,6 +1,6 @@
 """Receive-side IR behaviour, driven through InfraredTransceiver with fake pulse readers.
 
-Every transceiver here is built by :meth:`InfraredTransceiver.build`; tests
+Every transceiver here is built from fake pulse readers and writers; tests
 feed pulses to fake readers, call ``update`` (and ``send`` / ``apply_codec``
 where emission or a codec swap matters) and assert on what a caller reads
 back: ``received``, the signal values, the best receiver, the telemetry line
@@ -21,77 +21,35 @@ from hardware.shared.ir_codecs.tag import (
 )
 from hardware.shared.ir_telemetry import IrTelemetrySnapshot
 from hardware.shared.ir_transceiver import InfraredTransceiver
-from hardware.shared.ir_transport import PulseReader, PulseWriter
+from hardware.shared.tests.ir_fakes import (
+    EmitterPulseWriter,
+    EmitterWriterFactory,
+    ReplayingPulseReader,
+)
 
 # ---------------------------------------------------------------------------
-# Fakes and helpers
+# Helpers
 # ---------------------------------------------------------------------------
 
 
-class FakePulseReader(PulseReader):
-    """Replaying fake — drains a queue of pre-loaded pulses one at a time."""
-
-    def __init__(self) -> None:
-        self._queue: list[int] = []
-
-    def load(self, pulses) -> None:
-        """Replace the pending pulse queue."""
-        self._queue = list(pulses)
-
-    def read_pulse(self) -> int | None:
-        if self._queue:
-            return self._queue.pop(0)
-        return None
-
-
-class _FakePulseWriter(PulseWriter):
-    """A writer that, when *holds*, stays busy after a write until :meth:`finish`.
-
-    A holding writer keeps the device emitting across ticks, like a
-    DMA-backed writer mid-frame; a non-holding one finishes inline, like the
-    blocking ``PulseOutWriter``.
-    """
-
-    def __init__(self, holds: bool) -> None:
-        self._holds = holds
-        self._busy = False
-
-    def write_pulses(self, durations) -> None:
-        self._busy = self._holds
-
-    def is_busy(self) -> bool:
-        return self._busy
-
-    def finish(self) -> None:
-        self._busy = False
-
-
-class _WriterFactory:
-    """Builds a :class:`_FakePulseWriter` per emitter and keeps it by emitter key."""
-
-    def __init__(self, holds: bool) -> None:
-        self._holds = holds
-        self.writers: dict[str, _FakePulseWriter] = {}
-
-    def __call__(self, emitter: str, pin: object) -> tuple[PulseWriter, str]:
-        writer = _FakePulseWriter(self._holds)
-        self.writers[emitter] = writer
-        return writer, "fake"
-
-
-def _receiving(reader_count: int) -> tuple[InfraredTransceiver, list[FakePulseReader]]:
+def _receiving(reader_count: int) -> tuple[InfraredTransceiver, list[ReplayingPulseReader]]:
     """A transceiver with *reader_count* fake readers and no emitter."""
-    readers = [FakePulseReader() for _ in range(reader_count)]
-    return InfraredTransceiver.build(list(readers), {}, _WriterFactory(holds=False)), readers
+    readers = [ReplayingPulseReader() for _ in range(reader_count)]
+    return InfraredTransceiver(list(readers), {}, EmitterWriterFactory()), readers
 
 
 def _emitting(
     reader_count: int, holds: bool
-) -> tuple[InfraredTransceiver, list[FakePulseReader], _FakePulseWriter]:
-    """A transceiver with fake readers and a LINE emitter, plus that emitter's writer."""
-    readers = [FakePulseReader() for _ in range(reader_count)]
-    factory = _WriterFactory(holds)
-    transceiver = InfraredTransceiver.build(list(readers), {LINE: "GP1"}, factory)
+) -> tuple[InfraredTransceiver, list[ReplayingPulseReader], EmitterPulseWriter]:
+    """A transceiver with fake readers and a LINE emitter, plus that emitter's writer.
+
+    With *holds*, the writer stays busy after a write until its ``finish()``,
+    keeping the device emitting across ticks like a DMA-backed writer
+    mid-frame; otherwise it finishes inline, like the blocking writer.
+    """
+    readers = [ReplayingPulseReader() for _ in range(reader_count)]
+    factory = EmitterWriterFactory(blocking=not holds)
+    transceiver = InfraredTransceiver(list(readers), {LINE: "GP1"}, factory)
     return transceiver, readers, factory.writers[LINE]
 
 
@@ -593,7 +551,7 @@ def test_update_allocates_nothing_while_draining_during_emission():
 
 
 def test_a_transceiver_with_no_readers_receives_nothing_and_reports_no_receive_values():
-    transceiver = InfraredTransceiver.build([], {LINE: "GP1"}, _WriterFactory(holds=False))
+    transceiver = InfraredTransceiver([], {LINE: "GP1"}, EmitterWriterFactory())
 
     transceiver.update(0.0)
 
