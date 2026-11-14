@@ -110,8 +110,8 @@ The single per-scene typed accessor owning a phase machine's `GameState` key and
 _Avoid_: constructing a fresh `PhaseSlot` per rule (import the scene's one); passing a raw machine-key string to a phase rule; confusing it with the generic `StateSlot`; two slots sharing one key
 
 ### PhaseRule
-A `GameRule` owning one phase's lifecycle: `on_enter`/`on_exit`, phase-gated handlers, and `transition_to`; exactly one per `(machine, phase)`.
-_Avoid_: hand-rolled entry flags (use `on_enter`); reaching `super().on(...)` (bypasses the phase guard); transitioning from `on_enter`; transitioning to a phase no `PhaseRule` owns
+A `GameRule` owning one phase's lifecycle: `on_enter`/`on_exit`, phase-gated handlers, and `transition_to`; exactly one per `(machine, phase)`. On entry it may declare how its phase ends: after a duration, when a receipt stops, or when a condition on game state holds.
+_Avoid_: hand-rolled entry flags (use `on_enter`); storing a receipt in scene state only to poll it for the phase's end; reaching `super().on(...)` (bypasses the phase guard); transitioning from `on_enter`; transitioning to a phase no `PhaseRule` owns
 
 ### InPhaseRule
 A `GameRule` whose handlers fire only while a given phase is active, with no lifecycle hooks and no transitions; any number may share a phase.
@@ -206,8 +206,8 @@ The one way a device switches scenes: the target is persisted to device storage,
 _Avoid_: calling an **Overlay** a scene switch (the covered scene is still the device's scene); switching scenes in-process; "restart", "reload" (reload is CircuitPython's soft reboot after a deploy)
 
 ### Persisted scene
-The scene a device's card names in `aura-state.json` (`scene`, with its `return_to` companion), written by a **Reboot**. On boot it outranks the flash `default_scene`; a `deploy.py --scene` deploy clears it once, through a new **Scene deploy token**. One the device lacks the **Required capabilities** for is skipped at boot, left on the card, and logged.
-_Avoid_: "saved scene", "override" for it; clearing it because this device cannot run it (the card may go back to a prop that can); expecting it to name the running scene right after a `--scene` deploy (the card names none until the next Reboot); treating it as host-authored (only the device writes it)
+The scene a device's card names in `aura-state.json`, with its `return_to` companion, written by a **Reboot** under the reserved `persisted_scene.` key prefix. On boot it outranks the flash `default_scene`; a `deploy.py --scene` deploy clears it once, through a new **Scene deploy token**. One the device doesn't know, or lacks the **Required capabilities** for, is skipped at boot, left on the card, and logged; a `return_to` the device doesn't know counts as none recorded.
+_Avoid_: "saved scene", "override" for it; clearing it because this device cannot run or doesn't know it (the card may go back to a prop that can); expecting it to name the running scene right after a `--scene` deploy (the card names none until the next Reboot); treating it as host-authored (only the device writes it); writing game data under the `persisted_scene.` prefix; reading meaning into an older card's unprefixed `scene` / `return_to` keys (they are inert)
 
 ### Scene deploy token
 The value `deploy.py --scene` (or a **Simulated device**'s redeploy) writes as `scene_deploy_token` beside `default_scene` in `aura-boot.json`, new on every write. At boot, a token that differs from the one recorded in the card's `aura-state.json` clears the **Persisted scene** (and its `return_to`) and is recorded, so each `--scene` deploy wins once and later Reboots keep persisting.
@@ -330,7 +330,7 @@ The top-level `app/` package — the one place allowed to import both engine run
 _Avoid_: importing `hardware.*` from `engine/`, `effects/`, `magic/`, `packs/`; putting board-only code in `scene_composition.py`
 
 ### Scene boot
-The one boot the device and the **Simulated device** share, and the **Composition layer**'s only way in. From the hardware a device built, it applies a pending **Scene deploy token**, then picks the boot scene (the **Persisted scene**, else the flash `default_scene`), skipping one the device lacks the **Required capabilities** for and raising when none fits. It applies that scene's wire-frame codec before the first tick, and hands back the booted scene's name, its tick, its **SceneControls** and its **Active scene namespace**.
+The one boot the device and the **Simulated device** share, and the **Composition layer**'s only way in. From the hardware a device built, it applies a pending **Scene deploy token**, then picks the boot scene (the **Persisted scene**, else the flash `default_scene`), skipping a Persisted scene the device doesn't know or lacks the **Required capabilities** for, and raising when `default_scene` doesn't fit. It applies that scene's wire-frame codec before the first tick, and hands back the booted scene's name, its tick, its **SceneControls** and its **Active scene namespace**.
 _Avoid_: sequencing the boot's steps at a call site; a second boot for tests or examples; scanning packs or scenes outside it; copying the tick's body into a harness or entry point; building a tick per frame; reading `ir` or `radio` anywhere but `DeviceHardware`; "startup", "init" for it
 
 ### SceneRuntime
