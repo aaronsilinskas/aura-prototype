@@ -10,7 +10,7 @@ This repo implements:
 - An event-driven game engine (`engine/`)
 - Spell and aura logic (`magic/`)
 
-Full game and hardware design lives in `~/dev/aura/aura-docs/` (an Obsidian vault). Key references for agents:
+Full game and hardware design lives in `~/dev/aura/aura-docs/`, the maintainer's private Obsidian vault (contributors won't have it). Key references for agents that do:
 - `Overview/Magic System.md` — element definitions, buffs/debuffs, spell mechanics
 - `Overview/Design Principles.md` — core game design goals
 - `Reference/Props and Hardware.md` — physical device inventory

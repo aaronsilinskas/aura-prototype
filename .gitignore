@@ -40,3 +40,8 @@ fp-info-cache
 
 # Agent worktrees (Claude Code)
 .claude/worktrees/
+
+# Agent skills, installed per clone (see AGENTS.md)
+.claude/skills/
+.agents/
+skills-lock.json

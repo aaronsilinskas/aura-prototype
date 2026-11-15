@@ -290,6 +290,10 @@ choices are in [`GLOSSARY.md`](GLOSSARY.md) and the ADRs in
 
 ---
 
+## Contributing with an AI agent
+
+Agent instructions live in [`AGENTS.md`](AGENTS.md) (Claude Code reads it via `CLAUDE.md`). Its "Working on aura with an agent" section covers installing the skills those docs reference and the change flow.
+
 ## Licensing
 
 This repo splits licensing by area:
