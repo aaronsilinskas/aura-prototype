@@ -1,41 +1,30 @@
 from effects.effect import (
     AudioPlaybackConfig,
-    Effect,
     EffectAudio,
-    EffectConfig,
     EffectHaptic,
     EffectVerb,
     HapticPattern,
 )
-from engine.effects.builder import EffectBuilder
+from engine.effects.builder import ComposedEffectBuilder
 
-_GAME_OVER_HAPTIC = EffectHaptic(
-    patterns={
-        EffectVerb.START: HapticPattern(
-            [
-                HapticPattern.STRONG_BUZZ,
-                HapticPattern.PAUSE_250,
-                HapticPattern.STRONG_BUZZ,
-                HapticPattern.PAUSE_250,
-                HapticPattern.STRONG_BUZZ,
-            ]
-        )
-    }
+BUILD = ComposedEffectBuilder(
+    # Shared with every scene's game-over moment -- see basic/sounds/game_over_sting_start.wav.
+    audio=EffectAudio(
+        clips={
+            EffectVerb.START: AudioPlaybackConfig(name="basic.game_over_sting_start", loop=False)
+        }
+    ),
+    haptic=EffectHaptic(
+        patterns={
+            EffectVerb.START: HapticPattern(
+                [
+                    HapticPattern.STRONG_BUZZ,
+                    HapticPattern.PAUSE_250,
+                    HapticPattern.STRONG_BUZZ,
+                    HapticPattern.PAUSE_250,
+                    HapticPattern.STRONG_BUZZ,
+                ]
+            )
+        }
+    ),
 )
-
-# Shared with every other scene's game-over moment -- see basic/sounds/game_over_sting_start.wav.
-_GAME_OVER_AUDIO = EffectAudio(
-    clips={EffectVerb.START: AudioPlaybackConfig(name="basic.game_over_sting_start", loop=False)}
-)
-
-
-class _Builder(EffectBuilder):
-    def __call__(self, name: str, config: EffectConfig) -> Effect:
-        return Effect(
-            name=name,
-            audio=_GAME_OVER_AUDIO,
-            haptic=_GAME_OVER_HAPTIC,
-        )
-
-
-BUILD = _Builder()
