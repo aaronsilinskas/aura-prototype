@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 import sys
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import pytest
 
 from engine.tests.pack_tree import PackTree
+from hardware.shared.device_state import DeviceStateStore
 from hardware.shared.device_storage import DeviceStorage
+from hardware.shared.persisted_scene import PersistedScene
 
 TYPE_CHECKING = False
 
@@ -73,3 +75,17 @@ def device_storage(tmp_path: Path) -> Iterator[DeviceStorage]:
             del sys.modules[name]
     while storage.mount_root in sys.path:
         sys.path.remove(storage.mount_root)
+
+
+@pytest.fixture()
+def persisted_scene_on() -> Callable[[str | Path], PersistedScene]:
+    """Return a function giving the Persisted scene record on the card at a directory.
+
+    For arranging and inspecting card state without spelling the record's
+    keys, which only ``PersistedScene`` names.
+    """
+
+    def on(card: str | Path) -> PersistedScene:
+        return PersistedScene(DeviceStateStore(DeviceStorage(str(card))))
+
+    return on

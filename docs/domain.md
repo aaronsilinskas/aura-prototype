@@ -88,7 +88,8 @@ hardware/         Hardware abstraction layer
   shared/         Hardware-agnostic helpers (matrix_output, voice_pool, debounced_buttons,
                   device_config, neopixel_current_budget, device_boot, device_state,
                   device_hardware,
-                  device_storage, network_controls, scene_selection, ir_transport,
+                  device_storage, network_controls, scene_selection (flash side),
+                  persisted_scene (card side), ir_transport,
                   ir_transceiver, ir_codecs/ (base, aura, tag), ir_telemetry,
                   radio_transport, radio_transceiver, sd_sync_protocol, sd_sync_server,
                   device_reboot, device_assembly (the Device assembly),
@@ -103,9 +104,10 @@ app/              Composition layer — the one place allowed to import both the
                         are its whole interface (board-free, CPython-testable); the
                         device and the Simulated device share both the boot and the
                         tick, which polls DeviceHardware.polled. Boot runs the Persisted
-                        scene, else flash default_scene, skipping one the device lacks
-                        the Required capabilities for (raises MissingCapabilityError
-                        when none fits)
+                        scene, else flash default_scene, skipping one the device doesn't
+                        know or lacks the Required capabilities for (raises
+                        MissingCapabilityError when none fits); it opens one
+                        DeviceStateStore and shares it
   run_scene.py          run_scene (device-only: bring-up, build_scene_boot, then loops
                         the tick it returns)
   simulation/           Test-only Simulation test harness (Simulation, SimulatedDevice):
@@ -219,8 +221,10 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `RadioTransport` | `hardware/shared/radio_transport.py` | Board-free half-duplex radio port; live adapter `Rfm69RadioTransport` |
 | `RadioTransceiver` | `hardware/shared/radio_transceiver.py` | Board-free single owner of a device's radio subsystem |
 | `build_scene_boot` | `app/scene_composition.py` | The **Scene boot**, the Composition layer's only entry point: boots a `DeviceHardware` into its boot scene and returns a `SceneBoot`; shared by `run_scene` and the Simulated device |
-| `SceneBoot` | `app/scene_composition.py` | What `build_scene_boot` returns: the booted `scene_name`, its `tick`, `scene_controls` and `namespace`. The tick advances the runtime clock, updates every **Polled part**, queues their events and updates the runtime; it allocates nothing per tick |
-| `DeviceSceneReboot` | `hardware/shared/device_reboot.py` | Live `SceneReboot` adapter; persists the target, then calls its injected `reset` (`build_scene_boot` wires it; `run_scene` passes `microcontroller.reset`) |
+| `SceneBoot` | `app/scene_composition.py` | What `build_scene_boot` returns: the booted `scene_name`, its `tick`, `scene_controls` and `namespace`, and the boot's `device_state` store and `persisted_scene` record. The tick advances the runtime clock, updates every **Polled part**, queues their events and updates the runtime; it allocates nothing per tick |
+| `DeviceSceneReboot` | `hardware/shared/device_reboot.py` | Live `SceneReboot` adapter; records the switch through `PersistedScene`, then calls its injected `reset`, and does neither on a card-less device (`build_scene_boot` wires it; `run_scene` passes `microcontroller.reset`) |
+| `PersistedScene` | `hardware/shared/persisted_scene.py` | Board-free owner of the **Persisted scene** record on the card, the only code naming its `persisted_scene.` keys; a client of the boot's one `DeviceStateStore` (ADR-0009). Applies a Scene deploy token, reports the boot candidates and the previous scene, records a Reboot or a return, each in one write |
+| `DeviceStateStore` | `hardware/shared/device_state.py` | Board-free, general key/value store over the card's `aura-state.json`; one per boot, built by `build_scene_boot` |
 | `SdSyncServer` | `hardware/shared/sd_sync_server.py` | Board-free device side of the SD-sync protocol |
 | `SdSyncClient` | `scripts/sd_sync_client.py` | Board-free (CPython-only) host side of the SD-sync protocol |
 | `Transport` (SD sync) | `hardware/shared/sd_sync_protocol.py` | Board-free port `SdSyncClient`/`SdSyncServer` exchange base64-framed lines through; live adapters `UsbCdcTransport` (device) / `SerialTransport` (host) |

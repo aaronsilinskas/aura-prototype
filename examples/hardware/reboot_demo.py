@@ -25,20 +25,22 @@ single deploy:
 
 - **Boot 1** (no phase): boot + print the boot scene (the flash
   ``default_scene``), record ``phase=into``, then ``reboot_into(TARGET_SCENE)``
-  -- writes ``scene=TARGET_SCENE`` and ``return_to=<booted scene>``, then
-  hard-resets.
+  -- records ``TARGET_SCENE`` as the Persisted scene with ``return_to=<booted
+  scene>``, then hard-resets.
 - **Boot 2** (``phase=into``; scene now resolves to ``TARGET_SCENE``, with
   ``return_to`` recorded): print it -- this is the proof the write survived the
   reset and the boot read the override -- record ``phase=previous``,
-  then ``reboot_to_previous()`` -- writes ``scene=<recorded return_to>``, clears
-  ``return_to``, and hard-resets.
+  then ``reboot_to_previous()`` -- makes the recorded ``return_to`` the
+  Persisted scene, clears ``return_to``, and hard-resets.
 - **Boot 3** (``phase=previous``; scene back to the original, ``return_to``
   cleared): print, clear the phase key, then stop -- proving the ``return_to``
   round-trip and its ``clear``, and leaving the card clean to re-run.
 
 The ``phase`` key is written before each ``reboot_*`` call, so the reboot's own
-``scene``/``return_to`` writes (read-modify-write) preserve it across the reset;
-the boot ignores the extra key.
+Persisted scene write (read-modify-write) preserves it across the reset; the
+boot ignores the extra key. Both go through the boot's one device state store:
+the phase through ``SceneBoot.device_state``, ``return_to`` through
+``SceneBoot.persisted_scene``.
 
 Each boot prints a distinctive ``__REBOOT`` marker so the three boots are
 unmistakable in the serial log.
@@ -72,7 +74,6 @@ from engine.capabilities import MissingCapabilityError
 from engine.log import Logger
 from hardware.circuitpython.device_builder import build_hardware, load_device_config
 from hardware.shared.device_boot import read_boot_mapping
-from hardware.shared.device_state import DeviceStateStore
 
 # The scene reboot_into() switches to. Must be in the registry and, for the
 # proof to be visible, different from the flash default_scene the device boots.
@@ -95,11 +96,11 @@ boot = build_scene_boot(hw, read_boot_mapping(), reset=microcontroller.reset, lo
 scene_name = boot.scene_name
 controls = boot.scene_controls
 
-# This example owns reboot_demo_phase; return_to is the reboot's own key, read
+# This example owns reboot_demo_phase; return_to is the reboot's own, read
 # here only to print as proof (the reboot is what writes and clears it).
-state = DeviceStateStore(hw.storage, hw_logger)
+state = boot.device_state
 phase = state.get("reboot_demo_phase")
-return_to = state.get("return_to")
+return_to = boot.persisted_scene.previous_scene()
 
 if hw.storage is None:
     # Card-less: a reboot would only log-and-return, so there's nothing to

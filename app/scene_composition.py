@@ -21,10 +21,11 @@ from engine.state import SceneControls, SceneReboot
 from engine.timer import Timer
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.device_reboot import DeviceSceneReboot
+from hardware.shared.device_state import DeviceStateStore
 from hardware.shared.device_storage import DeviceStorage
 from hardware.shared.ir_codecs import codec_for
 from hardware.shared.ir_codecs.base import InfraredDecoder, InfraredEncoder
-from hardware.shared.scene_selection import apply_scene_deploy, boot_scene_candidates
+from hardware.shared.persisted_scene import PersistedScene
 
 try:
     from collections.abc import Callable
@@ -42,10 +43,19 @@ class SceneBoot:
     scene's ``SceneControls``, the same ones its rules hold: they cover it
     with an Overlay, pop it, or reboot. ``namespace`` is the game's own
     Active scene namespace, so a caller resolves a clip name exactly as the
-    running game does.
+    running game does. ``device_state`` is the boot's one ``DeviceStateStore``
+    and ``persisted_scene`` the card's Persisted scene record over it, so a
+    caller reads the card without opening a second store.
     """
 
-    __slots__ = ("namespace", "scene_controls", "scene_name", "tick")
+    __slots__ = (
+        "device_state",
+        "namespace",
+        "persisted_scene",
+        "scene_controls",
+        "scene_name",
+        "tick",
+    )
 
     def __init__(
         self,
@@ -53,11 +63,15 @@ class SceneBoot:
         tick: Callable[[], None],
         scene_controls: SceneControls,
         namespace: ActiveSceneNamespace,
+        device_state: DeviceStateStore,
+        persisted_scene: PersistedScene,
     ) -> None:
         self.scene_name: str = scene_name
         self.tick: Callable[[], None] = tick
         self.scene_controls: SceneControls = scene_controls
         self.namespace: ActiveSceneNamespace = namespace
+        self.device_state: DeviceStateStore = device_state
+        self.persisted_scene: PersistedScene = persisted_scene
 
 
 _TELEMETRY_PRINT_INTERVAL = 1.0  # seconds
@@ -67,7 +81,7 @@ _CARD_PACKS_ROOT = "aura_packs"
 
 def _resolve_boot_scene_name(
     scene_registry: SceneRegistry,
-    storage: DeviceStorage | None,
+    persisted_scene: PersistedScene,
     boot_mapping: dict,
     capabilities: frozenset[str],
     logger: Logger | None = None,
@@ -75,7 +89,7 @@ def _resolve_boot_scene_name(
     """Return the registered boot scene whose Required capabilities are all in *capabilities*.
 
     Tries the card's Persisted scene, then flash ``default_scene`` (see
-    ``boot_scene_candidates``); a ``None`` *storage* has no Persisted scene.
+    ``PersistedScene.boot_candidates``).
     A Persisted scene unknown to *scene_registry*, or one the device can't
     run, is skipped, logged once to *logger*, and left on the card: the card
     may go back to a prop that has it and can run it.
@@ -87,7 +101,7 @@ def _resolve_boot_scene_name(
             and what it is missing.
     """
     logger = logger if logger is not None else Logger.SILENT
-    persisted, fallback = boot_scene_candidates(storage, boot_mapping, logger)
+    persisted, fallback = persisted_scene.boot_candidates(boot_mapping)
     if persisted is not None:
         if persisted not in scene_registry.names():
             logger.log(f"skipping Persisted scene {persisted!r}: unknown scene on this device")
@@ -183,11 +197,12 @@ def build_scene_boot(
     The one boot shared by the device (:func:`app.run_scene.run_scene`)
     and the Simulated device, whose returned tick is also their one loop body.
     A pending Scene deploy token is applied first (see
-    :func:`~hardware.shared.scene_selection.apply_scene_deploy`); then the
+    :meth:`~hardware.shared.persisted_scene.PersistedScene.apply_scene_deploy`); then the
     card's Persisted scene wins over *boot_mapping*'s ``default_scene``,
     unless this device doesn't know it or can't run it: then it is skipped,
     logged to *logger* and left on the card. A reboot the scene asks for
-    persists to ``hw.storage``, then calls *reset*.
+    persists to ``hw.storage``, then calls *reset*. One ``DeviceStateStore``
+    over ``hw.storage`` serves the whole boot.
 
     *setting_overrides* overrides scenes' Settings (shaped as for
     ``scan_pack_roots``); the Simulated device boots shortened scenes through
@@ -205,18 +220,30 @@ def build_scene_boot(
     """
     catalog = _scan_boot_pack_catalog(hw.storage, setting_overrides)
     scene_registry = catalog.scene_registry
-    apply_scene_deploy(hw.storage, boot_mapping, logger)
+    device_state = DeviceStateStore(hw.storage, logger)
+    persisted_scene = PersistedScene(device_state, logger)
+    persisted_scene.apply_scene_deploy(boot_mapping)
     scene_name = _resolve_boot_scene_name(
-        scene_registry, hw.storage, boot_mapping, hw.capabilities, logger
+        scene_registry, persisted_scene, boot_mapping, hw.capabilities, logger
     )
     if hw.ir is not None:
         hw.ir.apply_codec(*_resolve_ir_codec(scene_registry, scene_name))
     scene_reboot = DeviceSceneReboot(
-        hw.storage, booted_scene=scene_name, reset=reset, logger=logger
+        persisted_scene if hw.storage is not None else None,
+        booted_scene=scene_name,
+        reset=reset,
+        logger=logger,
     )
     runtime = _build_scene_runtime(hw, scene_name, catalog, scene_reboot, timer, logger)
     tick = _build_scene_tick(hw, runtime)
-    return SceneBoot(scene_name, tick, runtime.scene_controls, runtime.namespace)
+    return SceneBoot(
+        scene_name,
+        tick,
+        runtime.scene_controls,
+        runtime.namespace,
+        device_state,
+        persisted_scene,
+    )
 
 
 def _build_scene_tick(hw: DeviceHardware, runtime: SceneRuntime) -> Callable[[], None]:

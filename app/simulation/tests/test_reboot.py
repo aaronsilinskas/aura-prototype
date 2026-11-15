@@ -7,6 +7,8 @@ this one. ``return_to_lobby``'s own behaviour is pinned in its pack's tests.
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from app.simulation import TICK, SimulatedDevice, Simulation
@@ -14,6 +16,7 @@ from engine.capabilities import MissingCapabilityError
 from engine.network import LINE
 from engine.pack_catalog import SettingOverrideError
 from engine.state import Scope
+from hardware.shared.device_storage import DeviceStorage
 from packs.rules.lobby.helpers.lobby_config import LobbyConfig
 from packs.tests.settings_helper import settings_for
 
@@ -75,6 +78,35 @@ def test_the_lobbys_b_reboots_into_the_selected_scene(simulation):
     launch(device, "element_browser")
 
     assert device.scene == "element_browser"
+
+
+def test_a_reboot_round_trip_leaves_only_prefixed_persisted_scene_keys_on_the_card(simulation):
+    device = simulation.add_device("red", scene="example_lobby")
+    launch(device, "element_browser")
+
+    hold_to_return(simulation, device)
+
+    assert device.scene == "example_lobby"
+    card_state = json.loads((device.card / "aura-state.json").read_text())
+    assert card_state
+    assert all(key.startswith("persisted_scene.") for key in card_state)
+
+
+def test_each_reboot_of_a_round_trip_writes_the_state_file_once(simulation, monkeypatch):
+    writes: list[str] = []
+    write_json = DeviceStorage.write_json
+
+    def recording_write_json(storage, name, mapping):
+        writes.append(name)
+        write_json(storage, name, mapping)
+
+    monkeypatch.setattr(DeviceStorage, "write_json", recording_write_json)
+    device = simulation.add_device("red", scene="example_lobby")
+
+    launch(device, "element_browser")
+    assert writes == ["aura-state.json"]
+    hold_to_return(simulation, device)
+    assert writes == ["aura-state.json", "aura-state.json"]
 
 
 @pytest.mark.parametrize("lacking", ["button.B", "storage"])

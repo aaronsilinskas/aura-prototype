@@ -290,17 +290,19 @@ def test_a_device_handed_a_card_with_an_empty_aura_packs_boots_its_flash_scene(
 
 
 def test_a_device_handed_a_card_naming_a_scene_it_doesnt_know_boots_its_flash_scene(
-    simulation, tmp_path
+    simulation, tmp_path, persisted_scene_on
 ):
-    (tmp_path / "aura-state.json").write_text(json.dumps({"scene": "other_props_scene"}))
+    persisted_scene_on(tmp_path).record_reboot("other_props_scene", "other_props_lobby")
 
     device = simulation.add_device("red", scene="hardware_test", card=tmp_path)
 
     assert device.scene == "hardware_test"
 
 
-def test_a_device_skipping_an_unknown_card_scene_narrates_the_skip(simulation, tmp_path):
-    (tmp_path / "aura-state.json").write_text(json.dumps({"scene": "other_props_scene"}))
+def test_a_device_skipping_an_unknown_card_scene_narrates_the_skip(
+    simulation, tmp_path, persisted_scene_on
+):
+    persisted_scene_on(tmp_path).record_reboot("other_props_scene", "other_props_lobby")
 
     device = simulation.add_device("red", scene="hardware_test", card=tmp_path)
 
@@ -309,12 +311,15 @@ def test_a_device_skipping_an_unknown_card_scene_narrates_the_skip(simulation, t
     assert "unknown" in skip
 
 
-def test_a_card_scene_the_device_doesnt_know_stays_on_the_card(simulation, tmp_path):
-    (tmp_path / "aura-state.json").write_text(json.dumps({"scene": "other_props_scene"}))
+def test_a_card_scene_the_device_doesnt_know_stays_on_the_card(
+    simulation, tmp_path, persisted_scene_on
+):
+    persisted_scene_on(tmp_path).record_reboot("other_props_scene", "other_props_lobby")
 
     simulation.add_device("red", scene="hardware_test", card=tmp_path)
 
-    assert json.loads((tmp_path / "aura-state.json").read_text())["scene"] == "other_props_scene"
+    persisted, _ = persisted_scene_on(tmp_path).boot_candidates({"default_scene": "hardware_test"})
+    assert persisted == "other_props_scene"
 
 
 def test_rebooting_into_a_scene_the_device_cannot_run_raises_and_persists_nothing(
@@ -346,14 +351,17 @@ def test_a_refused_reboot_leaves_the_device_running_its_scene(simulation, tmp_pa
     assert device.scene == "launcher"
 
 
-def test_the_next_scene_a_device_persists_is_on_the_card_it_was_handed(simulation, tmp_path):
+def test_the_next_scene_a_device_persists_is_on_the_card_it_was_handed(
+    simulation, tmp_path, persisted_scene_on
+):
     device = simulation.add_device(
         "red", scene="example_lobby", setting_overrides=lobby_of("element_browser"), card=tmp_path
     )
 
     device.tap("B")
 
-    assert json.loads((tmp_path / "aura-state.json").read_text())["scene"] == "element_browser"
+    persisted, _ = persisted_scene_on(tmp_path).boot_candidates({"default_scene": "example_lobby"})
+    assert persisted == "element_browser"
 
 
 def test_two_devices_handed_the_same_card_raise(simulation, tmp_path):

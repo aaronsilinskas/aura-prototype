@@ -8,7 +8,6 @@ Boot itself runs only a scene the device has the Required capabilities for.
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
@@ -16,6 +15,9 @@ import pytest
 from app.simulation import Simulation
 from engine.capabilities import MissingCapabilityError
 from engine.pack_catalog import scan_pack_roots
+from hardware.shared.device_state import DeviceStateStore
+from hardware.shared.device_storage import DeviceStorage
+from hardware.shared.persisted_scene import PersistedScene
 
 _FULL = frozenset(
     (
@@ -118,7 +120,7 @@ def test_pressing_a_button_the_device_lacks_raises_naming_it(simulation):
 
 
 def _persist(card: Path, scene: str) -> None:
-    (card / "aura-state.json").write_text(json.dumps({"scene": scene}))
+    PersistedScene(DeviceStateStore(DeviceStorage(str(card)))).record_reboot(scene, "example_lobby")
 
 
 @pytest.mark.parametrize("scene", sorted(scan_pack_roots(["packs"]).scene_registry.names()))
@@ -138,13 +140,15 @@ def test_a_persisted_scene_the_device_cannot_run_boots_the_default_scene(simulat
     assert device.scene == "hardware_test"
 
 
-def test_a_persisted_scene_the_device_cannot_run_is_left_on_the_card(simulation, tmp_path):
+def test_a_persisted_scene_the_device_cannot_run_is_left_on_the_card(
+    simulation, tmp_path, persisted_scene_on
+):
     _persist(tmp_path, "red_light_green_light")
 
     simulation.add_device("red", scene="hardware_test", card=tmp_path, without={"accelerometer"})
 
-    state = json.loads((tmp_path / "aura-state.json").read_text())
-    assert state["scene"] == "red_light_green_light"
+    persisted, _ = persisted_scene_on(tmp_path).boot_candidates({"default_scene": "hardware_test"})
+    assert persisted == "red_light_green_light"
 
 
 def test_boot_raises_when_neither_the_persisted_nor_the_default_scene_fits(simulation, tmp_path):
