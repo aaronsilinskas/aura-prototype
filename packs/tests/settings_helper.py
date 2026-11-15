@@ -53,11 +53,21 @@ def settings_for(
     return Settings(values)
 
 
-def declared_scene_defaults(scene: str) -> dict[str, object]:
-    """Return each of *scene*'s own Settings' ``default``, read straight from its ``scene.json``.
+def declared_scene_settings(scene: str) -> dict[str, dict[str, object]]:
+    """Return each of *scene*'s own Settings' declaration, read straight from its ``scene.json``.
 
-    It reads the file without the engine, so a test can check what the scan
-    resolves against the declaration itself.
+    It reads the file without the engine, so a test can check code against the
+    declarations themselves.
     """
     data = json.loads((_PACKS_ROOT / "scenes" / scene / "scene.json").read_text())
-    return {name: declaration["default"] for name, declaration in data["settings"].items()}
+    settings: dict[str, dict[str, object]] = data.get("settings", {})
+    return settings
+
+
+def scenes_declaring_settings() -> list[str]:
+    """Return the name of every scene under ``packs/scenes/`` that declares its own Settings."""
+    return sorted(
+        path.parent.name
+        for path in (_PACKS_ROOT / "scenes").glob("*/scene.json")
+        if declared_scene_settings(path.parent.name)
+    )

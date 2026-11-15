@@ -1,5 +1,7 @@
-"""Tests for ``TagConfig`` — built from the scene's declared Settings, its
-derived values, and the ``tag_config`` get-or-create accessor."""
+"""Tests for ``TagConfig``'s derived values and the ``tag_config`` get-or-create
+accessor.
+
+``packs/tests/test_scene_configs.py`` checks that each Setting lands in its field."""
 
 from __future__ import annotations
 
@@ -11,48 +13,11 @@ from packs.scenes.tag.rules.helpers.tag_config import (
     TagConfig,
     tag_config,
 )
-from packs.tests.settings_helper import declared_scene_defaults, settings_for
+from packs.tests.settings_helper import settings_for
 
 
 def _settings(**values: object) -> Settings:
     return settings_for("tag", settings=values)
-
-
-# ---------------------------------------------------------------------------
-# Building from Settings
-# ---------------------------------------------------------------------------
-
-
-def test_each_scene_setting_override_sets_the_config_field_of_the_same_name():
-    config = TagConfig(
-        _settings(
-            starting_hitpoints=20,
-            expected_team=2,
-            expected_player=3,
-            warning_pulse_count=4,
-            warning_pulse_duration=1.0,
-            max_ammo=5,
-            shot_cooldown=0.5,
-            reload_duration=2.5,
-        )
-    )
-
-    assert config.starting_hitpoints == 20
-    assert config.expected_team == 2
-    assert config.expected_player == 3
-    assert config.warning_pulse_count == 4
-    assert config.warning_pulse_duration == pytest.approx(1.0)
-    assert config.max_ammo == 5
-    assert config.shot_cooldown == pytest.approx(0.5)
-    assert config.reload_duration == pytest.approx(2.5)
-
-
-def test_with_no_overrides_each_field_holds_its_declared_default():
-    defaults = declared_scene_defaults("tag")
-
-    config = TagConfig(_settings())
-
-    assert {name: getattr(config, name) for name in defaults} == defaults
 
 
 # ---------------------------------------------------------------------------
