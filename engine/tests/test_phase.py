@@ -127,6 +127,43 @@ class _InPhaseEmitter(InPhaseRule):
         state.effect_controls.add_effect(Scope.PERSONAL, "in:" + self._label, {})
 
 
+class _ElapsedRecordingOwner(PhaseRule):
+    """PhaseRule recording its phase elapsed each tick, leaving for *next_phase* at 1 s."""
+
+    def __init__(self, phase: PhaseKey, phase_slot: PhaseSlot, next_phase: PhaseKey) -> None:
+        super().__init__(phase, phase_slot)
+        self._next_phase = next_phase
+        self.readings: list[float] = []
+        self.on(_TickEvent, self._tick)
+
+    def _tick(self, event: _TickEvent, state: GameState) -> None:
+        elapsed = self.phase_elapsed(state)
+        self.readings.append(elapsed)
+        if elapsed >= 1.0:
+            self.transition_to(state, self._next_phase)
+
+
+class _ElapsedRecordingBystander(InPhaseRule):
+    """InPhaseRule recording its phase elapsed each tick its phase is active."""
+
+    def __init__(self, phase: PhaseKey, phase_slot: PhaseSlot) -> None:
+        super().__init__(phase, phase_slot)
+        self.readings: list[float] = []
+        self.on(_TickEvent, self._tick)
+
+    def _tick(self, event: _TickEvent, state: GameState) -> None:
+        self.readings.append(self.phase_elapsed(state))
+
+
+def _run_timed(rules: list, ticks: int, step: float) -> None:
+    """Run *rules* through *ticks* SceneRun ticks of *step* seconds, one event each."""
+    state = GameState(SpyEffectControls(), SceneControls())
+    run = SceneRun(state, rules)
+    for _ in range(ticks):
+        state.queue_event(_TickEvent())
+        run.tick(step)
+
+
 def _run(rules: list, ticks: int, events_per_tick: int = 1) -> list[str]:
     """Run *rules* through *ticks* SceneRun ticks; return emitted effect names in order."""
     spy = SpyEffectControls()
@@ -513,3 +550,53 @@ def test_shared_phase_slot_resolves_the_same_machine_for_phase_rule_and_in_phase
 
     assert via_module_level_reference is via_phase_rule
     assert via_module_level_reference is via_in_phase_rule
+
+
+# ---------------------------------------------------------------------------
+# Phase elapsed — each rule reads how long its own phase has run
+# ---------------------------------------------------------------------------
+
+
+def test_a_phase_rule_reads_how_long_its_phase_has_run() -> None:
+    slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
+    owner = _ElapsedRecordingOwner(_PHASE_A, slot, next_phase=_PHASE_B)
+    _LifecycleRule(_PHASE_B, "b", phase_slot=slot)
+
+    _run_timed([owner], ticks=2, step=0.25)
+
+    assert owner.readings == pytest.approx([0.25, 0.5])
+
+
+def test_an_in_phase_rule_reads_how_long_its_phase_has_run() -> None:
+    slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
+    leaving = _LifecycleRule(_PHASE_A, "a", phase_slot=slot, transitions_to=_PHASE_B)
+    _LifecycleRule(_PHASE_B, "b", phase_slot=slot)
+    bystander = _ElapsedRecordingBystander(_PHASE_B, slot)
+
+    # B is entered at 0.25 s, on tick 1.
+    _run_timed([leaving, bystander], ticks=3, step=0.25)
+
+    assert bystander.readings == pytest.approx([0.25, 0.5])
+
+
+def test_a_phase_rules_reading_restarts_from_zero_when_its_phase_is_re_entered() -> None:
+    slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
+    owner = _ElapsedRecordingOwner(_PHASE_A, slot, next_phase=_PHASE_B)
+    bouncer = _LifecycleRule(_PHASE_B, "b", phase_slot=slot, transitions_to=_PHASE_A)
+
+    # A leaves at 1.0 s (tick 2); B sends it back at 1.5 s (tick 3).
+    _run_timed([owner, bouncer], ticks=4, step=0.5)
+
+    assert owner.readings == pytest.approx([0.5, 1.0, 0.5])
+
+
+def test_an_in_phase_rules_reading_restarts_from_zero_when_its_phase_is_re_entered() -> None:
+    slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
+    bystander = _ElapsedRecordingBystander(_PHASE_A, slot)
+    owner = _ElapsedRecordingOwner(_PHASE_A, slot, next_phase=_PHASE_B)
+    bouncer = _LifecycleRule(_PHASE_B, "b", phase_slot=slot, transitions_to=_PHASE_A)
+
+    # A leaves at 1.0 s (tick 2); B sends it back at 1.5 s (tick 3).
+    _run_timed([bystander, owner, bouncer], ticks=4, step=0.5)
+
+    assert bystander.readings == pytest.approx([0.5, 1.0, 0.5])

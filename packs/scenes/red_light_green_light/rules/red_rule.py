@@ -48,7 +48,7 @@ class RlglRedRule(PhaseRule):
     def _handle(self, event: InputEvents.Sensors, state: GameState) -> None:
         # Timer expiry is always checked before motion
         level = rlgl_phase_state(state).level
-        elapsed = rlgl_phase(state).elapsed(state.total)
+        elapsed = self.phase_elapsed(state)
         if elapsed >= rlgl_config(state).red_duration(level):
             self.transition_to(state, PHASE_GREEN_WARNING)
             return

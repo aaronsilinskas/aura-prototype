@@ -20,6 +20,9 @@ This module ships that machinery once:
 - :class:`InPhaseRule` — phase-gated handlers without the entry/exit
   lifecycle; any number may share a phase.
 
+Both kinds of phase rule read how long their own phase has run with
+``phase_elapsed``, without reaching through the :class:`PhaseSlot`.
+
 A phase starts in the tick it is entered, whatever order the scene's rules
 run in: :meth:`PhaseRule.transition_to` runs the entering phase's ``on_enter``
 itself, finding its owner through the :class:`PhaseSlot`.  The initial phase
@@ -204,6 +207,15 @@ class _PhaseGuardedRule(GameRule):
         """
         self._phase_handlers[event_type] = handler
         super().on(event_type, self._phase_dispatch)
+
+    def phase_elapsed(self, state: GameState) -> float:
+        """Return how long this rule's phase has run, in game time.
+
+        Read it from this rule's handlers or ``on_enter``, while its phase is
+        active; it restarts from zero each time the phase is entered.  Game
+        time does not advance while the scene is covered by an Overlay.
+        """
+        return self._machine(state).elapsed(state.total)
 
     def _machine(self, state: GameState) -> PhaseMachine:
         """Return this rule's :class:`PhaseMachine` via its :class:`PhaseSlot`."""

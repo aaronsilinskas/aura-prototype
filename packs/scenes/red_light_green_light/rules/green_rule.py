@@ -53,7 +53,7 @@ class RlglGreenRule(PhaseRule):
         # Timer expiry is always checked before motion
         config = rlgl_config(state)
         level = rlgl_phase_state(state).level
-        elapsed = rlgl_phase(state).elapsed(state.total)
+        elapsed = self.phase_elapsed(state)
         if elapsed >= config.green_duration(level):
             if level < config.max_level:
                 self.transition_to(state, PHASE_LEVEL_UP)
