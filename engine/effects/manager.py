@@ -202,12 +202,17 @@ class EffectManager(EffectControls, EffectAdmin):
         ]
 
     def _emit(
-        self, entry: EffectManager._EffectEntry, verb: EffectVerb, event_keys: set[str]
+        self, entry: EffectManager._EffectEntry, verb: EffectVerb, event_keys: Iterable[str]
     ) -> None:
-        """Send *entry*'s *verb* event, with its resolved clip, to outputs serving event_keys."""
+        """Send *entry*'s *verb* event, with its resolved clip, to outputs serving event_keys.
+
+        Only the *event_keys* that *entry* occupies route the event, so an
+        output never hears a lifecycle event for an effect it never ran.
+        """
         event = EffectEvent(entry.pack_name, entry.effect_name, verb, entry.clips.get(verb))
+        routed = set(entry.keys).intersection(event_keys)
         for i in range(len(self._outputs)):
-            matching = event_keys & self._output_key_sets[i]
+            matching = routed & self._output_key_sets[i]
             if matching:
                 self._outputs[i].handle_event(
                     event, frozenset(matching), entry.effect, entry.receipt
@@ -250,7 +255,7 @@ class EffectManager(EffectControls, EffectAdmin):
         )
 
         def scoped_listener(verb: EffectVerb) -> None:
-            self._emit(entry, verb, set(entry.keys))
+            self._emit(entry, verb, entry.keys)
 
         config = EffectConfig(resolution=resolution, options=options, listeners=[scoped_listener])
         entry.effect = builder(effect_name, config)
@@ -293,22 +298,19 @@ class EffectManager(EffectControls, EffectAdmin):
             if not buf_dict:
                 entry.output_buffers[i] = None
 
-    def _stop_entries(
+    def _clear_vacated_keys(
         self,
         stopped: list[tuple[EffectManager._EffectEntry, set[str]]],
         remaining: list[EffectManager._EffectEntry],
     ) -> None:
-        """Fire stop events and clear_pixels for entries that have stopped or been narrowed.
+        """Call clear_pixels for each removed key that no remaining effect occupies.
 
         Args:
             stopped: List of ``(entry, removed_keys)`` pairs. ``removed_keys`` is the set
-                of scope keys being removed from each entry (used for event routing).
+                of scope keys each entry occupied and has given up.
             remaining: The effects that will remain active after this stop operation,
                 with their keys already narrowed to the post-stop state.
         """
-        for entry, removed_keys in stopped:
-            self._emit(entry, EffectVerb.STOP, removed_keys)
-
         remaining_key_set: set[str] = set()
         for r in remaining:
             remaining_key_set.update(r.keys)
@@ -332,18 +334,24 @@ class EffectManager(EffectControls, EffectAdmin):
         entry is still running, so its receipt is left alone.
         """
         stopped: list[tuple[EffectManager._EffectEntry, set[str]]] = []
+        narrowed: list[EffectManager._EffectEntry] = []
         new_effects: list[EffectManager._EffectEntry] = []
         for entry in self._effects:
-            remaining = tuple(k for k in entry.keys if k not in scope_key_set)
-            if len(remaining) < len(entry.keys):
-                stopped.append((entry, scope_key_set))
-            if remaining:
-                entry.keys = remaining
-                self._update_output_buffers(entry)
-                new_effects.append(entry)
-            else:
-                entry.receipt.stop()
-        self._stop_entries(stopped, new_effects)
+            removed = scope_key_set.intersection(entry.keys)
+            if removed:
+                stopped.append((entry, removed))
+                if len(removed) == len(entry.keys):
+                    entry.receipt.stop()
+                    continue
+                narrowed.append(entry)
+            new_effects.append(entry)
+        for entry, removed in stopped:
+            self._emit(entry, EffectVerb.STOP, removed)
+        # Narrow only after emitting: _emit routes only to keys the entry still holds.
+        for entry in narrowed:
+            entry.keys = tuple(k for k in entry.keys if k not in scope_key_set)
+            self._update_output_buffers(entry)
+        self._clear_vacated_keys(stopped, new_effects)
         self._effects = new_effects
 
     def set_merge_strategy(self, scope: ScopeValue, strategy: MergeStrategy) -> None:
@@ -461,7 +469,9 @@ class EffectManager(EffectControls, EffectAdmin):
                     stopped.append((entry, set(entry.keys)))
                 else:
                     new_effects.append(entry)
-            self._stop_entries(stopped, new_effects)
+            for entry, removed in stopped:
+                self._emit(entry, EffectVerb.STOP, removed)
+            self._clear_vacated_keys(stopped, new_effects)
             self._effects = new_effects
 
         elapsed = timer.elapsed
