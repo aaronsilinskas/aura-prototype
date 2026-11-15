@@ -10,7 +10,7 @@ Default triage labels (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-f
 
 ### Domain docs
 
-Single-context: root `GLOSSARY.md` (canonical terms + what to avoid), `docs/domain.md` (the map: module layout, key types, constraints), and `docs/adr/`. These are the single source of truth for engine design; `README.md` points at them rather than restating them. Extended design in the Obsidian vault at `~/dev/aura/aura-docs/`. See `docs/agents/domain.md`.
+Single-context: root `GLOSSARY.md` (canonical terms + what to avoid), `docs/domain.md` (the map: module layout, key types, constraints), and `docs/adr/`. These are the single source of truth for engine design; `README.md` points at them rather than restating them. Extended game and hardware design lives in the maintainer's private Obsidian vault (`~/dev/aura/aura-docs/`); without it, work from the repo docs. See `docs/agents/domain.md`.
 
 ### Other
 
@@ -22,6 +22,19 @@ Single-context: root `GLOSSARY.md` (canonical terms + what to avoid), `docs/doma
 - **Main checkout**: usually holds unrelated uncommitted work (KiCad files under `electronics/`, drafts in progress). Work in a worktree based on `origin/main`, and read committed files with `git show origin/<branch>:<path>`.
 - **Coding standards**: `CODING_STANDARDS.md`.
 
-## Workflows
+## Working on aura with an agent
 
-Agent sessions for this repo run from the home repo, `mindwidgets/core` (`~/dev/mindwidgets/core`), which pre-approves this directory in its `.claude/settings.json`. Its `AGENTS.md` defines the spec and ticket workflows, the `implement`/`implement-spec` notes, the publish scripts and the skills. This file holds aura's project facts only.
+The agent skills these docs name (`tdd`, `code-review`, `code-quality`, `test-quality`, `comments`, `diagnosing-bugs` and others) are not committed here. Install them into your clone from their public sources (both locations are git-ignored):
+
+```sh
+npx skills add mattpocock/skills -a claude-code --copy -y
+npx skills add aaronsilinskas/ai-skills -a claude-code --copy -y
+```
+
+Then, once per clone: `uv sync` and `uv run pre-commit install`.
+
+To make a change: build it with the `tdd` skill, review it with `code-review` against `CODING_STANDARDS.md`, run `uv run pytest -q`, and open a PR. Propose larger features as an issue first.
+
+## Maintainer workflows
+
+The maintainer runs the spec and ticket workflows (`to-spec`, `grill-with-docs`, publishing specs and ticket batches, `implement-spec`) from a private home repo that holds those workflow notes and their scripts. They need write access to this repo's issues and labels. If you're not the maintainer, skip them and use the flow above.

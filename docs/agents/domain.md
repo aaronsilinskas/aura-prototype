@@ -7,7 +7,7 @@ How the engineering skills should consume this repo's domain documentation when 
 - **`GLOSSARY.md`** at the repo root: canonical code-facing terms and the words to avoid. It is long: list its terms with `grep -n "^### " GLOSSARY.md`, then read just the entries you need by line range.
 - **`docs/domain.md`**: the domain map (module layout, key types, constraints). Term meanings live in the glossary, not here.
 - **`docs/adr/`**: read ADRs that touch the area you're about to work in.
-- **`~/dev/aura/aura-docs/`** (Obsidian vault): game and hardware design, including magic-system vocabulary (elements, auras, spells). Read the relevant notes when a task touches game rules or props.
+- **`~/dev/aura/aura-docs/`** (the maintainer's private Obsidian vault): game and hardware design, including magic-system vocabulary (elements, auras, spells). Read the relevant notes when a task touches game rules or props. Contributors won't have it; work from the repo docs.
 
 If any of these files don't exist, **proceed silently**. Don't flag their absence; don't suggest creating them upfront. The `/domain-modeling` skill (reached via `/grill-with-docs` and `/improve-codebase-architecture`) creates them lazily when terms or decisions actually get resolved.
 
