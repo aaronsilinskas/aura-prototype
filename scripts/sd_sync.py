@@ -3,13 +3,13 @@
 Usage
 -----
     # List everything under the SD card root (or a subtree):
-    python -m scripts.sd_sync list [SD_SUBPATH]
+    uv run python -m scripts.sd_sync list [SD_SUBPATH]
 
     # Pull a file from the SD card to the host:
-    python -m scripts.sd_sync pull SD_PATH HOST_PATH
+    uv run python -m scripts.sd_sync pull SD_PATH HOST_PATH
 
     # Push a host file to the SD card:
-    python -m scripts.sd_sync push HOST_PATH SD_PATH
+    uv run python -m scripts.sd_sync push HOST_PATH SD_PATH
 
 Every verb accepts ``--port`` to bypass auto-detection of the data-channel
 serial port (see ``scripts.sd_sync_transport.find_data_port``). This CLI

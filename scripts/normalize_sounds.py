@@ -14,13 +14,13 @@ directory. A single invocation recurses *root* to find and normalize every
 
 Usage
 -----
-    python scripts/normalize_sounds.py
+    uv run python scripts/normalize_sounds.py
 
     # Preview measured gains without writing:
-    python scripts/normalize_sounds.py --dry-run
+    uv run python scripts/normalize_sounds.py --dry-run
 
     # Normalize a different root (recurses every sounds/ folder beneath it):
-    python scripts/normalize_sounds.py --root path/to/root
+    uv run python scripts/normalize_sounds.py --root path/to/root
 """
 
 import argparse

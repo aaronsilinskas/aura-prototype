@@ -49,7 +49,7 @@ Installation
    as starting points.
 
 4. Run the deploy script to copy all source files and set code.py:
-     python scripts/deploy.py examples/hardware/scene_demo.py
+     uv run python scripts/deploy.py examples/hardware/scene_demo.py
    The board reboots and starts running automatically.
 """
 

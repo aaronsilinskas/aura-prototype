@@ -51,7 +51,7 @@ connection and waits for the post-deploy reboot banner, but
 each cycle. Deploy once with ``scripts/deploy.py`` and watch the console
 manually (Mu / ``tio`` / ``screen``) across the three boots::
 
-    python scripts/deploy.py examples/hardware/reboot_demo.py
+    uv run python scripts/deploy.py examples/hardware/reboot_demo.py
 
 Requires the same deployed ``aura-device.json`` + ``aura-boot.json`` as
 ``scene_demo.py``, a mounted SD card (the whole point -- a card-less device
