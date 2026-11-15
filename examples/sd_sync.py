@@ -7,7 +7,7 @@ console/REPL channel so file traffic never collides with REPL I/O.
 ``SdSyncServer.serve_one`` dispatches each request by its own verb, so one
 connection carries a mix of ``pull``/``push``/``list`` without reconnecting.
 
-Deploying this file (``python scripts/deploy.py examples/sd_sync.py``) is what
+Deploying this file (``uv run python scripts/deploy.py examples/sd_sync.py``) is what
 puts a device into sync-server mode; the file deployed as ``code.py`` is the
 only thing that decides a device's mode.
 
@@ -29,7 +29,7 @@ Installation
 ------------
 1. Place ``aura-device.json`` on CIRCUITPY, declaring the SD card's ``sdcard``
    section (``cs``, ``mount``).
-2. Deploy: ``python scripts/deploy.py examples/sd_sync.py`` -- this also copies
+2. Deploy: ``uv run python scripts/deploy.py examples/sd_sync.py`` -- this also copies
    ``hardware/circuitpython/boot.py`` (which opens the data channel; see there
    for the first-time hard reset it needs).
 3. On the host, drive the device's data CDC port with

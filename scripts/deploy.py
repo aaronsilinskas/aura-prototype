@@ -3,13 +3,13 @@
 Usage
 -----
     # Deploy an example and sync all modules (compiles .py → .mpy via mpy-cross):
-    python scripts/deploy.py examples/hardware/scene_demo.py
+    uv run python scripts/deploy.py examples/hardware/scene_demo.py
 
     # Sync modules only, without changing code.py:
-    python scripts/deploy.py
+    uv run python scripts/deploy.py
 
     # Override the default mount path:
-    python scripts/deploy.py examples/hardware/scene_demo.py --mount /Volumes/MYBOARD
+    uv run python scripts/deploy.py examples/hardware/scene_demo.py --mount /Volumes/MYBOARD
 
 mpy-cross
 ---------
@@ -26,7 +26,7 @@ import sys
 from pathlib import Path
 
 if not __package__:
-    # Run as a file (python scripts/deploy.py): put the repo root on the path so
+    # Run as a file (uv run python scripts/deploy.py): put the repo root on the path so
     # the package imports below resolve as they do under python -m.
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 

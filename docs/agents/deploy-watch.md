@@ -8,10 +8,10 @@ any time you want to observe what the device prints after a deploy.
 
 ## Invocation
 
-Run as a module from the repo root (`python scripts/deploy_watch.py` also works):
+Run as a module from the repo root (`uv run python scripts/deploy_watch.py` also works):
 
 ```
-python -m scripts.deploy_watch <example_file> [options]
+uv run python -m scripts.deploy_watch <example_file> [options]
 ```
 
 At least one of `--seconds` or `--until` is required.
@@ -56,23 +56,23 @@ chatter — which is useful for parsing device output in a subsequent step.
 
 **Fixed time window:**
 ```
-python -m scripts.deploy_watch examples/hardware/scene_demo.py --seconds 30
+uv run python -m scripts.deploy_watch examples/hardware/scene_demo.py --seconds 30
 ```
 
 **Stop early on a specific marker (here, a crash):**
 ```
-python -m scripts.deploy_watch examples/hardware/scene_demo.py \
+uv run python -m scripts.deploy_watch examples/hardware/scene_demo.py \
     --until "Traceback" --seconds 30
 ```
 
 **Deploy a scene and watch it boot:**
 ```
-python -m scripts.deploy_watch examples/hardware/scene_demo.py --scene hardware_test --seconds 15
+uv run python -m scripts.deploy_watch examples/hardware/scene_demo.py --scene hardware_test --seconds 15
 ```
 
 **Capture clean output to file for later analysis:**
 ```
-python -m scripts.deploy_watch examples/hardware/scene_demo.py \
+uv run python -m scripts.deploy_watch examples/hardware/scene_demo.py \
     --seconds 30 --output /tmp/scene_demo_run.txt
 ```
 

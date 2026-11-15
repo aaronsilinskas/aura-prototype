@@ -3,16 +3,16 @@
 Usage
 -----
     # Deploy and watch until a marker line appears:
-    python scripts/deploy_watch.py examples/hardware/scene_demo.py --until READY
+    uv run python scripts/deploy_watch.py examples/hardware/scene_demo.py --until READY
 
     # Deploy and watch for up to 30 seconds:
-    python scripts/deploy_watch.py examples/hardware/scene_demo.py --seconds 30
+    uv run python scripts/deploy_watch.py examples/hardware/scene_demo.py --seconds 30
 
     # Both: exits 0 on match, 2 on timeout-before-match:
-    python scripts/deploy_watch.py examples/hardware/scene_demo.py --until READY --seconds 10
+    uv run python scripts/deploy_watch.py examples/hardware/scene_demo.py --until READY --seconds 10
 
     # Deploy with a scene (same meaning as deploy.py --scene), then watch:
-    python scripts/deploy_watch.py examples/hardware/scene_demo.py --scene hardware_test \
+    uv run python scripts/deploy_watch.py examples/hardware/scene_demo.py --scene hardware_test \
         --seconds 10
 
 Exit codes
@@ -31,7 +31,7 @@ from pathlib import Path
 from typing import IO, Final, Protocol
 
 if not __package__:
-    # Run as a file (python scripts/deploy_watch.py): put the repo root on the path
+    # Run as a file (uv run python scripts/deploy_watch.py): put the repo root on the path
     # so the package imports below resolve as they do under python -m.
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
