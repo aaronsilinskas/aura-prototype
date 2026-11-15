@@ -57,7 +57,7 @@ engine/           Event-driven game loop (CircuitPython/MicroPython-safe)
   log.py          Board-free, tag-prefixed line logger with an injectable sink
   effects/
     admin.py      EffectAdmin, HeldEffects, SceneView (scene-transition face; hardware can't reach it)
-    builder.py    EffectBuilder
+    builder.py    EffectBuilder, ComposedEffectBuilder
     manager.py    EffectManager; VerbKeyError
     output.py     EffectOutput (abstract hardware output port)
     merge.py      SplitMerge, AdditiveMerge (per-scope layered-buffer compositing;
@@ -175,6 +175,7 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `EffectManager` | `engine/effects/manager.py` | Concrete `EffectControls` + `EffectAdmin`; routes effects to outputs by scope |
 | `EffectOutput` | `engine/effects/output.py` | Abstract hardware output port |
 | `EffectBuilder` | `engine/effects/builder.py` | Callable `(name, config) → Effect`; one per effect item |
+| `ComposedEffectBuilder` | `engine/effects/builder.py` | `EffectBuilder` declaring an optional base builder, fixed options, `EffectAudio` and `EffectHaptic`; builds the base's pixels (keeping its verbs) with the declared audio and haptic |
 | `EffectReceipt` | `engine/state.py` | Handle for a running effect; `stop` plus `brightness`/`loudness` controls |
 | `ScopeValue` / `Scope` | `engine/state.py` | Output-agnostic routing keys (see glossary) |
 | `NetworkControls` | `engine/state.py` | Rule-facing send-only network seam; a send on missing hardware raises `MissingCapabilityError` |

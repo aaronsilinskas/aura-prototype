@@ -213,6 +213,16 @@ class EffectConfig:
             return self._options[key]  # type: ignore[return-value]  # typed like default by contract
         return default
 
+    def with_options(self, options: dict[str, object]) -> EffectConfig:
+        """Return a copy whose *options* replace this config's for those keys.
+
+        Every other option, the ``resolution`` and the ``listeners`` carry over
+        unchanged; this config is left as it was.
+        """
+        merged = dict(self._options)
+        merged.update(options)
+        return EffectConfig(self.resolution, merged, self.listeners)
+
     def notify_listeners(self, verb: EffectVerb) -> None:
         """Announce ``verb`` to every registered listener, in registration order."""
         for listener in self.listeners:

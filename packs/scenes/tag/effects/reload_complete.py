@@ -1,45 +1,27 @@
 """Tag scene "reload_complete" effect — audio + haptic sting for a finished reload.
 
-No pixel output (``Effect.pixels = None``) — issued with ``add_effect`` so it
+No pixel output — issued with ``add_effect`` so it
 layers over the restored ``GLOBAL.BUFF`` ammo bar without a pixel conflict.
 One-shot with ``stops_effect=True`` so the effect (and its haptic) ends
 when the clip finishes.
 """
 
-from __future__ import annotations
-
 from effects.effect import (
     AudioPlaybackConfig,
-    Effect,
     EffectAudio,
-    EffectConfig,
     EffectHaptic,
     EffectVerb,
     HapticPattern,
 )
-from engine.effects.builder import EffectBuilder
+from engine.effects.builder import ComposedEffectBuilder
 
-_RELOAD_COMPLETE_AUDIO = EffectAudio(
-    clips={
-        EffectVerb.START: AudioPlaybackConfig(
-            name="scene.reload_complete", loop=False, stops_effect=True
-        ),
-    }
+BUILD = ComposedEffectBuilder(
+    audio=EffectAudio(
+        clips={
+            EffectVerb.START: AudioPlaybackConfig(
+                name="scene.reload_complete", loop=False, stops_effect=True
+            ),
+        }
+    ),
+    haptic=EffectHaptic(patterns={EffectVerb.START: HapticPattern([HapticPattern.DOUBLE_CLICK])}),
 )
-
-_RELOAD_COMPLETE_HAPTIC = EffectHaptic(
-    patterns={EffectVerb.START: HapticPattern([HapticPattern.DOUBLE_CLICK])}
-)
-
-
-class _Builder(EffectBuilder):
-    def __call__(self, name: str, config: EffectConfig) -> Effect:
-        return Effect(
-            name=name,
-            pixels=None,
-            audio=_RELOAD_COMPLETE_AUDIO,
-            haptic=_RELOAD_COMPLETE_HAPTIC,
-        )
-
-
-BUILD = _Builder()
