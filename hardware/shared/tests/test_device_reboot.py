@@ -1,7 +1,8 @@
 """Behaviour-driven tests for DeviceSceneReboot (hardware/shared/device_reboot.py).
 
-Each test injects a ``RecordingReset`` in place of ``microcontroller.reset``,
-so a "reboot" only records what storage held at the moment it fired.
+Each test injects a recording reset in place of ``microcontroller.reset``,
+so a "reboot" only records what storage held (or how many writes it had seen)
+at the moment it fired.
 """
 
 from engine.log import Logger
@@ -20,6 +21,29 @@ class RecordingReset:
     def __call__(self) -> None:
         store = DeviceStateStore(self._storage)
         self.calls.append((store.get("scene"), store.get("return_to")))
+
+
+class WriteCountingStorage(DeviceStorage):
+    """A real ``DeviceStorage`` that counts ``write_json`` calls, so a test can see writes land."""
+
+    def __init__(self, mount_root: str) -> None:
+        super().__init__(mount_root)
+        self.json_writes = 0
+
+    def write_json(self, name: str, mapping: dict) -> None:
+        self.json_writes += 1
+        super().write_json(name, mapping)
+
+
+class WriteCountAtReset:
+    """A reset that records how many ``write_json`` calls *storage* had seen when it fired."""
+
+    def __init__(self, storage: WriteCountingStorage) -> None:
+        self._storage = storage
+        self.counts: list[int] = []
+
+    def __call__(self) -> None:
+        self.counts.append(self._storage.json_writes)
 
 
 # ---------------------------------------------------------------------------
@@ -50,6 +74,16 @@ def test_reboot_into_resets_once_after_persisting(device_storage):
     reboot.reboot_into("tag")
 
     assert reset.calls == [("tag", "lobby")]
+
+
+def test_reboot_into_persists_in_one_write_before_resetting(tmp_path):
+    storage = WriteCountingStorage(str(tmp_path))
+    reset = WriteCountAtReset(storage)
+    reboot = DeviceSceneReboot(storage, booted_scene="lobby", reset=reset)
+
+    reboot.reboot_into("tag")
+
+    assert reset.counts == [1]
 
 
 def test_reboot_into_on_a_card_less_device_does_not_reset():
@@ -103,6 +137,17 @@ def test_reboot_to_previous_resets_once_after_persisting(device_storage):
     reboot.reboot_to_previous()
 
     assert reset.calls == [("lobby", None)]
+
+
+def test_reboot_to_previous_persists_in_one_write_before_resetting(tmp_path):
+    DeviceStateStore(DeviceStorage(str(tmp_path))).set("return_to", "lobby")
+    storage = WriteCountingStorage(str(tmp_path))
+    reset = WriteCountAtReset(storage)
+    reboot = DeviceSceneReboot(storage, booted_scene="tag", reset=reset)
+
+    reboot.reboot_to_previous()
+
+    assert reset.counts == [1]
 
 
 def test_reboot_to_previous_with_no_recorded_return_to_does_not_reset(device_storage):
