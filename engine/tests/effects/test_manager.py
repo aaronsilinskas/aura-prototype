@@ -814,7 +814,9 @@ def test_set_effect_fires_stop_only_to_outputs_in_call_time_scope(pack_tree) -> 
     assert output_directional.handle_event_calls == []
 
 
-def test_stop_effect_with_broader_scope_fires_stop_to_all_matching_outputs(pack_tree) -> None:
+def test_stop_effect_with_broader_scope_fires_stop_only_to_outputs_that_ran_the_effect(
+    pack_tree,
+) -> None:
     output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
     manager = _make_manager(
@@ -831,14 +833,7 @@ def test_stop_effect_with_broader_scope_fires_stop_to_all_matching_outputs(pack_
     assert output_personal.handle_event_calls == [
         (EffectEvent("stub", "fire", EffectVerb.STOP), frozenset({"personal"}), ANY, fire_receipt)
     ]
-    assert output_directional.handle_event_calls == [
-        (
-            EffectEvent("stub", "fire", EffectVerb.STOP),
-            frozenset({"directional"}),
-            ANY,
-            fire_receipt,
-        )
-    ]
+    assert output_directional.handle_event_calls == []
 
 
 def test_stop_effect_by_receipt_fires_stop_event(pack_tree) -> None:
@@ -1409,6 +1404,21 @@ def test_clear_pixels_fires_for_narrowed_key_with_no_remaining_coverage(pack_tre
 
     manager.add_effect(Scope.ALL, "stub.fire", {})
     manager.stop_effect(Scope.PERSONAL)
+
+    assert output_personal.clear_pixels_calls == ["personal"]
+    assert output_directional.clear_pixels_calls == []
+
+
+def test_stop_effect_with_broader_scope_clears_only_keys_the_effect_occupied(pack_tree) -> None:
+    output_personal = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    output_directional = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
+    manager = _make_manager(
+        registry=_make_stub_registry(pack_tree),
+        outputs=[output_personal, output_directional],
+    )
+
+    manager.add_effect(Scope.PERSONAL, "stub.fire", {})
+    manager.stop_effect(Scope.ALL)
 
     assert output_personal.clear_pixels_calls == ["personal"]
     assert output_directional.clear_pixels_calls == []
