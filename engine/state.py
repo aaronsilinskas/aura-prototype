@@ -150,8 +150,9 @@ class SceneControls:
     def reboot_to_previous(self) -> None:
         """Persist the recorded ``return_to`` scene and reboot immediately.
 
-        A no-op when no ``return_to`` was recorded. A successful reboot
-        never returns to the caller.
+        A no-op when no ``return_to`` was recorded, or when the recorded one
+        is not a scene this device knows. A successful reboot never returns
+        to the caller.
         """
         raise NotImplementedError
 

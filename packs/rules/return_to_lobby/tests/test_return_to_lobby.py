@@ -130,3 +130,15 @@ def test_a_hold_does_not_return_to_a_scene_the_device_cannot_run(simulation, tmp
 
     assert excinfo.value.scene == "red_light_green_light"
     assert json.loads(state_file.read_text()) == {"return_to": "red_light_green_light"}
+
+
+def test_a_hold_does_not_return_to_a_scene_this_prop_does_not_have(simulation, tmp_path):
+    state_file = tmp_path / "aura-state.json"
+    state_file.write_text(json.dumps({"return_to": "another_props_scene"}))
+    device = simulation.add_device("red", scene="element_browser", card=tmp_path)
+
+    device.hold("A", "B")
+    simulation.advance(hold_seconds("element_browser"))
+
+    assert device.scene == "element_browser"
+    assert json.loads(state_file.read_text()) == {"return_to": "another_props_scene"}

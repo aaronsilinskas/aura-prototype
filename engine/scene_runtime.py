@@ -11,6 +11,7 @@ from __future__ import annotations
 from engine.effects.manager import EffectManager
 from engine.effects.output import EffectOutput
 from engine.events import Event
+from engine.log import Logger
 from engine.namespace import ActiveSceneNamespace
 from engine.pack_catalog import PackCatalog
 from engine.scene import SceneManager
@@ -26,7 +27,8 @@ class SceneRuntime:
     Built from *catalog* and what the device offers: its effect *outputs*,
     *network_controls*, *capabilities* and *scene_reboot* port. *clock* is
     the one clock the scene and its effects run on; omitted, a wall-clock
-    ``Timer`` is built. Because it builds every part itself, the namespace
+    ``Timer`` is built. *logger* is where the scene manager logs a declined
+    Return to lobby; omitted, nothing is logged. Because it builds every part itself, the namespace
     effects resolve names through is always the one transitions install
     Scene views into, and effects always update on the scene's clock.
 
@@ -49,6 +51,7 @@ class SceneRuntime:
         capabilities: frozenset[str],
         scene_reboot: SceneReboot,
         clock: Timer | None = None,
+        logger: Logger | None = None,
     ) -> None:
         self._clock: Timer = clock if clock is not None else Timer()
         self._namespace = ActiveSceneNamespace(catalog.effect_registry, catalog.pack_sounds)
@@ -61,6 +64,7 @@ class SceneRuntime:
             catalog.scene_registry,
             self._effect_manager,
             scene_reboot,
+            logger,
         )
 
     def activate_boot_scene(self, name: str) -> None:
