@@ -92,7 +92,9 @@ def _resolve_boot_scene_name(
     ``PersistedScene.boot_candidates``).
     A Persisted scene unknown to *scene_registry*, or one the device can't
     run, is skipped, logged once to *logger*, and left on the card: the card
-    may go back to a prop that has it and can run it.
+    may go back to a prop that has it and can run it. With no flash
+    ``default_scene`` the Persisted scene is the fallback, with nothing to
+    skip to, so it is never skipped.
 
     Raises:
         ValueError: The fallback is unknown to *scene_registry*; names the
@@ -213,10 +215,10 @@ def build_scene_boot(
             misconfigured.
         MissingCapabilityError: no boot scene candidate fits the device's
             Capabilities.
-        ValueError: neither boot file names a scene, the flash
-            ``default_scene`` is unknown (the message names the known
-            scenes), or the booted scene declares an unknown wire-frame
-            codec.
+        ValueError: neither boot file names a scene; the flash
+            ``default_scene`` is unknown, or there is none and the Persisted
+            scene is unknown (the message names the known scenes); or the
+            booted scene declares an unknown wire-frame codec.
     """
     catalog = _scan_boot_pack_catalog(hw.storage, setting_overrides)
     scene_registry = catalog.scene_registry

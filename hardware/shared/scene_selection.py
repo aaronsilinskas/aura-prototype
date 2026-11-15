@@ -13,6 +13,7 @@ except ImportError:
 
 __all__ = [
     "SCENE_DEPLOY_TOKEN_KEY",
+    "non_empty_string_or_none",
     "resolve_scene_name",
     "with_scene_deploy",
 ]
@@ -20,7 +21,7 @@ __all__ = [
 SCENE_DEPLOY_TOKEN_KEY: Final = "scene_deploy_token"
 
 
-def _non_empty_string_or_none(value: object) -> str | None:
+def non_empty_string_or_none(value: object) -> str | None:
     """Return *value* unchanged when it is a non-empty string, else None.
 
     A present-but-wrong-typed or empty-string value is treated the same as
@@ -41,7 +42,7 @@ def resolve_scene_name(boot_mapping: dict) -> str:
         boot_mapping: The raw ``aura-boot.json`` mapping.
     """
     raw = boot_mapping.get("default_scene")
-    scene = _non_empty_string_or_none(raw)
+    scene = non_empty_string_or_none(raw)
     if scene is not None:
         return scene
     raise ValueError(f"aura-boot.json 'default_scene' must be a non-empty string, got {raw!r}")

@@ -44,6 +44,11 @@ LOBBY_ENTRIES = _lobby_entries()
 """``example_lobby``'s entries, in the order A steps through them."""
 
 
+def _state_file(card: Path) -> bytes:
+    """The card's whole state file, as opaque bytes, to show a hold changed nothing on it."""
+    return (card / "aura-state.json").read_bytes()
+
+
 def hold_seconds(scene: str) -> float:
     return settings_for(scene).get_float("return_to_lobby", "hold_seconds")
 
@@ -120,29 +125,42 @@ def test_a_device_lacking_what_the_pack_requires_does_not_start_the_scene(
 def test_a_hold_does_not_return_to_a_scene_the_device_cannot_run(
     simulation, tmp_path, persisted_scene_on
 ):
-    record = persisted_scene_on(tmp_path)
-    record.record_reboot("element_browser", "red_light_green_light")
+    persisted_scene_on(tmp_path).record_reboot("element_browser", "red_light_green_light")
     device = simulation.add_device(
         "red", scene="element_browser", card=tmp_path, without={"accelerometer"}
     )
+    card_before = _state_file(tmp_path)
 
     device.hold("A", "B")
     with pytest.raises(MissingCapabilityError) as excinfo:
         simulation.advance(hold_seconds("element_browser"))
 
     assert excinfo.value.scene == "red_light_green_light"
-    assert record.previous_scene() == "red_light_green_light"
+    assert _state_file(tmp_path) == card_before
 
 
 def test_a_hold_does_not_return_to_a_scene_this_prop_does_not_have(
     simulation, tmp_path, persisted_scene_on
 ):
-    record = persisted_scene_on(tmp_path)
-    record.record_reboot("element_browser", "another_props_scene")
+    persisted_scene_on(tmp_path).record_reboot("element_browser", "another_props_scene")
     device = simulation.add_device("red", scene="element_browser", card=tmp_path)
+    card_before = _state_file(tmp_path)
 
     device.hold("A", "B")
     simulation.advance(hold_seconds("element_browser"))
 
     assert device.scene == "element_browser"
-    assert record.previous_scene() == "another_props_scene"
+    assert _state_file(tmp_path) == card_before
+
+
+def test_a_hold_with_a_scene_this_prop_does_not_have_to_return_to_logs_it(
+    simulation, tmp_path, persisted_scene_on
+):
+    persisted_scene_on(tmp_path).record_reboot("element_browser", "another_props_scene")
+    device = simulation.add_device("red", scene="element_browser", card=tmp_path)
+
+    device.hold("A", "B")
+    simulation.advance(hold_seconds("element_browser"))
+
+    [line] = [line for line in device.printed if "'another_props_scene'" in line]
+    assert "not rebooting" in line
