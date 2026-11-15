@@ -23,13 +23,13 @@ from hardware.shared.sd_sync_server import SdSyncServer
 
 
 def test_read_returns_the_exact_bytes_of_a_written_file(device_storage):
-    device_storage.write_bytes("aura-state.json", b'{"scene": "tag"}')
+    device_storage.write_bytes("aura-state.json", b'{"level": "tag"}')
     server = SdSyncServer(device_storage)
 
     chunks = server.read("aura-state.json")
 
     assert chunks is not None
-    assert b"".join(chunks) == b'{"scene": "tag"}'
+    assert b"".join(chunks) == b'{"level": "tag"}'
 
 
 def test_read_returns_none_for_a_never_written_path(device_storage):
@@ -56,9 +56,9 @@ def test_read_yields_more_than_one_chunk_for_content_larger_than_chunk_size(devi
 def test_write_stores_the_exact_bytes_of_the_streamed_chunks(device_storage):
     server = SdSyncServer(device_storage)
 
-    server.write("aura-state.json", [b'{"scene": ', b'"tag"}'])
+    server.write("aura-state.json", [b'{"level": ', b'"tag"}'])
 
-    assert device_storage.read_bytes("aura-state.json") == b'{"scene": "tag"}'
+    assert device_storage.read_bytes("aura-state.json") == b'{"level": "tag"}'
 
 
 def test_write_creates_missing_parent_directories(device_storage):
@@ -75,7 +75,7 @@ def test_write_creates_missing_parent_directories(device_storage):
 
 
 def test_list_returns_every_seeded_file_at_the_card_root(device_storage):
-    device_storage.write_bytes("aura-state.json", b'{"scene": "tag"}')
+    device_storage.write_bytes("aura-state.json", b'{"level": "tag"}')
     device_storage.write_bytes("aura_packs/scenes/tag/scene.json", b"{}")
     server = SdSyncServer(device_storage)
 
@@ -86,7 +86,7 @@ def test_list_returns_every_seeded_file_at_the_card_root(device_storage):
 
 
 def test_list_of_a_named_subpath_scopes_to_files_beneath_it(device_storage):
-    device_storage.write_bytes("aura-state.json", b'{"scene": "tag"}')
+    device_storage.write_bytes("aura-state.json", b'{"level": "tag"}')
     device_storage.write_bytes("aura_packs/scenes/tag/scene.json", b"{}")
     device_storage.write_bytes("aura_packs/scenes/lobby/scene.json", b"{}")
     server = SdSyncServer(device_storage)
@@ -95,7 +95,7 @@ def test_list_of_a_named_subpath_scopes_to_files_beneath_it(device_storage):
 
 
 def test_list_of_an_empty_subpath_returns_no_entries(device_storage):
-    device_storage.write_bytes("aura-state.json", b'{"scene": "tag"}')
+    device_storage.write_bytes("aura-state.json", b'{"level": "tag"}')
     server = SdSyncServer(device_storage)
 
     assert server.list("aura_packs/scenes") == []
@@ -127,7 +127,7 @@ class _ScriptedTransport(Transport):
 
 
 def test_serve_one_services_a_list_request(device_storage):
-    device_storage.write_bytes("aura-state.json", b'{"scene": "tag"}')
+    device_storage.write_bytes("aura-state.json", b'{"level": "tag"}')
     server = SdSyncServer(device_storage)
     transport = _ScriptedTransport([encode_frame(Frame("req", "list "))])
 

@@ -414,6 +414,7 @@ class SimulatedDevice:
         self._boot_values: dict[str, object] = {"default_scene": scene}
         self._setting_overrides = setting_overrides
         self._narration: list[str] = []
+        self._boot_narration_end = 0
         self._logger = Logger("[hw]", sink=self._narration.append)
         self._sim_hw = SimulatedHardware(
             now=lambda: sim.now,
@@ -441,13 +442,23 @@ class SimulatedDevice:
         self._namespace = boot.namespace
         self.scene = boot.scene_name
         """The scene the device is running now."""
+        self._boot_narration_end = len(self._narration)
 
     @property
     def boot_narration(self) -> list[str]:
         """The ``[hw]`` lines the device printed as it last booted, as a board prints them.
 
-        The Device assembly's Boot narration, then what the Scene boot logged,
-        such as a skipped Persisted scene.
+        The Device assembly's lines, then what the Scene boot logged, such as
+        a skipped Persisted scene.
+        """
+        return "".join(self._narration[: self._boot_narration_end]).splitlines()
+
+    @property
+    def printed(self) -> list[str]:
+        """Every ``[hw]`` line the device has printed since it last booted.
+
+        The ``boot_narration``, then what the running scene logged, such as a
+        Return to lobby with nowhere to return to.
         """
         return "".join(self._narration).splitlines()
 

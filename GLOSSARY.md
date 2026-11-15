@@ -342,7 +342,7 @@ The board-free turning of a `DeviceConfig` into a `DeviceHardware`, shared by th
 _Avoid_: builder (names the device-only entry point); repeating gating or IR wiring in a `DeviceParts` adapter
 
 ### Boot narration
-The `[hw]` lines a device prints as the **Device assembly** brings it up: a begin line naming the board, one line per part (what it is, how it's wired, and whether it came up, was skipped as disabled, or `FAILED`), and a ready line with counts and elapsed time. Only the Device assembly writes it, so each part's line reads the same on every prop and in the **Simulated device**.
+The `[hw]` lines a device prints as it boots: the **Device assembly**'s begin line naming the board, one line per part (what it is, how it's wired, and whether it came up, was skipped as disabled, or `FAILED`), and ready line with counts and elapsed time, then any line the **Scene boot** logs (a skipped **Persisted scene**). Only the Device assembly describes a part, so each part's line reads the same on every prop and in the **Simulated device**.
 _Avoid_: "build log", "boot log" for it; describing a part anywhere but the Device assembly; parsing it in tools (it is for people reading deploy-watch output)
 
 ### Pin reference

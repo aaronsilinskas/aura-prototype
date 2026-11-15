@@ -15,15 +15,16 @@ Add a ``"default_scene"`` string to ``aura-boot.json``, kept alongside
     }
 
 ``run_scene`` resolves the boot scene only after hardware is brought up (so
-the SD card, if any, is mounted): a ``scene`` value persisted to the SD
-card's ``aura-state.json`` overrides this flash ``default_scene``; a
-card-less device, or one with nothing persisted, boots the flash default
-unaffected.  There is no code-level default scene: when neither a persisted
-selection nor a flash default is set, boot raises and stops.  An unknown
-name (not in the scene registry) also raises, naming the known scenes,
-rather than silently running a fallback scene.  ``DeviceConfig`` carries no
-``scene`` field — the hardware config (``aura-device.json``) has nothing to
-do with scene selection.
+the SD card, if any, is mounted): the Persisted scene on the SD card's
+``aura-state.json`` overrides this flash ``default_scene``; a card-less
+device, or one with nothing persisted, boots the flash default unaffected.
+A Persisted scene this device doesn't know, or can't run, is skipped and
+logged, and the flash default boots.  There is no code-level default scene:
+when neither a Persisted scene nor a flash default is set, boot raises and
+stops.  An unknown flash ``default_scene`` (not in the scene registry) also
+raises, naming the known scenes, rather than silently running a fallback
+scene.  ``DeviceConfig`` carries no ``scene`` field — the hardware config
+(``aura-device.json``) has nothing to do with scene selection.
 
 Hardware
 --------

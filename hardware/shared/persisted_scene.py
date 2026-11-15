@@ -17,18 +17,13 @@ except ImportError:
 
 from engine.log import Logger
 from hardware.shared.device_state import DeviceStateStore
-from hardware.shared.scene_selection import SCENE_DEPLOY_TOKEN_KEY
+from hardware.shared.scene_selection import SCENE_DEPLOY_TOKEN_KEY, non_empty_string_or_none
 
 __all__ = ["PersistedScene"]
 
 _SCENE_KEY: Final = "persisted_scene.scene"
 _RETURN_TO_KEY: Final = "persisted_scene.return_to"
 _DEPLOY_TOKEN_KEY: Final = "persisted_scene.deploy_token"
-
-
-def _non_empty_string_or_none(value: object) -> str | None:
-    """Return *value* when it is a non-empty string, else None, so a wrong-typed value is absent."""
-    return value if isinstance(value, str) and value else None
 
 
 class PersistedScene:
@@ -54,7 +49,7 @@ class PersistedScene:
         recorded, in one write, and the deploy is logged. An absent, empty or
         already recorded token changes nothing.
         """
-        token = _non_empty_string_or_none(boot_mapping.get(SCENE_DEPLOY_TOKEN_KEY))
+        token = non_empty_string_or_none(boot_mapping.get(SCENE_DEPLOY_TOKEN_KEY))
         if token is None:
             return
         state = self._store.read()
@@ -83,8 +78,8 @@ class PersistedScene:
             ValueError: Neither the Persisted scene nor a flash
                 ``default_scene`` is a non-empty string.
         """
-        persisted = _non_empty_string_or_none(self._store.get(_SCENE_KEY))
-        default = _non_empty_string_or_none(boot_mapping.get("default_scene"))
+        persisted = non_empty_string_or_none(self._store.get(_SCENE_KEY))
+        default = non_empty_string_or_none(boot_mapping.get("default_scene"))
         if default is None or default == persisted:
             if persisted is None:
                 raise ValueError(
@@ -111,4 +106,4 @@ class PersistedScene:
 
     def previous_scene(self) -> str | None:
         """The recorded ``return_to``, or ``None`` when none is."""
-        return _non_empty_string_or_none(self._store.get(_RETURN_TO_KEY))
+        return non_empty_string_or_none(self._store.get(_RETURN_TO_KEY))

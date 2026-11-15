@@ -166,6 +166,15 @@ def test_an_unknown_default_scene_behind_an_unknown_persisted_scene_raises_namin
         probe.boot(_hw(probe.storage), boot_mapping={"default_scene": "not-a-real-default"})
 
 
+def test_an_unknown_persisted_scene_with_no_default_scene_behind_it_raises_naming_the_known_scenes(
+    probe,
+):
+    _persist(probe.storage, "not-a-real-scene")
+
+    with pytest.raises(ValueError, match=f"unknown scene 'not-a-real-scene'.*{_FLASH_SCENE}"):
+        probe.boot(_hw(probe.storage), boot_mapping={})
+
+
 def test_a_persisted_scene_the_device_cant_run_is_skipped_for_the_flash_default(probe):
     _persist(probe.storage, PROBE_SCENE)
 
