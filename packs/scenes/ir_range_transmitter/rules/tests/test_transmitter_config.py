@@ -1,5 +1,7 @@
-"""Tests for ``TransmitterConfig`` — built from the scene's declared Settings,
-its derived values, and the ``transmitter_config`` get-or-create accessor."""
+"""Tests for ``TransmitterConfig``'s derived values and the ``transmitter_config``
+get-or-create accessor.
+
+``packs/tests/test_scene_configs.py`` checks that each Setting lands in its field."""
 
 from __future__ import annotations
 
@@ -11,31 +13,11 @@ from packs.scenes.ir_range_transmitter.rules.helpers.transmitter_config import (
     TransmitterConfig,
     transmitter_config,
 )
-from packs.tests.settings_helper import declared_scene_defaults, settings_for
+from packs.tests.settings_helper import settings_for
 
 
 def _settings(**values: object) -> Settings:
     return settings_for("ir_range_transmitter", settings=values)
-
-
-# ---------------------------------------------------------------------------
-# Building from Settings
-# ---------------------------------------------------------------------------
-
-
-def test_each_scene_setting_override_sets_the_config_field_of_the_same_name():
-    config = TransmitterConfig(_settings(send_rate_hz=10.0, payload_size=8))
-
-    assert config.send_rate_hz == pytest.approx(10.0)
-    assert config.payload_size == 8
-
-
-def test_with_no_overrides_each_field_holds_its_declared_default():
-    defaults = declared_scene_defaults("ir_range_transmitter")
-
-    config = TransmitterConfig(_settings())
-
-    assert {name: getattr(config, name) for name in defaults} == defaults
 
 
 # ---------------------------------------------------------------------------
