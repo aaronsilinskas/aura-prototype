@@ -1,3 +1,5 @@
+import pytest
+
 from effects.effect import (
     AudioPlaybackConfig,
     EffectAudio,
@@ -24,6 +26,11 @@ def test_without_a_base_the_effect_has_no_pixels_and_the_declared_audio_and_hapt
     assert effect.pixels is None
     assert effect.audio is _AUDIO
     assert effect.haptic is _HAPTIC
+
+
+def test_fixed_options_without_a_base_are_rejected() -> None:
+    with pytest.raises(ValueError, match="base"):
+        ComposedEffectBuilder(options={"color": 0xFFFFFF})
 
 
 def test_with_a_base_the_effect_carries_the_base_pixels_and_the_declared_audio_and_haptic() -> None:
@@ -77,6 +84,7 @@ def test_fixed_options_leave_the_caller_listeners_on_the_base_config() -> None:
     build = ComposedEffectBuilder(base, options={"color": 0xFFFFFF})
 
     build("scene.flash", EffectConfig(resolution=7, listeners=[heard.append]))
+
     assert base.last_config is not None
     base.last_config.notify_listeners(EffectVerb.START)
 

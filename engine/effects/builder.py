@@ -21,7 +21,8 @@ class EffectBuilder:
                 ``config.resolution`` describes the output hardware.
 
         Returns:
-            A configured ``Effect`` ready to be advanced each frame.
+            A configured ``Effect`` ready to be advanced each frame, new on
+            every call, so callers such as ``ComposedEffectBuilder`` may modify it.
         """
         raise NotImplementedError
 
@@ -29,11 +30,15 @@ class EffectBuilder:
 class ComposedEffectBuilder(EffectBuilder):
     """Builds a base effect's pixels plus a declared ``EffectAudio`` and ``EffectHaptic``.
 
-    *options* fix those keys of the base's options; every other caller option
-    passes through. The base's pixels carry their declared custom verbs, so
-    clips and patterns may be keyed on them (a pulse's ``PEAK``), and
-    ``EffectManager`` checks those keys as for any effect. Without a base the
-    effect has no pixels. Whatever audio or haptic the base built is replaced.
+    *options* fix those keys of the base's options; every other caller option,
+    and the caller's listeners, pass through. The base's pixels carry their
+    declared custom verbs, so clips and patterns may be keyed on them (a
+    pulse's ``PEAK``), and ``EffectManager`` checks those keys as for any
+    effect. Without a base the effect has no pixels. Whatever audio or haptic
+    the base built is replaced.
+
+    Raises:
+        ValueError: *options* are given without a *base* to apply them to.
     """
 
     def __init__(
@@ -43,6 +48,8 @@ class ComposedEffectBuilder(EffectBuilder):
         audio: EffectAudio | None = None,
         haptic: EffectHaptic | None = None,
     ) -> None:
+        if base is None and options is not None:
+            raise ValueError("ComposedEffectBuilder options need a base to apply them to")
         self._base = base
         self._options = options
         self._audio = audio

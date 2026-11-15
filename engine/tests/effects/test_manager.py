@@ -1242,15 +1242,16 @@ def test_wrapper_may_key_clips_on_the_verbs_its_reused_pack_pixels_declare(pack_
     assert peak.clip.path == catalog.pack_sounds["sfx.boom"]
 
 
-# A scene-local effect composing basic.pulse's pixels with a clip keyed on *verb*.
-def _composed_pulse_item(verb_source: str) -> str:
+# A scene-local effect composing basic.pulse's pixels, with *options_source* fixed,
+# and a clip keyed on *verb*.
+def _composed_pulse_item(verb_source: str, options_source: str = "None") -> str:
     return (
         "from effects.effect import AudioPlaybackConfig, EffectAudio, EffectVerb\n"
         "from engine.effects.builder import ComposedEffectBuilder\n"
         "from packs.effects.basic.helpers.pulse_effect import PulseEffect\n"
         "from packs.effects.basic.pulse import BUILD as PULSE\n"
         f"_AUDIO = EffectAudio({{{verb_source}: AudioPlaybackConfig('sfx.boom', loop=False)}})\n"
-        "BUILD = ComposedEffectBuilder(PULSE, audio=_AUDIO)\n"
+        f"BUILD = ComposedEffectBuilder(PULSE, options={options_source}, audio=_AUDIO)\n"
     )
 
 
@@ -1262,6 +1263,24 @@ def test_composed_effect_may_key_clips_on_the_verbs_its_base_pixels_declare(pack
     manager.set_effect(Scope.PERSONAL, "sfx.warn", {})
     timer = _make_timer()
     timer.elapsed = _PAST_PULSE_PEAK
+
+    manager.update(timer)
+
+    peak = _events(output)[-1]
+    assert peak.verb.name == "peak"
+    assert peak.clip is not None
+    assert peak.clip.path == catalog.pack_sounds["sfx.boom"]
+
+
+def test_composed_effect_with_fixed_options_plays_the_clip_keyed_on_its_base_peak(
+    pack_tree,
+) -> None:
+    output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    item = _composed_pulse_item("PulseEffect.PEAK", "{'brighten_duration': 0.2}")
+    manager, catalog = _make_clip_manager(pack_tree, {"warn": item}, [output])
+    manager.set_effect(Scope.PERSONAL, "sfx.warn", {})
+    timer = _make_timer()
+    timer.elapsed = 0.3  # past the fixed 0.2 s brighten, before the default 0.5 s one
 
     manager.update(timer)
 

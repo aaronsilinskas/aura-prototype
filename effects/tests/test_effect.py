@@ -47,6 +47,40 @@ def test_get_option_returns_default_when_no_options_were_provided() -> None:
 
 
 # ---------------------------------------------------------------------------
+# EffectConfig — with_options
+# ---------------------------------------------------------------------------
+
+
+def test_with_options_replaces_the_given_keys_and_keeps_the_others() -> None:
+    config = EffectConfig(resolution=10, options={"color": "red", "speed": 2})
+
+    copy = config.with_options({"color": "white"})
+
+    assert copy.get_option("color", "") == "white"
+    assert copy.get_option("speed", 0) == 2
+
+
+def test_with_options_keeps_the_resolution_and_listeners() -> None:
+    received: list[EffectVerb] = []
+    config = EffectConfig(resolution=7, listeners=[received.append])
+
+    copy = config.with_options({"color": "white"})
+    copy.notify_listeners(EffectVerb.START)
+
+    assert copy.resolution == 7
+    assert received == [EffectVerb.START]
+
+
+def test_with_options_leaves_the_original_config_unchanged() -> None:
+    config = EffectConfig(resolution=10, options={"color": "red"})
+
+    config.with_options({"color": "white", "speed": 2})
+
+    assert config.get_option("color", "") == "red"
+    assert config.get_option("speed", 0) == 0
+
+
+# ---------------------------------------------------------------------------
 # EffectConfig — listeners
 # ---------------------------------------------------------------------------
 
