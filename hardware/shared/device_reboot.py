@@ -26,7 +26,7 @@ class DeviceSceneReboot(SceneReboot):
 
     Holds *storage* itself (not just the ``DeviceStateStore`` composed over
     it) so it knows whether persistence is available: on a card-less device
-    (``storage is None``, where ``DeviceStateStore.set`` is a silent no-op)
+    (``storage is None``, where every ``DeviceStateStore`` write is a silent no-op)
     this adapter does not reboot at all for either method — it logs and
     returns, leaving the caller running, since persisting nothing and then
     resetting would boot into whatever ``aura-boot.json`` already

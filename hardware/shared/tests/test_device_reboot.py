@@ -1,7 +1,8 @@
 """Behaviour-driven tests for DeviceSceneReboot (hardware/shared/device_reboot.py).
 
-Each test injects a ``RecordingReset`` in place of ``microcontroller.reset``,
-so a "reboot" only records what storage held at the moment it fired.
+Each test injects a recording reset in place of ``microcontroller.reset``,
+so a "reboot" only records what storage held (or how many writes it had seen)
+at the moment it fired.
 """
 
 from engine.log import Logger
