@@ -1,52 +1,31 @@
 """Tag scene "fire_shot" effect — one-shot felt feedback for a Button-A shot.
 
-Built on ``basic.solid``: a bright flash of color, layered with a one-shot
-``scene.fire_shot_start`` audio clip (``stops_effect=True`` so the whole effect —
-pixels and haptic included — ends when the clip finishes, returning
-``Scope.DIRECTIONAL`` to dark) and a strong haptic pulse.
+Built on ``basic.solid``: a bright white flash, whatever color a caller passes,
+layered with a one-shot ``scene.fire_shot_start`` audio clip
+(``stops_effect=True`` so the whole effect — pixels and haptic included — ends
+when the clip finishes, returning ``Scope.DIRECTIONAL`` to dark) and a strong
+haptic pulse.
 """
-
-from __future__ import annotations
 
 from effects.effect import (
     AudioPlaybackConfig,
-    Effect,
     EffectAudio,
-    EffectConfig,
     EffectHaptic,
     EffectVerb,
     HapticPattern,
 )
-from engine.effects.builder import EffectBuilder
+from engine.effects.builder import ComposedEffectBuilder
 from packs.effects.basic.solid import SolidBuilder
 
-_solid = SolidBuilder()
-
-_FIRE_SHOT_AUDIO = EffectAudio(
-    clips={
-        EffectVerb.START: AudioPlaybackConfig(
-            name="scene.fire_shot_start", loop=False, stops_effect=True
-        )
-    }
+BUILD = ComposedEffectBuilder(
+    SolidBuilder(),
+    options={"color": 0xFFFFFF},
+    audio=EffectAudio(
+        clips={
+            EffectVerb.START: AudioPlaybackConfig(
+                name="scene.fire_shot_start", loop=False, stops_effect=True
+            )
+        }
+    ),
+    haptic=EffectHaptic(patterns={EffectVerb.START: HapticPattern([HapticPattern.STRONG_CLICK])}),
 )
-
-_FIRE_SHOT_HAPTIC = EffectHaptic(
-    patterns={EffectVerb.START: HapticPattern([HapticPattern.STRONG_CLICK])}
-)
-
-_FLASH_COLOR = 0xFFFFFF
-
-
-class _Builder(EffectBuilder):
-    def __call__(self, name: str, config: EffectConfig) -> Effect:
-        base_config = EffectConfig(resolution=config.resolution, options={"color": _FLASH_COLOR})
-        base = _solid(name, base_config)
-        return Effect(
-            name=name,
-            pixels=base.pixels,
-            audio=_FIRE_SHOT_AUDIO,
-            haptic=_FIRE_SHOT_HAPTIC,
-        )
-
-
-BUILD = _Builder()
