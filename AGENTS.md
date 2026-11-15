@@ -24,4 +24,4 @@ Single-context: root `GLOSSARY.md` (canonical terms + what to avoid), `docs/doma
 
 ## Workflows
 
-Agent sessions for this repo run from the home repo, `mindwidgets/core` (`~/dev/mindwidgets/core`), started with `claude --add-dir ~/dev/aura/aura-prototype`. Its `AGENTS.md` defines the spec and ticket workflows, the `implement`/`implement-spec` notes, the publish scripts and the skills. This file holds aura's project facts only.
+Agent sessions for this repo run from the home repo, `mindwidgets/core` (`~/dev/mindwidgets/core`), which pre-approves this directory in its `.claude/settings.json`. Its `AGENTS.md` defines the spec and ticket workflows, the `implement`/`implement-spec` notes, the publish scripts and the skills. This file holds aura's project facts only.
