@@ -6,50 +6,34 @@ and the scope returns to dark — the moment the clip finishes, plus a
 strong-buzz/pause/strong-click haptic sequence for a punchier hit feel.
 """
 
-from __future__ import annotations
-
 from effects.effect import (
     AudioPlaybackConfig,
-    Effect,
     EffectAudio,
-    EffectConfig,
     EffectHaptic,
     EffectVerb,
     HapticPattern,
 )
-from engine.effects.builder import EffectBuilder
+from engine.effects.builder import ComposedEffectBuilder
 from packs.effects.basic.pulse import PulseBuilder
 
-_pulse = PulseBuilder()
-
-_HIT_HAPTIC = EffectHaptic(
-    patterns={
-        EffectVerb.START: HapticPattern(
-            [
-                HapticPattern.STRONG_BUZZ,
-                HapticPattern.PAUSE_250,
-                HapticPattern.STRONG_CLICK,
-            ]
-        )
-    }
+BUILD = ComposedEffectBuilder(
+    PulseBuilder(),
+    audio=EffectAudio(
+        clips={
+            EffectVerb.START: AudioPlaybackConfig(
+                name="scene.hit_start", loop=False, stops_effect=True
+            )
+        }
+    ),
+    haptic=EffectHaptic(
+        patterns={
+            EffectVerb.START: HapticPattern(
+                [
+                    HapticPattern.STRONG_BUZZ,
+                    HapticPattern.PAUSE_250,
+                    HapticPattern.STRONG_CLICK,
+                ]
+            )
+        }
+    ),
 )
-
-_HIT_AUDIO = EffectAudio(
-    clips={
-        EffectVerb.START: AudioPlaybackConfig(name="scene.hit_start", loop=False, stops_effect=True)
-    }
-)
-
-
-class _Builder(EffectBuilder):
-    def __call__(self, name: str, config: EffectConfig) -> Effect:
-        base = _pulse(name, config)
-        return Effect(
-            name=base.name,
-            pixels=base.pixels,
-            audio=_HIT_AUDIO,
-            haptic=_HIT_HAPTIC,
-        )
-
-
-BUILD = _Builder()
