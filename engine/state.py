@@ -170,8 +170,8 @@ class SceneReboot:
 
     Mirrors how ``SceneManager`` already reaches ``EffectAdmin`` through an
     injected seam: ``SceneManager`` validates ``reboot_into``'s *target*
-    against its scene registry (a typo must never persist a name that would
-    brick the next boot), checks the target's Required capabilities (reading
+    against its scene registry (a typo must never persist a name the next
+    boot would only skip), checks the target's Required capabilities (reading
     ``reboot_to_previous``'s target from ``previous_scene``), and otherwise
     delegates both reboots straight to this port. All the device work —
     writing the scene switch to durable storage and physically resetting the

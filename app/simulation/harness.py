@@ -34,6 +34,7 @@ from types import TracebackType
 
 from app.scene_composition import build_scene_boot
 from engine.capabilities import IR_RECEIVE, button_label_of, ir_emitter_of, unknown_capabilities
+from engine.log import Logger
 from engine.pack_catalog import SettingOverrides
 from engine.state import ScopeValue
 from engine.timer import Timer
@@ -412,11 +413,14 @@ class SimulatedDevice:
         self._switched_on_into = scene
         self._boot_values: dict[str, object] = {"default_scene": scene}
         self._setting_overrides = setting_overrides
+        self._narration: list[str] = []
+        self._logger = Logger("[hw]", sink=self._narration.append)
         self._sim_hw = SimulatedHardware(
             now=lambda: sim.now,
             config=_simulated_device_config(without, radio_node),
             ir_sink=lambda emitter, pulses: sim._carry_ir(self, emitter, pulses),
             radio_sink=lambda payload: sim._carry_radio(self, payload),
+            logger=self._logger,
             card=None if card is None else str(card),
         )
         self._boot()
@@ -429,6 +433,7 @@ class SimulatedDevice:
             dict(self._boot_values),
             reset=_reset,
             timer=_SimulationClock(self._sim),
+            logger=self._logger,
             setting_overrides=self._setting_overrides,
         )
         self._scene_tick = boot.tick
@@ -436,6 +441,15 @@ class SimulatedDevice:
         self._namespace = boot.namespace
         self.scene = boot.scene_name
         """The scene the device is running now."""
+
+    @property
+    def boot_narration(self) -> list[str]:
+        """The ``[hw]`` lines the device printed as it last booted, as a board prints them.
+
+        The Device assembly's Boot narration, then what the Scene boot logged,
+        such as a skipped Persisted scene.
+        """
+        return "".join(self._narration).splitlines()
 
     # -- deploys ------------------------------------------------------------
 
@@ -456,6 +470,7 @@ class SimulatedDevice:
         The device boots into whatever its card names, else its flash
         ``default_scene``.
         """
+        self._narration.clear()
         self._sim_hw.power_on()
         self._boot()
 

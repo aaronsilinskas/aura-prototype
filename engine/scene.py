@@ -471,7 +471,7 @@ class SceneManager(SceneControls):
         Raises ``ValueError`` naming the known scenes, and persists nothing,
         when *target* is not in the scene registry — a typo caught here
         (e.g. at the Button-B press) never reaches the port, so it never
-        persists a name that would brick the next boot. A known *target*
+        persists a name the next boot would only skip. A known *target*
         the device can run delegates straight through;
         ``SceneReboot.reboot_into`` reboots and never returns.
 
@@ -487,9 +487,8 @@ class SceneManager(SceneControls):
         """Check the port's ``previous_scene``, then delegate to the port.
 
         With nothing recorded the port's own no-op handles it. A recorded
-        scene is not checked against the registry here: an unknown one is
-        caught at boot by ``SceneRegistry.resolve_known``, exactly like the
-        Persisted scene.
+        scene unknown to the registry is not checked here; the port reboots
+        into it, and the Scene boot skips it as an unknown Persisted scene.
 
         Raises:
             MissingCapabilityError: the device can't run the recorded scene;
