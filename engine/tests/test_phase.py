@@ -71,6 +71,17 @@ class _LifecycleRule(PhaseRule):
             self._transitions_to = None
 
 
+class _DeafOwner(PhaseRule):
+    """PhaseRule that emits ``enter:`` but subscribes to no event, so is never dispatched."""
+
+    def __init__(self, phase: PhaseKey, label: str, phase_slot: PhaseSlot) -> None:
+        super().__init__(phase, phase_slot)
+        self._label = label
+
+    def on_enter(self, state: GameState) -> None:
+        state.effect_controls.add_effect(Scope.PERSONAL, "enter:" + self._label, {})
+
+
 class _TransitionsOnEnterRule(PhaseRule):
     """PhaseRule whose ``on_enter`` (wrongly) transitions straight to another phase."""
 
@@ -369,9 +380,9 @@ def test_in_phase_rule_handler_fires_only_while_its_phase_is_active() -> None:
     assert names.index("in:bystander") > names.index("tick:a")
 
 
-def test_in_phase_rule_does_not_consume_the_entry_flag_for_a_phase_owner() -> None:
-    # InPhaseRule registered first so it dispatches before the owner each tick;
-    # if it consumed the entry flag, the owner's on_enter would never fire.
+def test_the_initial_phases_on_enter_runs_once_when_an_in_phase_rule_dispatches_first() -> None:
+    # InPhaseRule registered first so it dispatches before the owner each tick:
+    # the owner's on_enter must run on its behalf once, and never again.
     slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
     bystander = _InPhaseEmitter(_PHASE_A, "bystander", phase_slot=slot)
     owner = _LifecycleRule(_PHASE_A, "owner", phase_slot=slot)
@@ -379,6 +390,36 @@ def test_in_phase_rule_does_not_consume_the_entry_flag_for_a_phase_owner() -> No
     names = _run([bystander, owner], ticks=2)
 
     assert names.count("enter:owner") == 1
+
+
+def test_the_initial_phases_on_enter_runs_before_an_earlier_registered_in_phase_rule() -> None:
+    slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
+    bystander = _InPhaseEmitter(_PHASE_A, "bystander", phase_slot=slot)
+    owner = _LifecycleRule(_PHASE_A, "owner", phase_slot=slot)
+
+    names = _run([bystander, owner], ticks=1)
+
+    assert names[:2] == ["enter:owner", "in:bystander"]
+
+
+def test_the_initial_phases_on_enter_runs_when_its_owner_hears_no_event() -> None:
+    slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
+    owner = _DeafOwner(_PHASE_A, "owner", phase_slot=slot)
+    bystander = _InPhaseEmitter(_PHASE_A, "bystander", phase_slot=slot)
+
+    names = _run([owner, bystander], ticks=1)
+
+    assert names == ["enter:owner", "in:bystander"]
+
+
+def test_the_initial_phases_on_enter_runs_when_only_another_phases_rule_hears_an_event() -> None:
+    slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
+    _DeafOwner(_PHASE_A, "owner", phase_slot=slot)
+    other_phase = _InPhaseEmitter(_PHASE_B, "other_phase", phase_slot=slot)
+
+    names = _run([other_phase], ticks=1)
+
+    assert names == ["enter:owner"]
 
 
 def test_multiple_in_phase_rules_share_one_phase() -> None:

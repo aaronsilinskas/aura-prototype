@@ -23,7 +23,8 @@ This module ships that machinery once:
 A phase starts in the tick it is entered, whatever order the scene's rules
 run in: :meth:`PhaseRule.transition_to` runs the entering phase's ``on_enter``
 itself, finding its owner through the :class:`PhaseSlot`.  The initial phase
-has no transition, so its ``on_enter`` runs on its owner's first dispatch.
+has no transition, so its ``on_enter`` runs on the first event any phase rule
+on the slot hears, before that rule's handler.
 
 A newly entered phase's handlers, on both :class:`PhaseRule` and
 :class:`InPhaseRule`, first hear the event *after* the one that entered it,
@@ -179,9 +180,11 @@ class _PhaseGuardedRule(GameRule):
 
     Overrides :meth:`on` to stash the user handler in a private per-event-type
     map and subscribe a single private dispatcher.  The dispatcher fetches the
-    machine through :meth:`_machine`, returns immediately unless the machine is
-    in this rule's phase and the event is not the one dispatched when that
-    phase was entered, then defers to subclass behaviour.
+    machine through :meth:`_machine` and first runs the initial phase owner's
+    ``on_enter`` if it is still pending, whatever this rule's phase.  It then
+    returns unless the machine is in this rule's phase and the event is not
+    the one dispatched when that phase was entered, and otherwise calls the
+    user handler.
 
     Takes the scene's one :class:`PhaseSlot` for the machine it guards, through
     which it reaches the shared :class:`PhaseMachine`.
@@ -208,28 +211,27 @@ class _PhaseGuardedRule(GameRule):
 
     def _phase_dispatch(self, event: Event, state: GameState) -> None:
         machine = self._machine(state)
+        if machine._enter_pending:
+            # Only the initial phase is still pending here: transition_to runs
+            # every entered phase's on_enter itself.
+            owner = self._phase_slot.owner_of(machine.phase)
+            if owner is not None:
+                owner._run_pending_enter(machine, state)
         if machine.phase != self.phase or machine._entry_dispatch == state.dispatch_count:
             return
-        self._before_handler(machine, state)
         handler = self._phase_handlers.get(type(event))
         if handler is not None:
             handler(event, state)
-
-    def _before_handler(self, machine: PhaseMachine, state: GameState) -> None:
-        """Hook run after the phase guard passes, before the user handler.
-
-        No-op by default; :class:`PhaseRule` overrides it to drive ``on_enter``.
-        """
 
 
 class PhaseRule(_PhaseGuardedRule):
     """A :class:`GameRule` that owns one phase's lifecycle.
 
     ``on_enter`` runs once per entry: inside the :meth:`transition_to` that
-    enters the phase or, for the scene's initial phase, on this rule's first
-    dispatch, just before its handler.  The handlers fire for every event while
-    the phase is active, starting with the event after the one that entered
-    it.  ``on_exit`` runs when a handler calls
+    enters the phase or, for the scene's initial phase, on the first event any
+    phase rule on its slot hears, before that rule's handler.  The handlers
+    fire for every event while the phase is active, starting with the event
+    after the one that entered it.  ``on_exit`` runs when a handler calls
     :meth:`transition_to`.  Exactly one ``PhaseRule`` may own a given
     phase of a :class:`PhaseSlot`: each registers itself with its slot when
     constructed, and constructing a second owner raises ``ValueError``.
@@ -268,9 +270,6 @@ class PhaseRule(_PhaseGuardedRule):
     def on_exit(self, state: GameState) -> None:
         """Run when :meth:`transition_to` leaves this phase. No-op by default."""
 
-    def _before_handler(self, machine: PhaseMachine, state: GameState) -> None:
-        self._run_pending_enter(machine, state)
-
     def _run_pending_enter(self, machine: PhaseMachine, state: GameState) -> None:
         if not machine.take_enter_pending():
             return
@@ -285,10 +284,10 @@ class InPhaseRule(_PhaseGuardedRule):
     """A :class:`GameRule` whose handlers fire only while its phase is active.
 
     Shares the phase-gated ``on`` override and forwarding with
-    :class:`PhaseRule` but has no entry/exit lifecycle: it never runs a
-    pending ``on_enter`` and has no ``on_enter`` / ``on_exit`` /
-    ``transition_to``.  Like a :class:`PhaseRule`, its handlers start with the
-    event after the one that entered its phase.  Any number of
-    ``InPhaseRule``s may share a phase, and an ``InPhaseRule`` may share a
-    phase with that phase's owning :class:`PhaseRule`.
+    :class:`PhaseRule` but has no entry/exit lifecycle: it has no
+    ``on_enter`` / ``on_exit`` / ``transition_to``, though it may trigger the
+    initial phase owner's pending ``on_enter``.  Like a :class:`PhaseRule`,
+    its handlers start with the event after the one that entered its phase.
+    Any number of ``InPhaseRule``s may share a phase, and an ``InPhaseRule``
+    may share a phase with that phase's owning :class:`PhaseRule`.
     """

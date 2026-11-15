@@ -11,5 +11,5 @@
 ## Consequences
 
 - `on_enter` must not call `transition_to`, and the target of `transition_to` must have an owning `PhaseRule`; both raise.
-- A scene's initial phase has no transition, so its `on_enter` still runs on the first dispatch.
+- A scene's initial phase has no transition, so its `on_enter` runs on the first event any phase rule on its slot hears, before that rule's handler, whatever the rule order.
 - Tests must not construct a second instance of a scene's phase rule against the scene's slot; they use the module's `RULE` or build their own slot.
