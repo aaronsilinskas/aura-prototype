@@ -479,7 +479,7 @@ class SceneManager(SceneControls):
         Raises ``ValueError`` naming the known scenes, and persists nothing,
         when *target* is not in the scene registry — a typo caught here
         (e.g. at the Button-B press) never reaches the port, so it never
-        persists a name that would brick the next boot. A known *target*
+        persists a name the next boot would only skip. A known *target*
         the device can run delegates straight through;
         ``SceneReboot.reboot_into`` reboots and never returns.
 

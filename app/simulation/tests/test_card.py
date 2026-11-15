@@ -289,6 +289,34 @@ def test_a_device_handed_a_card_with_an_empty_aura_packs_boots_its_flash_scene(
     assert device.scene == "element_browser"
 
 
+def test_a_device_handed_a_card_naming_a_scene_it_doesnt_know_boots_its_flash_scene(
+    simulation, tmp_path
+):
+    (tmp_path / "aura-state.json").write_text(json.dumps({"scene": "other_props_scene"}))
+
+    device = simulation.add_device("red", scene="hardware_test", card=tmp_path)
+
+    assert device.scene == "hardware_test"
+
+
+def test_a_device_skipping_an_unknown_card_scene_narrates_the_skip(simulation, tmp_path):
+    (tmp_path / "aura-state.json").write_text(json.dumps({"scene": "other_props_scene"}))
+
+    device = simulation.add_device("red", scene="hardware_test", card=tmp_path)
+
+    [skip] = [line for line in device.boot_narration if "skipping" in line]
+    assert "'other_props_scene'" in skip
+    assert "unknown" in skip
+
+
+def test_a_card_scene_the_device_doesnt_know_stays_on_the_card(simulation, tmp_path):
+    (tmp_path / "aura-state.json").write_text(json.dumps({"scene": "other_props_scene"}))
+
+    simulation.add_device("red", scene="hardware_test", card=tmp_path)
+
+    assert json.loads((tmp_path / "aura-state.json").read_text())["scene"] == "other_props_scene"
+
+
 def test_rebooting_into_a_scene_the_device_cannot_run_raises_and_persists_nothing(
     simulation, tmp_path
 ):

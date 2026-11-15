@@ -269,7 +269,7 @@ def test_reboot_into_delegates_to_the_injected_scene_reboot_port() -> None:
 
 def test_reboot_into_rejects_an_unregistered_scene_name_and_persists_nothing() -> None:
     """An unknown target must never reach the port -- a typo persisted there
-    would brick the next boot."""
+    would only be skipped at the next boot."""
     scene_reboot = RecordingSceneReboot()
     manager = _make_scene_manager(scene_reboot=scene_reboot)
 

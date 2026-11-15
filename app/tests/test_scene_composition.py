@@ -104,11 +104,44 @@ def test_boot_raises_naming_both_boot_files_when_neither_names_a_scene(probe):
         probe.boot(_hw(probe.storage), boot_mapping={})
 
 
-def test_boot_raises_naming_the_known_scenes_when_the_persisted_scene_is_unknown(probe):
+def test_a_persisted_scene_the_device_doesnt_know_is_skipped_for_the_flash_default(probe):
     probe.storage.write_json("aura-state.json", {"scene": "not-a-real-scene"})
 
-    with pytest.raises(ValueError, match=_FLASH_SCENE):
-        probe.boot(_hw(probe.storage), boot_mapping={"default_scene": _FLASH_SCENE})
+    boot = probe.boot(_hw(probe.storage), boot_mapping={"default_scene": _FLASH_SCENE})
+
+    assert boot.scene_name == _FLASH_SCENE
+
+
+def test_skipping_an_unknown_persisted_scene_logs_one_line_naming_it_as_unknown(probe):
+    probe.storage.write_json("aura-state.json", {"scene": "not-a-real-scene"})
+    lines: list[str] = []
+
+    probe.boot(
+        _hw(probe.storage),
+        boot_mapping={"default_scene": _FLASH_SCENE},
+        logger=Logger("[boot]", sink=lines.append),
+    )
+
+    [line] = lines
+    assert "'not-a-real-scene'" in line
+    assert "unknown" in line
+
+
+def test_an_unknown_persisted_scene_stays_on_the_card_after_boot(probe):
+    probe.storage.write_json("aura-state.json", {"scene": "not-a-real-scene"})
+
+    probe.boot(_hw(probe.storage), boot_mapping={"default_scene": _FLASH_SCENE})
+
+    assert probe.storage.read_json("aura-state.json")["scene"] == "not-a-real-scene"
+
+
+def test_an_unknown_default_scene_behind_an_unknown_persisted_scene_raises_naming_the_known_scenes(
+    probe,
+):
+    probe.storage.write_json("aura-state.json", {"scene": "not-a-real-scene"})
+
+    with pytest.raises(ValueError, match=f"unknown scene 'not-a-real-default'.*{_FLASH_SCENE}"):
+        probe.boot(_hw(probe.storage), boot_mapping={"default_scene": "not-a-real-default"})
 
 
 def test_a_persisted_scene_the_device_cant_run_is_skipped_for_the_flash_default(probe):
