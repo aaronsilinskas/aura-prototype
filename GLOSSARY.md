@@ -234,7 +234,7 @@ A hardware or software output registered with the effect system; `receives_pixel
 _Avoid_: "output" (ambiguous in multi-output contexts); importing it from `engine.effects.manager` (import from `engine.effects.output`)
 
 ### EffectEvent
-A structured event payload (`pack`, `name`, `verb`, plus the verb's **Resolved clip** or `None`) routed to every in-scope `EffectOutput.handle_event`; `verb` is an **EffectVerb**. `EffectVerb.START`/`STOP` are emitted automatically, custom verbs (`PulseEffect.PEAK`, `LightningEffect.STRIKE`) via `notify_listeners`. Its identity is `pack`, `name` and `verb`; the clip is payload.
+A structured event payload (`pack`, `name`, `verb`, plus the verb's **Resolved clip** or `None`) routed to the `EffectOutput.handle_event` of every output serving the keys the effect occupies; `verb` is an **EffectVerb**. `EffectVerb.START`/`STOP` are emitted automatically, custom verbs (`PulseEffect.PEAK`, `LightningEffect.STRIKE`) via `notify_listeners`. Its identity is `pack`, `name` and `verb`; the clip is payload.
 _Avoid_: confusing with `Event` (game-rule events); assuming only `EffectVerb.START`/`STOP` exist
 
 ### EffectVerb
