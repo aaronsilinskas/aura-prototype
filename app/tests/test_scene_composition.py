@@ -12,8 +12,11 @@ from engine.pack_catalog import PackScanError
 from engine.tests.helpers import SpyNetworkControls
 from hardware.shared.debounced_buttons import DebouncedButtons
 from hardware.shared.device_hardware import DeviceHardware
+from hardware.shared.device_state import DeviceStateStore
+from hardware.shared.device_storage import DeviceStorage
 from hardware.shared.ir_codecs.aura import AuraInfraredDecoder, AuraInfraredEncoder
 from hardware.shared.ir_codecs.tag import TagInfraredDecoder, TagInfraredEncoder
+from hardware.shared.persisted_scene import PersistedScene
 
 _FULL = frozenset(
     (
@@ -33,6 +36,16 @@ _FULL = frozenset(
 
 _FLASH_SCENE = "hardware_test"
 """A flash scene with no Required capabilities."""
+
+
+def _record(storage: DeviceStorage) -> PersistedScene:
+    """The Persisted scene record on *storage*'s card, to arrange or inspect it."""
+    return PersistedScene(DeviceStateStore(storage))
+
+
+def _persist(storage: DeviceStorage, scene: str) -> None:
+    """Make *scene* the Persisted scene on *storage*'s card, as a Reboot into it would."""
+    _record(storage).record_reboot(scene, _FLASH_SCENE)
 
 
 def _hw(storage=None, ir=None, capabilities=_FULL):
@@ -86,11 +99,19 @@ class _CodecRecordingIr:
 
 
 def test_the_cards_persisted_scene_boots_over_the_flash_default_scene(probe):
-    probe.storage.write_json("aura-state.json", {"scene": PROBE_SCENE})
+    _persist(probe.storage, PROBE_SCENE)
 
     boot = probe.boot(_hw(probe.storage), boot_mapping={"default_scene": _FLASH_SCENE})
 
     assert boot.scene_name == PROBE_SCENE
+
+
+def test_a_card_holding_only_the_older_unprefixed_keys_boots_the_flash_default_scene(probe):
+    probe.storage.write_json("aura-state.json", {"scene": PROBE_SCENE, "return_to": PROBE_SCENE})
+
+    boot = probe.boot(_hw(probe.storage), boot_mapping={"default_scene": _FLASH_SCENE})
+
+    assert boot.scene_name == _FLASH_SCENE
 
 
 def test_a_card_less_device_boots_the_flash_default_scene():
@@ -104,15 +125,58 @@ def test_boot_raises_naming_both_boot_files_when_neither_names_a_scene(probe):
         probe.boot(_hw(probe.storage), boot_mapping={})
 
 
-def test_boot_raises_naming_the_known_scenes_when_the_persisted_scene_is_unknown(probe):
-    probe.storage.write_json("aura-state.json", {"scene": "not-a-real-scene"})
+def test_a_persisted_scene_the_device_doesnt_know_is_skipped_for_the_flash_default(probe):
+    _persist(probe.storage, "not-a-real-scene")
 
-    with pytest.raises(ValueError, match=_FLASH_SCENE):
-        probe.boot(_hw(probe.storage), boot_mapping={"default_scene": _FLASH_SCENE})
+    boot = probe.boot(_hw(probe.storage), boot_mapping={"default_scene": _FLASH_SCENE})
+
+    assert boot.scene_name == _FLASH_SCENE
+
+
+def test_skipping_an_unknown_persisted_scene_logs_one_line_naming_it_as_unknown(probe):
+    _persist(probe.storage, "not-a-real-scene")
+    lines: list[str] = []
+
+    probe.boot(
+        _hw(probe.storage),
+        boot_mapping={"default_scene": _FLASH_SCENE},
+        logger=Logger("[boot]", sink=lines.append),
+    )
+
+    [line] = lines
+    assert "'not-a-real-scene'" in line
+    assert "unknown" in line
+
+
+def test_an_unknown_persisted_scene_stays_on_the_card_after_boot(probe):
+    _persist(probe.storage, "not-a-real-scene")
+
+    probe.boot(_hw(probe.storage), boot_mapping={"default_scene": _FLASH_SCENE})
+
+    persisted, _ = _record(probe.storage).boot_candidates({"default_scene": _FLASH_SCENE})
+    assert persisted == "not-a-real-scene"
+
+
+def test_an_unknown_default_scene_behind_an_unknown_persisted_scene_raises_naming_the_known_scenes(
+    probe,
+):
+    _persist(probe.storage, "not-a-real-scene")
+
+    with pytest.raises(ValueError, match=f"unknown scene 'not-a-real-default'.*{_FLASH_SCENE}"):
+        probe.boot(_hw(probe.storage), boot_mapping={"default_scene": "not-a-real-default"})
+
+
+def test_an_unknown_persisted_scene_with_no_default_scene_behind_it_raises_naming_the_known_scenes(
+    probe,
+):
+    _persist(probe.storage, "not-a-real-scene")
+
+    with pytest.raises(ValueError, match=f"unknown scene 'not-a-real-scene'.*{_FLASH_SCENE}"):
+        probe.boot(_hw(probe.storage), boot_mapping={})
 
 
 def test_a_persisted_scene_the_device_cant_run_is_skipped_for_the_flash_default(probe):
-    probe.storage.write_json("aura-state.json", {"scene": PROBE_SCENE})
+    _persist(probe.storage, PROBE_SCENE)
 
     boot = probe.boot(
         _hw(probe.storage, capabilities=_FULL - {"accelerometer"}),
@@ -124,7 +188,7 @@ def test_a_persisted_scene_the_device_cant_run_is_skipped_for_the_flash_default(
 
 
 def test_skipping_a_persisted_scene_logs_one_line_naming_it_and_what_it_lacks(probe):
-    probe.storage.write_json("aura-state.json", {"scene": PROBE_SCENE})
+    _persist(probe.storage, PROBE_SCENE)
     lines: list[str] = []
 
     probe.boot(
@@ -153,7 +217,7 @@ def test_boot_raises_missing_capability_when_no_candidate_fits_the_device(probe)
 
 
 def test_a_pending_scene_deploy_token_boots_the_deployed_scene_over_a_stale_persisted_one(probe):
-    probe.storage.write_json("aura-state.json", {"scene": _FLASH_SCENE})
+    _persist(probe.storage, _FLASH_SCENE)
 
     boot = probe.boot(
         _hw(probe.storage),
@@ -165,12 +229,9 @@ def test_a_pending_scene_deploy_token_boots_the_deployed_scene_over_a_stale_pers
 
 def test_an_applied_scene_deploy_token_no_longer_overrides_the_persisted_scene(probe):
     boot_mapping = {"default_scene": PROBE_SCENE, "scene_deploy_token": "deploy-1"}
-    probe.storage.write_json("aura-state.json", {"scene": _FLASH_SCENE})
+    _persist(probe.storage, _FLASH_SCENE)
     probe.boot(_hw(probe.storage), boot_mapping=boot_mapping)
-    probe.storage.write_json(
-        "aura-state.json",
-        {**(probe.storage.read_json("aura-state.json") or {}), "scene": _FLASH_SCENE},
-    )
+    _persist(probe.storage, _FLASH_SCENE)
 
     boot = probe.boot(_hw(probe.storage), boot_mapping=boot_mapping)
 
@@ -273,18 +334,35 @@ def test_the_booted_scenes_rules_see_the_devices_capabilities(probe):
 
 
 def test_a_reboot_the_booted_scene_asks_for_persists_its_target_then_resets(probe):
-    persisted_at_reset: list[dict | None] = []
+    persisted_at_reset: list[str | None] = []
     tick = probe.boot(
         _hw(probe.storage),
-        reset=lambda: persisted_at_reset.append(probe.storage.read_json("aura-state.json")),
+        reset=lambda: persisted_at_reset.append(
+            _record(probe.storage).boot_candidates({"default_scene": PROBE_SCENE})[0]
+        ),
     ).tick
     tick()
 
     probe.state().scene_controls.reboot_into(_FLASH_SCENE)
 
-    [persisted] = persisted_at_reset
-    assert persisted is not None
-    assert persisted["scene"] == _FLASH_SCENE
+    assert persisted_at_reset == [_FLASH_SCENE]
+
+
+def test_a_boot_opens_exactly_one_device_state_store(probe, monkeypatch):
+    opened: list[DeviceStateStore] = []
+    open_store = DeviceStateStore.__init__
+
+    def counting_init(store, *args, **kwargs):
+        opened.append(store)
+        open_store(store, *args, **kwargs)
+
+    monkeypatch.setattr(DeviceStateStore, "__init__", counting_init)
+    tick = probe.boot(_hw(probe.storage), reset=lambda: None).tick
+    tick()
+
+    probe.state().scene_controls.reboot_into(_FLASH_SCENE)
+
+    assert len(opened) == 1
 
 
 def test_the_boots_scene_controls_are_the_ones_the_booted_scenes_rules_hold(probe):

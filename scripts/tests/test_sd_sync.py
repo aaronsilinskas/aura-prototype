@@ -152,14 +152,14 @@ def _loopback_client(storage: "DeviceStorage | None"):
 def test_dispatch_pull_writes_the_sd_file_to_the_given_host_path(
     device_storage: DeviceStorage, tmp_path: Path
 ) -> None:
-    device_storage.write_bytes("aura-state.json", b'{"scene": "tag"}')
+    device_storage.write_bytes("aura-state.json", b'{"level": "tag"}')
     client = _loopback_client(device_storage)
     host_path = tmp_path / "aura-state.json"
     args = parse_args(["pull", "aura-state.json", str(host_path)])
 
     dispatch(args, client)
 
-    assert host_path.read_bytes() == b'{"scene": "tag"}'
+    assert host_path.read_bytes() == b'{"level": "tag"}'
 
 
 def test_dispatch_push_writes_the_host_file_to_the_given_sd_path(
@@ -167,16 +167,16 @@ def test_dispatch_push_writes_the_host_file_to_the_given_sd_path(
 ) -> None:
     client = _loopback_client(device_storage)
     host_path = tmp_path / "aura-state.json"
-    host_path.write_bytes(b'{"scene": "lobby"}')
+    host_path.write_bytes(b'{"level": "lobby"}')
     args = parse_args(["push", str(host_path), "aura-state.json"])
 
     dispatch(args, client)
 
-    assert device_storage.read_bytes("aura-state.json") == b'{"scene": "lobby"}'
+    assert device_storage.read_bytes("aura-state.json") == b'{"level": "lobby"}'
 
 
 def test_dispatch_list_prints_each_entry_as_tab_separated_path_and_size(device_storage) -> None:
-    device_storage.write_bytes("aura-state.json", b'{"scene": "tag"}')
+    device_storage.write_bytes("aura-state.json", b'{"level": "tag"}')
     client = _loopback_client(device_storage)
     args = parse_args(["list"])
     out = io.StringIO()

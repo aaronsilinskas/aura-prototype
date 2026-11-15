@@ -8,6 +8,7 @@ from engine.capabilities import MissingCapabilityError
 from engine.effects.merge import ADDITIVE, SPLIT
 from engine.engine import GameRule
 from engine.events import Event, EventGroup
+from engine.log import Logger
 from engine.packs import PackRegistry
 from engine.scene import PackReference, Scene, SceneLocalRegistry, SceneManager, SceneRegistry
 from engine.settings import Settings
@@ -79,6 +80,7 @@ def _make_scene_manager(
     effect_controls: EffectControls | None = None,
     network_controls: NetworkControls | None = None,
     capabilities: frozenset[str] = frozenset(),
+    logger: Logger | None = None,
 ) -> SceneManager:
     """Construct a SceneManager, defaulting any unspecified registry, port or control.
 
@@ -93,6 +95,7 @@ def _make_scene_manager(
         scene_registry if scene_registry is not None else make_scene_registry(),
         effect_admin if effect_admin is not None else SpyEffectAdmin(),
         scene_reboot if scene_reboot is not None else RecordingSceneReboot(),
+        logger,
     )
 
 
@@ -266,7 +269,7 @@ def test_reboot_into_delegates_to_the_injected_scene_reboot_port() -> None:
 
 def test_reboot_into_rejects_an_unregistered_scene_name_and_persists_nothing() -> None:
     """An unknown target must never reach the port -- a typo persisted there
-    would brick the next boot."""
+    would only be skipped at the next boot."""
     scene_reboot = RecordingSceneReboot()
     manager = _make_scene_manager(scene_reboot=scene_reboot)
 
@@ -285,15 +288,18 @@ def test_reboot_to_previous_delegates_to_the_injected_scene_reboot_port() -> Non
     assert scene_reboot.reboot_to_previous_calls == 1
 
 
-def test_reboot_to_previous_delegates_without_registry_validation() -> None:
-    """Unlike reboot_into, no scene name is validated here at all -- the
-    recorded return_to is checked at boot by SceneRegistry.resolve_known instead."""
-    scene_reboot = RecordingSceneReboot()
-    manager = _make_scene_manager(scene_registry=make_scene_registry(), scene_reboot=scene_reboot)
+def test_reboot_to_previous_into_an_unknown_scene_logs_it_and_never_reaches_the_port() -> None:
+    """A card from another prop can record a return_to this prop doesn't have."""
+    lines: list[str] = []
+    scene_reboot = RecordingSceneReboot(previous="elsewhere")
+    manager = _make_scene_manager(
+        scene_reboot=scene_reboot, logger=Logger("[scene]", sink=lines.append)
+    )
 
-    manager.reboot_to_previous()  # must not raise, even with an empty registry
+    manager.reboot_to_previous()
 
-    assert scene_reboot.reboot_to_previous_calls == 1
+    assert scene_reboot.reboot_to_previous_calls == 0
+    assert lines == ["[scene] return_to 'elsewhere' is not a known scene; not rebooting\n"]
 
 
 # ---------------------------------------------------------------------------
