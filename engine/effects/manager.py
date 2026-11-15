@@ -329,13 +329,12 @@ class EffectManager(EffectControls, EffectAdmin):
     def _remove_effects_in_scope(self, scope_key_set: set[str]) -> None:
         """Remove or narrow entries that overlap scope_key_set, firing stop events.
 
-        Each entry's stop event goes only to the keys it occupied in
-        scope_key_set, and only those keys are cleared. A removed entry's
-        receipt is stopped, so outputs tracking it (a looping voice, a haptic
-        sequence) release it on their next flush. A narrowed entry is still
-        running, so its receipt is left alone.
+        A removed entry's receipt is stopped, so outputs tracking it (a looping
+        voice, a haptic sequence) release it on their next flush. A narrowed
+        entry is still running, so its receipt is left alone.
         """
         stopped: list[tuple[EffectManager._EffectEntry, set[str]]] = []
+        narrowed: list[EffectManager._EffectEntry] = []
         new_effects: list[EffectManager._EffectEntry] = []
         for entry in self._effects:
             removed = scope_key_set.intersection(entry.keys)
@@ -344,13 +343,14 @@ class EffectManager(EffectControls, EffectAdmin):
                 if len(removed) == len(entry.keys):
                     entry.receipt.stop()
                     continue
+                narrowed.append(entry)
             new_effects.append(entry)
-        # Emit before narrowing: _emit routes only to keys the entry still holds.
         for entry, removed in stopped:
             self._emit(entry, EffectVerb.STOP, removed)
-            if len(removed) < len(entry.keys):
-                entry.keys = tuple(k for k in entry.keys if k not in removed)
-                self._update_output_buffers(entry)
+        # Narrow only after emitting: _emit routes only to keys the entry still holds.
+        for entry in narrowed:
+            entry.keys = tuple(k for k in entry.keys if k not in scope_key_set)
+            self._update_output_buffers(entry)
         self._clear_vacated_keys(stopped, new_effects)
         self._effects = new_effects
 
