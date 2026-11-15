@@ -141,6 +141,7 @@ def _build_scene_runtime(
     catalog: PackCatalog,
     scene_reboot: SceneReboot,
     timer: Timer | None,
+    logger: Logger | None,
 ) -> SceneRuntime:
     """Build the ``SceneRuntime`` on *hw* from *catalog* and boot it into *scene_name*.
 
@@ -149,7 +150,8 @@ def _build_scene_runtime(
     ``_scan_boot_pack_catalog``, shared with boot-scene and IR-codec
     resolution; nothing is scanned here. *timer* is the clock the scene, its
     effects and the Polled parts the tick updates all run on; ``None`` lets
-    the runtime build a wall clock.
+    the runtime build a wall clock. *logger* is where the runtime logs a
+    declined Return to lobby.
     """
     runtime = SceneRuntime(
         catalog,
@@ -158,6 +160,7 @@ def _build_scene_runtime(
         hw.capabilities,
         scene_reboot,
         clock=timer,
+        logger=logger,
     )
     runtime.activate_boot_scene(catalog.scene_registry.resolve_known(scene_name))
     return runtime
@@ -204,7 +207,7 @@ def build_scene_boot(
     scene_reboot = DeviceSceneReboot(
         hw.storage, booted_scene=scene_name, reset=reset, logger=logger
     )
-    runtime = _build_scene_runtime(hw, scene_name, catalog, scene_reboot, timer)
+    runtime = _build_scene_runtime(hw, scene_name, catalog, scene_reboot, timer, logger)
     tick = _build_scene_tick(hw, runtime)
     return SceneBoot(scene_name, tick, runtime.scene_controls, runtime.namespace)
 

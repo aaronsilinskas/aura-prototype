@@ -18,6 +18,7 @@ except ImportError:
 from engine.capabilities import MissingCapabilityError
 from engine.effects.admin import EffectAdmin, HeldEffects, SceneView
 from engine.engine import GameRule, Version
+from engine.log import Logger
 from engine.packs import PackRegistry, UnknownItemError, load_item
 from engine.settings import Settings
 from engine.state import (
@@ -359,12 +360,17 @@ class SceneManager(SceneControls):
     role in activation, ``overlay`` or ``pop`` — it exists solely for the
     two reboot methods, which apply immediately and synchronously rather
     than joining the deferred-transition queue.
+
+    *logger* is where ``reboot_to_previous`` logs declining a recorded scene
+    the scene registry doesn't know. Omitted or None normalizes to
+    ``Logger.SILENT``.
     """
 
     __slots__ = (
         "_capabilities",
         "_effect_admin",
         "_effect_controls",
+        "_logger",
         "_network_controls",
         "_pending",
         "_rule_registry",
@@ -382,6 +388,7 @@ class SceneManager(SceneControls):
         scene_registry: SceneRegistry,
         effect_admin: EffectAdmin,
         scene_reboot: SceneReboot,
+        logger: Logger | None = None,
     ) -> None:
         self._effect_controls = effect_controls
         self._network_controls = network_controls
@@ -390,6 +397,7 @@ class SceneManager(SceneControls):
         self._scene_registry = scene_registry
         self._effect_admin = effect_admin
         self._scene_reboot = scene_reboot
+        self._logger = logger if logger is not None else Logger.SILENT
         self._stack: list[_SceneStackEntry] = []
         self._pending: tuple[Literal["overlay"], Scene] | tuple[Literal["pop"]] | None = None
 
@@ -487,16 +495,19 @@ class SceneManager(SceneControls):
         """Check the port's ``previous_scene``, then delegate to the port.
 
         With nothing recorded the port's own no-op handles it. A recorded
-        scene is not checked against the registry here: an unknown one is
-        caught at boot by ``SceneRegistry.resolve_known``, exactly like the
-        Persisted scene.
+        scene the scene registry doesn't know (its card came from another
+        prop) is logged and declined here: nothing is persisted and the
+        device doesn't reset, the same as when nothing is recorded.
 
         Raises:
             MissingCapabilityError: the device can't run the recorded scene;
                 nothing is persisted and the device doesn't reset.
         """
         previous = self._scene_reboot.previous_scene()
-        if previous is not None and previous in self._scene_registry.names():
+        if previous is not None:
+            if previous not in self._scene_registry.names():
+                self._logger.log(f"return_to {previous!r} is not a known scene; not rebooting")
+                return
             self._require_runnable(previous)
         self._scene_reboot.reboot_to_previous()
 
