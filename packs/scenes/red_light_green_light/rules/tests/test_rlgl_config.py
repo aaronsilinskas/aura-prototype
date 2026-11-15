@@ -1,5 +1,6 @@
-"""Tests for ``RlglConfig`` -- warning sting options, the check across its
-Settings, and the ``rlgl_config`` get-or-create accessor.
+"""Tests for ``RlglConfig`` -- warning sting options, the cross-Setting check
+(gravity tracking slower than motion smoothing), and the ``rlgl_config``
+get-or-create accessor.
 
 ``packs/tests/test_scene_configs.py`` checks that each Setting lands in its field."""
 
@@ -50,7 +51,7 @@ def test_warning_sting_opts_scales_sub_durations_with_level():
 
 
 # ---------------------------------------------------------------------------
-# Checks across Settings
+# Cross-Setting check: gravity tracking slower than motion smoothing
 # ---------------------------------------------------------------------------
 
 

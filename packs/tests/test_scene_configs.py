@@ -1,7 +1,7 @@
 """Every Scene Config reads each of its scene's declared Settings into the field of the same name.
 
 One check for every scene under ``packs/scenes/`` that declares scene Settings:
-the scene's Scene Config is found through its ``StateSlot`` accessor, and each
+the scene's Scene Config is found by calling its ``StateSlot`` accessors, and each
 declared Setting, overridden alone to a distinct value, must land in the config
 field of the same name. A declared Setting with no such field fails, whether no
 field reads it (a dead Setting) or the field that reads it is spelled
@@ -19,6 +19,7 @@ their explicit one-line reads (ADR-0010).
 
 from __future__ import annotations
 
+import functools
 import importlib
 import pkgutil
 from typing import get_type_hints
@@ -43,8 +44,9 @@ def _builds_from_settings(cls: type) -> bool:
     return hints == {"settings": Settings}
 
 
-def _scene_config_slot(scene: str) -> StateSlot:
-    """Return the one ``StateSlot`` in *scene*'s rules whose class is built from Settings alone."""
+@functools.cache
+def _scene_state_slots(scene: str) -> tuple[StateSlot, ...]:
+    """Return every ``StateSlot`` defined in *scene*'s rules package, each once."""
     package = importlib.import_module(f"packs.scenes.{scene}.rules")
     slots: dict[int, StateSlot] = {}
     for module_info in pkgutil.walk_packages(package.__path__, f"{package.__name__}."):
@@ -52,32 +54,46 @@ def _scene_config_slot(scene: str) -> StateSlot:
             continue
         module = importlib.import_module(module_info.name)
         for value in vars(module).values():
-            if isinstance(value, StateSlot) and _builds_from_settings(value._expected_class):
+            if isinstance(value, StateSlot):
                 slots[id(value)] = value
-    if len(slots) != 1:
+    return tuple(slots.values())
+
+
+def _scene_config(scene: str, state: GameState) -> object:
+    """Return the one value from *scene*'s slots whose class builds from Settings alone."""
+    configs = [
+        value
+        for value in (slot(state) for slot in _scene_state_slots(scene))
+        if _builds_from_settings(type(value))
+    ]
+    if len(configs) != 1:
         pytest.fail(
-            f"scene {scene!r} declares Settings but its rules have {len(slots)} Scene Config"
+            f"scene {scene!r} declares Settings but its rules have {len(configs)} Scene Config"
             + " StateSlots, not one"
         )
-    return next(iter(slots.values()))
+    return configs[0]
 
 
 def _distinct_override(declaration: dict[str, object], taken: set[object]) -> object:
     """Return a valid value for *declaration* that differs from every value in *taken*."""
     type_name = declaration["type"]
-    default = declaration.get("default")
-    if type_name == "bool":
-        return not default
-    if type_name == "str":
-        return f"{default}-override"
     if type_name not in ("int", "float"):
         pytest.fail(f"no distinct override rule for a {type_name} Setting")
+    default = declaration.get("default")
     step = 1 if type_name == "int" else 0.01
     candidate = default if isinstance(default, (int, float)) else 0
     while True:
         candidate += step
         if candidate not in taken:
             return candidate
+
+
+class _NoSuchField:
+    def __repr__(self) -> str:
+        return "<no field of that name>"
+
+
+_NO_SUCH_FIELD = _NoSuchField()
 
 
 _SCENE_SETTINGS = [
@@ -97,13 +113,9 @@ def test_each_declared_scene_setting_override_lands_in_the_scene_config_field_of
     settings = settings_for(scene, settings={setting: override})
     state = GameState(EffectControls(), SceneControls(), settings=settings)
 
-    config = _scene_config_slot(scene)(state)
+    config = _scene_config(scene, state)
 
-    if not hasattr(config, setting):
-        pytest.fail(
-            f"scene {scene!r} declares Setting {setting!r} but {type(config).__name__}"
-            + " has no field of that name"
-        )
-    assert getattr(config, setting) == override, (
-        f"scene {scene!r}: {type(config).__name__}.{setting} does not hold the Setting's override"
+    assert getattr(config, setting, _NO_SUCH_FIELD) == override, (
+        f"scene {scene!r} declares Setting {setting!r} but {type(config).__name__}.{setting}"
+        + " does not hold its override"
     )
