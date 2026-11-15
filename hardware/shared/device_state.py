@@ -1,8 +1,8 @@
 """DeviceStateStore -- owns aura-state.json, the device-written SD state file.
 
-Persists small key/value state a device writes about itself (today: the
-Persisted scene, its return_to companion, and the last applied Scene deploy
-token) across a reboot. Built
+Persists small key/value state a device writes about itself across a
+reboot. It stays general (ADR-0009): the Persisted scene record is one
+client, ``PersistedScene``, which alone names its keys. Built
 entirely on the DeviceStorage port's read_json/write_json convenience, so
 this module has no board/sdcardio/storage import and is CPython-testable
 like the rest of hardware/shared -- the live adapter is whatever DeviceStorage
@@ -55,14 +55,15 @@ class DeviceStateStore:
         """
         return self._read_mapping()
 
-    def write(self, mapping: dict) -> None:
-        """Replace the persisted state with *mapping*, in one write.
+    def write(self, mapping: dict) -> bool:
+        """Replace the persisted state with *mapping*, in one write; return whether it was written.
 
-        A no-op when *storage* is ``None``.
+        A no-op returning ``False`` when *storage* is ``None``.
         """
         if self._storage is None:
-            return
+            return False
         self._storage.write_json(_STATE_FILE_NAME, mapping)
+        return True
 
     def set(self, key: str, value: str) -> None:
         """Durably persist *value* under *key*, leaving every other key untouched.

@@ -15,27 +15,23 @@ except ImportError:
 
 from engine.log import Logger
 from engine.state import SceneReboot
-from hardware.shared.device_state import DeviceStateStore
-from hardware.shared.device_storage import DeviceStorage
+from hardware.shared.persisted_scene import PersistedScene
 
 __all__ = ["DeviceSceneReboot"]
 
 
 class DeviceSceneReboot(SceneReboot):
-    """Live ``SceneReboot``: persists via a composed ``DeviceStateStore``, then resets.
+    """Live ``SceneReboot``: records the switch through ``PersistedScene``, then resets.
 
-    Holds *storage* itself (not just the ``DeviceStateStore`` composed over
-    it) so it knows whether persistence is available: on a card-less device
-    (``storage is None``, where every ``DeviceStateStore`` write is a silent no-op)
-    this adapter does not reboot at all for either method — it logs and
-    returns, leaving the caller running, since persisting nothing and then
-    resetting would boot into whatever ``aura-boot.json`` already
-    defaults to and silently discard the request (v1 gives no on-device
-    visual for this failure).
+    On a card-less device (*persisted_scene* is ``None``) it does not reboot
+    at all for either method — it logs and returns, leaving the caller
+    running, since persisting nothing and then resetting would boot into
+    whatever ``aura-boot.json`` already defaults to and silently discard the
+    request (v1 gives no on-device visual for this failure).
 
     Args:
-        storage: The mounted ``DeviceStorage`` to persist through, or None
-            on a card-less device.
+        persisted_scene: The card's Persisted scene record, or ``None`` on a
+            card-less device.
         booted_scene: The name of the scene this process booted into.
             Recorded as ``return_to`` by :meth:`reboot_into`, so no rule
             needs to know its own scene name — the return target is "the
@@ -46,49 +42,48 @@ class DeviceSceneReboot(SceneReboot):
             Omitted or None normalizes to ``Logger.SILENT``.
     """
 
-    __slots__ = ("_booted_scene", "_logger", "_reset", "_state_store", "_storage")
+    __slots__ = ("_booted_scene", "_logger", "_persisted_scene", "_reset")
 
     def __init__(
         self,
-        storage: DeviceStorage | None,
+        persisted_scene: PersistedScene | None,
         booted_scene: str,
         reset: Callable[[], None],
         logger: Logger | None = None,
     ) -> None:
-        self._storage = storage
+        self._persisted_scene = persisted_scene
         self._booted_scene = booted_scene
         self._reset = reset
         self._logger = logger if logger is not None else Logger.SILENT
-        self._state_store = DeviceStateStore(storage, self._logger)
 
     def reboot_into(self, target: str) -> None:
-        """Persist ``scene=target``/``return_to=<booted scene>``, then reset.
+        """Record a Reboot into *target*, leaving the booted scene, then reset.
 
         A card-less device logs and returns instead of rebooting — see the
         class docstring.
         """
-        if self._storage is None:
+        if self._persisted_scene is None:
             self._logger.log(f"no SD card mounted; not rebooting into scene {target!r}")
             return
-        self._state_store.update({"scene": target, "return_to": self._booted_scene})
+        self._persisted_scene.record_reboot(target, self._booted_scene)
         self._reset()
 
     def reboot_to_previous(self) -> None:
-        """Persist the recorded ``return_to`` as ``scene``, clear it, then reset.
+        """Record a return to the recorded ``return_to``, then reset.
 
         A no-op (logged) when no ``return_to`` was recorded, or on a
         card-less device — see the class docstring for the latter.
         """
-        if self._storage is None:
+        if self._persisted_scene is None:
             self._logger.log("no SD card mounted; not rebooting to the previous scene")
             return
-        return_to = self.previous_scene()
-        if return_to is None:
+        if self._persisted_scene.record_return() is None:
             self._logger.log("no return_to recorded; not rebooting")
             return
-        self._state_store.update({"scene": return_to}, remove=("return_to",))
         self._reset()
 
     def previous_scene(self) -> str | None:
         """The recorded ``return_to``, or ``None`` when none is, or on a card-less device."""
-        return self._state_store.get("return_to")
+        if self._persisted_scene is None:
+            return None
+        return self._persisted_scene.previous_scene()
