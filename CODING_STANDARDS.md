@@ -1,10 +1,10 @@
 # Coding standards
 
-Read at review time (`code-review`), not during implementation. Each source below is authoritative for its area; apply every rule in each.
+Read at review time (`code-review`), not during implementation. Each source below is authoritative for its area; apply every rule in each. The skills are installed in the home repo, `mindwidgets/core` (`~/dev/mindwidgets/core/.claude/skills/`); `docs/standards/` holds aura's additions to them, which win where they differ.
 
-- **Production code**: `.claude/skills/code-quality/SKILL.md`. For code that runs on the device (`engine/`, `hardware/`, `packs/`), also `.claude/skills/code-quality/embedded-python.md`.
-- **Tests**: `.claude/skills/test-quality/SKILL.md` and `.claude/skills/test-quality/mocking-python.md`.
-- **Comments and docstrings**: `.claude/skills/comments/SKILL.md` and `.claude/skills/comments/python-docstrings.md`.
+- **Production code**: the `code-quality` skill (`code-quality/SKILL.md`). For code that runs on the device (`engine/`, `hardware/`, `packs/`), also `code-quality/embedded-python.md` and `docs/standards/embedded-python.md`.
+- **Tests**: the `test-quality` skill (`test-quality/SKILL.md`), `test-quality/mocking-python.md` and `docs/standards/mocking-python.md`.
+- **Comments and docstrings**: the `comments` skill (`comments/SKILL.md`) and `comments/python-docstrings.md`.
 - **Terms**: `GLOSSARY.md`. Use its canonical terms and flag the terms it says to avoid.
 - **Design decisions**: `docs/adr/`. Flag code that departs from an accepted ADR.
 
