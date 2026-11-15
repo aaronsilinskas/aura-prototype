@@ -180,9 +180,11 @@ class _PhaseGuardedRule(GameRule):
 
     Overrides :meth:`on` to stash the user handler in a private per-event-type
     map and subscribe a single private dispatcher.  The dispatcher fetches the
-    machine through :meth:`_machine`, returns immediately unless the machine is
-    in this rule's phase and the event is not the one dispatched when that
-    phase was entered, then defers to subclass behaviour.
+    machine through :meth:`_machine` and first runs the initial phase owner's
+    ``on_enter`` if it is still pending, whatever this rule's phase.  It then
+    returns unless the machine is in this rule's phase and the event is not
+    the one dispatched when that phase was entered, and otherwise calls the
+    user handler.
 
     Takes the scene's one :class:`PhaseSlot` for the machine it guards, through
     which it reaches the shared :class:`PhaseMachine`.
@@ -285,7 +287,7 @@ class InPhaseRule(_PhaseGuardedRule):
     :class:`PhaseRule` but has no entry/exit lifecycle: it has no
     ``on_enter`` / ``on_exit`` / ``transition_to``, though it may trigger the
     initial phase owner's pending ``on_enter``.  Like a :class:`PhaseRule`,
-    its handlers start with the event after the one that entered its phase.  Any number of
-    ``InPhaseRule``s may share a phase, and an ``InPhaseRule`` may share a
-    phase with that phase's owning :class:`PhaseRule`.
+    its handlers start with the event after the one that entered its phase.
+    Any number of ``InPhaseRule``s may share a phase, and an ``InPhaseRule``
+    may share a phase with that phase's owning :class:`PhaseRule`.
     """

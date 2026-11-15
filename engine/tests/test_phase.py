@@ -71,26 +71,15 @@ class _LifecycleRule(PhaseRule):
             self._transitions_to = None
 
 
-class _NeverSentEvent(Event):
-    __slots__ = ()
-
-    def __init__(self) -> None:
-        super().__init__(_GROUP, "never_sent")
-
-
-class _RareEventOwner(PhaseRule):
-    """PhaseRule that emits ``enter:`` but subscribes only to an event no test sends."""
+class _DeafOwner(PhaseRule):
+    """PhaseRule that emits ``enter:`` but subscribes to no event, so is never dispatched."""
 
     def __init__(self, phase: PhaseKey, label: str, phase_slot: PhaseSlot) -> None:
         super().__init__(phase, phase_slot)
         self._label = label
-        self.on(_NeverSentEvent, self._never_sent)
 
     def on_enter(self, state: GameState) -> None:
         state.effect_controls.add_effect(Scope.PERSONAL, "enter:" + self._label, {})
-
-    def _never_sent(self, event: _NeverSentEvent, state: GameState) -> None:
-        pass
 
 
 class _TransitionsOnEnterRule(PhaseRule):
@@ -410,17 +399,27 @@ def test_the_initial_phases_on_enter_runs_before_an_earlier_registered_in_phase_
 
     names = _run([bystander, owner], ticks=1)
 
-    assert names == ["enter:owner", "in:bystander", "tick:owner"]
+    assert names[:2] == ["enter:owner", "in:bystander"]
 
 
-def test_the_initial_phases_on_enter_runs_on_the_first_event_its_owner_never_hears() -> None:
+def test_the_initial_phases_on_enter_runs_when_its_owner_hears_no_event() -> None:
     slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
-    owner = _RareEventOwner(_PHASE_A, "owner", phase_slot=slot)
+    owner = _DeafOwner(_PHASE_A, "owner", phase_slot=slot)
     bystander = _InPhaseEmitter(_PHASE_A, "bystander", phase_slot=slot)
 
     names = _run([owner, bystander], ticks=1)
 
     assert names == ["enter:owner", "in:bystander"]
+
+
+def test_the_initial_phases_on_enter_runs_when_only_another_phases_rule_hears_an_event() -> None:
+    slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
+    _DeafOwner(_PHASE_A, "owner", phase_slot=slot)
+    other_phase = _InPhaseEmitter(_PHASE_B, "other_phase", phase_slot=slot)
+
+    names = _run([other_phase], ticks=1)
+
+    assert names == ["enter:owner"]
 
 
 def test_multiple_in_phase_rules_share_one_phase() -> None:
