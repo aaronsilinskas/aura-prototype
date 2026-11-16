@@ -2,13 +2,12 @@
 
 On entry, increments the Game Level, updates the ``Scope.AMBIENT`` progress
 bar to the new level's fraction, and replaces Green Light on
-``Scope.NON_AMBIENT`` with the level-up flash.
-Transitions back to Red Warning after ``level_up_duration``.
+``Scope.NON_AMBIENT`` with the level-up flash. Declares that the phase ends
+after ``level_up_duration``, moving back to Red Warning.
 """
 
 from __future__ import annotations
 
-from engine.input import InputEvents
 from engine.phase import PhaseRule
 from engine.state import GameState, Scope
 from packs.scenes.red_light_green_light.rules.helpers.phases import (
@@ -25,21 +24,17 @@ class RlglLevelUpRule(PhaseRule):
 
     def __init__(self) -> None:
         super().__init__(PHASE_LEVEL_UP, rlgl_phase)
-        self.on(InputEvents.Sensors, self._handle)
 
     def on_enter(self, state: GameState) -> None:
         phase_state = rlgl_phase_state(state)
         level = phase_state.level + 1
         phase_state.level = level
-        max_level = rlgl_config(state).max_level
+        config = rlgl_config(state)
         state.effect_controls.set_effect(
-            Scope.AMBIENT, "basic.progress", {"progress": level / max_level}
+            Scope.AMBIENT, "basic.progress", {"progress": level / config.max_level}
         )
         state.effect_controls.set_effect(Scope.NON_AMBIENT, "scene.level_up", {})
-
-    def _handle(self, event: InputEvents.Sensors, state: GameState) -> None:
-        if rlgl_phase(state).elapsed(state.total) >= rlgl_config(state).level_up_duration:
-            self.transition_to(state, PHASE_RED_WARNING)
+        self.end_after(state, config.level_up_duration, PHASE_RED_WARNING)
 
 
 RULE = RlglLevelUpRule()
