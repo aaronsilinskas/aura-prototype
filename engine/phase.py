@@ -150,12 +150,13 @@ class PhaseMachine:
         """Return the time elapsed since :attr:`phase_start`."""
         return now - self.phase_start
 
-    def declare_end(
+    def _declare_end(
         self, phase: PhaseKey, condition: Callable[[GameState], bool], next_phase: PhaseKey
     ) -> None:
         """Record that this entry of *phase* ends, moving to *next_phase*, once *condition* holds.
 
-        Called by :meth:`PhaseRule.end_when`, which scenes use instead.
+        Private to this module: only :meth:`PhaseRule.end_when` calls it, so
+        only the owning rule can declare its phase's end.
 
         Raises:
             RuntimeError: if *phase*'s ``on_enter`` is not running, or if this
@@ -167,12 +168,12 @@ class PhaseMachine:
             raise RuntimeError(f"End of {phase!r} already declared for this entry")
         self._pending_end = _PendingEnd(condition, next_phase)
 
-    def take_due_end(self, state: GameState) -> PhaseKey | None:
+    def _take_due_end(self, state: GameState) -> PhaseKey | None:
         """Return the declared end's next phase if its condition holds on *state*, clearing it.
 
         Returns ``None``, keeping the end, while its condition does not hold
-        or when none is declared.  Consumed internally by :class:`PhaseRule`,
-        which then transitions to the returned phase.
+        or when none is declared.  Private to this module: only the owning
+        :class:`PhaseRule` calls it, then transitions to the returned phase.
         """
         pending_end = self._pending_end
         if pending_end is None or not pending_end.condition(state):
@@ -363,7 +364,7 @@ class PhaseRule(_PhaseGuardedRule):
             RuntimeError: if called anywhere but this rule's ``on_enter``, or
                 if this phase entry already declared an end.
         """
-        self._machine(state).declare_end(self.phase, condition, next_phase)
+        self._machine(state)._declare_end(self.phase, condition, next_phase)
 
     def end_after(self, state: GameState, seconds: float, next_phase: PhaseKey) -> None:
         """Declare that this phase ends, moving to *next_phase*, once it has run *seconds*.
@@ -393,7 +394,7 @@ class PhaseRule(_PhaseGuardedRule):
 
     def _handle_in_phase(self, event: Event, machine: PhaseMachine, state: GameState) -> None:
         if type(event) is InputEvents.Sensors:
-            next_phase = machine.take_due_end(state)
+            next_phase = machine._take_due_end(state)
             if next_phase is not None:
                 self.transition_to(state, next_phase)
                 return
