@@ -1,0 +1,8 @@
+# Proposes a PR for each new release of a pinned action or shared workflow, moving the SHA pin
+# and its version comment together.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

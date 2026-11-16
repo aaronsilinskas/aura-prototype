@@ -46,5 +46,5 @@ fp-info-cache
 .agents/
 skills-lock.json
 
-# Automated triage: the issue input a triage run writes (scripts/triage_input.py)
+# Automated triage: the issue input the shared triage workflow writes at the checkout root
 triage-issue-input.md
