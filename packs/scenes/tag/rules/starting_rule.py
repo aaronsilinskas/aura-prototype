@@ -26,16 +26,10 @@ class TagStartingRule(PhaseRule):
 
     def on_enter(self, state: GameState) -> None:
         config = tag_config(state)
-        half = config.warning_pulse_duration / 2
         state.effect_controls.set_effect(
             Scope.ALL,
             "scene.warning_pulse",
-            {
-                "brighten_duration": half,
-                "on_duration": 0.0,
-                "darken_duration": half,
-                "off_duration": 0.0,
-            },
+            {"pulse_duration": config.warning_pulse_duration},
         )
         self.end_after(state, config.warning_duration(), PHASE_PLAYING)
 
