@@ -235,6 +235,7 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `find_data_port` / `select_data_port` | `scripts/sd_sync_transport.py` | Data-channel **Port auto-detect** for `scripts/sd_sync.py`; `--port` overrides |
 | `find_console_port` / `select_console_port` | `scripts/deploy_watch.py` | Console-channel **Port auto-detect** for `deploy_watch`; `--port` overrides |
 | `ship_list` / `ShipList` / `ShipEntry` / `governed_mount_files` | `scripts/ship_list.py` | The **Ship list**: which files land where on a device (`MODULE_DIRS`, exclusions, compiled or raw, `boot.py` placement). `scripts/build.py` stages it; `scripts/deploy.py` syncs it and prunes mount files it no longer names |
+| `gate` / `IssueState` / `TriageEvent` / `GateVerdict` / `read_issue_state` | `scripts/triage.py` | Automated triage's deterministic logic (CPython-only, run by the triage workflow). `gate` is pure: an event and the issue's live `IssueState` in, run or skip with a reason out; it runs only for a `labeled` event adding `needs-triage`, or a `workflow_dispatch`, on an open issue (not a pull request) carrying `needs-triage` live, from a non-bot sender. `read_issue_state` reads that state with `gh issue view`, never from the event payload |
 
 ---
 
