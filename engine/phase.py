@@ -11,7 +11,8 @@ This module ships that machinery once:
 - :class:`PhaseKey` — an opaque, identity-typed phase token.  The engine ships
   only the *type*; scenes own the named instances.
 - :class:`PhaseMachine` — the mutable phase mechanics (current phase, a private
-  pending-entry flag, and ``phase_start``), cached in :class:`GameState`.
+  pending-entry flag, ``phase_start`` and the phase's pending end), cached in
+  :class:`GameState`.
 - :class:`PhaseSlot` — the one accessor a scene builds per machine, shared by
   every rule that touches it.  See its docstring for the identity contract.
 - :class:`PhaseRule` — owns one phase's lifecycle: ``on_enter`` /
@@ -34,6 +35,16 @@ A newly entered phase's handlers, on both :class:`PhaseRule` and
 again whatever the rule order.  The engine counts every event it dispatches
 (:attr:`GameState.dispatch_count`) and the machine records the count at
 entry, so this holds even for the reused per-frame ``Sensors`` event.
+
+A phase ends when its owning :class:`PhaseRule` calls
+:meth:`~PhaseRule.transition_to` from a handler, or when the end it declared
+in ``on_enter`` fires: after a duration, when an effect receipt stops, or
+when a condition on game state holds, each naming the next phase.  The
+machine holds at most one such pending end and drops it on every
+transition, so a phase's end belongs to that one entry.  The end is checked
+once per tick on the ``Sensors`` event, before the owning rule's own
+``Sensors`` handler, which is skipped on the tick it fires.  It is measured
+in game time, so like the phase itself it pauses under an Overlay.
 """
 
 from __future__ import annotations
@@ -48,7 +59,8 @@ except ImportError:
 
 from engine.engine import GameRule
 from engine.events import Event
-from engine.state import GameState, StateSlot
+from engine.input import InputEvents
+from engine.state import EffectReceipt, GameState, StateSlot
 
 __all__ = [
     "InPhaseRule",
@@ -81,14 +93,22 @@ class PhaseMachine:
     """Mutable phase mechanics cached in :class:`GameState`.
 
     Holds only the current :class:`PhaseKey`, ``phase_start``, the
-    :attr:`GameState.dispatch_count` the phase was entered on, and private
-    flags marking an ``on_enter`` as pending or running.  It owns no effects
-    and no receipts — :meth:`enter` has no side effects beyond those fields,
-    so it can never leak an effect across a transition.  Lifecycle teardown
-    belongs to the owning :class:`PhaseRule`'s ``on_exit``.
+    :attr:`GameState.dispatch_count` the phase was entered on, private
+    flags marking an ``on_enter`` as pending or running, and at most one
+    pending end, dropped on transition; it never stops an effect.  :meth:`enter`
+    has no side effects beyond those fields, so it can never leak an effect
+    across a transition.  Lifecycle teardown belongs to the owning
+    :class:`PhaseRule`'s ``on_exit``.
     """
 
-    __slots__ = ("_enter_pending", "_entering", "_entry_dispatch", "phase", "phase_start")
+    __slots__ = (
+        "_enter_pending",
+        "_entering",
+        "_entry_dispatch",
+        "_pending_end",
+        "phase",
+        "phase_start",
+    )
 
     def __init__(self, initial_phase: PhaseKey) -> None:
         self.phase = initial_phase
@@ -97,6 +117,8 @@ class PhaseMachine:
         self._entry_dispatch = 0
         self._enter_pending = True
         self._entering = False
+        # The current phase's declared end: its condition and next phase.
+        self._pending_end: tuple[Callable[[GameState], bool], PhaseKey] | None = None
 
     def enter(self, phase: PhaseKey, now: float, dispatch: int) -> None:
         """Atomically move to *phase* at *now* on *dispatch* and mark ``on_enter`` pending.
@@ -104,14 +126,16 @@ class PhaseMachine:
         *dispatch* is the :attr:`GameState.dispatch_count` of the event being
         dispatched at entry; the phase's handlers skip that event.
 
-        Has no other side effects: it never stops effects or clears receipts,
-        and it does not run ``on_enter`` itself — :meth:`PhaseRule.transition_to`
-        does, straight after.
+        Drops any pending end, so every transition cancels the leaving
+        phase's declared end.  Has no other side effects: it never stops
+        effects or clears receipts, and it does not run ``on_enter`` itself —
+        :meth:`PhaseRule.transition_to` does, straight after.
         """
         self.phase = phase
         self.phase_start = now
         self._entry_dispatch = dispatch
         self._enter_pending = True
+        self._pending_end = None
 
     def elapsed(self, now: float) -> float:
         """Return the time elapsed since :attr:`phase_start`."""
@@ -221,6 +245,10 @@ class _PhaseGuardedRule(GameRule):
         """Return this rule's :class:`PhaseMachine` via its :class:`PhaseSlot`."""
         return self._phase_slot(state)
 
+    def _end_fired(self, event: Event, machine: PhaseMachine, state: GameState) -> bool:
+        """Return ``True`` if this rule ended its phase on *event*; only a PhaseRule can."""
+        return False
+
     def _phase_dispatch(self, event: Event, state: GameState) -> None:
         machine = self._machine(state)
         if machine._enter_pending:
@@ -230,6 +258,8 @@ class _PhaseGuardedRule(GameRule):
             if owner is not None:
                 owner._run_pending_enter(machine, state)
         if machine.phase != self.phase or machine._entry_dispatch == state.dispatch_count:
+            return
+        if self._end_fired(event, machine, state):
             return
         handler = self._phase_handlers.get(type(event))
         if handler is not None:
@@ -243,15 +273,19 @@ class PhaseRule(_PhaseGuardedRule):
     enters the phase or, for the scene's initial phase, on the first event any
     phase rule on its slot hears, before that rule's handler.  The handlers
     fire for every event while the phase is active, starting with the event
-    after the one that entered it.  ``on_exit`` runs when a handler calls
-    :meth:`transition_to`.  Exactly one ``PhaseRule`` may own a given
-    phase of a :class:`PhaseSlot`: each registers itself with its slot when
-    constructed, and constructing a second owner raises ``ValueError``.
+    after the one that entered it.  ``on_exit`` runs when the phase is left,
+    by a handler calling :meth:`transition_to` or by the end ``on_enter``
+    declared (:meth:`end_when` and its named forms).  Exactly one
+    ``PhaseRule`` may own a given phase of a :class:`PhaseSlot`: each
+    registers itself with its slot when constructed, and constructing a
+    second owner raises ``ValueError``.
     """
 
     def __init__(self, phase: PhaseKey, phase_slot: PhaseSlot) -> None:
         super().__init__(phase, phase_slot)
         phase_slot._register_owner(self)
+        # A declared end is checked on Sensors whether or not a handler is registered for it.
+        GameRule.on(self, InputEvents.Sensors, self._phase_dispatch)
 
     def transition_to(self, state: GameState, next_phase: PhaseKey) -> None:
         """Run ``on_exit``, move the machine to *next_phase*, then run its ``on_enter``.
@@ -276,11 +310,63 @@ class PhaseRule(_PhaseGuardedRule):
         machine.enter(next_phase, state.total, state.dispatch_count)
         owner._run_pending_enter(machine, state)
 
+    def end_when(
+        self, state: GameState, condition: Callable[[GameState], bool], next_phase: PhaseKey
+    ) -> None:
+        """Declare that this phase ends, moving to *next_phase*, once *condition* holds.
+
+        Call it from ``on_enter``.  *condition* receives the game state only
+        and is checked once per tick on the ``Sensors`` event, from the one
+        after entry, before this rule's own ``Sensors`` handler, which is
+        skipped on the tick the end fires.  Any transition cancels it,
+        including this rule's own :meth:`transition_to`.
+
+        Raises:
+            RuntimeError: if called anywhere but this rule's ``on_enter``, or
+                if this phase entry already declared an end.
+        """
+        machine = self._machine(state)
+        if not machine._entering or machine.phase is not self.phase:
+            raise RuntimeError(f"End of {self.phase!r} declared outside its on_enter")
+        if machine._pending_end is not None:
+            raise RuntimeError(f"End of {self.phase!r} already declared for this entry")
+        machine._pending_end = (condition, next_phase)
+
+    def end_after(self, state: GameState, seconds: float, next_phase: PhaseKey) -> None:
+        """Declare that this phase ends, moving to *next_phase*, once it has run *seconds*.
+
+        A named form of :meth:`end_when`, with its rules; *seconds* is read
+        once, at the call.  Game time stops under an Overlay, so this end
+        pauses with it.
+        """
+        self.end_when(state, lambda s: self.phase_elapsed(s) >= seconds, next_phase)
+
+    def end_when_stopped(
+        self, state: GameState, receipt: EffectReceipt, next_phase: PhaseKey
+    ) -> None:
+        """Declare that this phase ends, moving to *next_phase*, once *receipt*'s effect stops.
+
+        A named form of :meth:`end_when`, with its rules.  Ending the phase
+        never stops the effect, and a transition that cancels this end
+        leaves the effect running.
+        """
+        self.end_when(state, lambda s: receipt.is_stopped(), next_phase)
+
     def on_enter(self, state: GameState) -> None:
         """Run once each time this phase is entered. No-op by default; must not transition."""
 
     def on_exit(self, state: GameState) -> None:
         """Run when :meth:`transition_to` leaves this phase. No-op by default."""
+
+    def _end_fired(self, event: Event, machine: PhaseMachine, state: GameState) -> bool:
+        pending_end = machine._pending_end
+        if pending_end is None or type(event) is not InputEvents.Sensors:
+            return False
+        condition, next_phase = pending_end
+        if not condition(state):
+            return False
+        self.transition_to(state, next_phase)
+        return True
 
     def _run_pending_enter(self, machine: PhaseMachine, state: GameState) -> None:
         if not machine.take_enter_pending():
