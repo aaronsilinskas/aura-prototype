@@ -21,6 +21,10 @@ updates:
       uv-minor-and-patch:
         patterns: ["*"]
         update-types: [minor, patch]
+    ignore:
+      # Pinned to the device firmware (CIRCUITPYTHON_VERSION in scripts/setup_mpy_cross.sh) and
+      # bumped together with it by hand.
+      - dependency-name: circuitpython-stubs
   - package-ecosystem: pre-commit
     directory: /
     schedule:
