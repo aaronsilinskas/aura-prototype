@@ -102,8 +102,8 @@ An opaque, identity-typed constant naming one phase; compared by identity, so a 
 _Avoid_: bare `str`/`int` phase values; comparing a phase against a string literal
 
 ### PhaseMachine
-The mutable per-scene holder of the current `PhaseKey`, the phase-start time, and the dispatch the phase was entered on (so its handlers skip that event); reached through a scene's `PhaseSlot`.
-_Avoid_: storing receipts or per-phase scratch on it; auto-stopping effects inside `enter()`
+The mutable per-scene holder of the current `PhaseKey`, the phase-start time, the dispatch the phase was entered on (so its handlers skip that event), and at most one pending end a `PhaseRule` declared, dropped on every transition; reached through a scene's `PhaseSlot`.
+_Avoid_: storing receipts or per-phase scratch on it beyond the declared end; stopping effects inside `enter()`, including the effect a dropped end was waiting on
 
 ### PhaseSlot
 The single per-scene typed accessor owning a phase machine's `GameState` key and initial phase, and knowing which `PhaseRule` owns each phase; all of a scene's phase rules share the *same* instance, so "same key ⇒ same `PhaseMachine`" holds by construction.
