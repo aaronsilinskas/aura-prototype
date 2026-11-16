@@ -65,8 +65,8 @@ These sit outside the triage state machine, like `idea`. Edit the right-hand col
 
 The workflow authenticates with the maintainer's Claude subscription through the `CLAUDE_CODE_OAUTH_TOKEN` repository secret. The token expires one year after it is minted; renew it eleven months after minting.
 
-- **Minted:** _not yet_ (record the date here)
-- **Renew by:** _eleven months after minting_ (record the date here, and set a calendar reminder for it)
+- **Minted:** 2026-11-16 (expires 2027-11-16)
+- **Renew by:** 2027-10-16 (keep a calendar reminder for this date)
 
 To renew: run `claude setup-token` locally, replace the `CLAUDE_CODE_OAUTH_TOKEN` secret (repo admin), and update the two dates above. An expired or missing token fails the run visibly and leaves `needs-triage` on the issue.
 
