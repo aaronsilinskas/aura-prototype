@@ -2,7 +2,7 @@
 
 Phase mechanics now live in the scene's :class:`PhaseMachine` (covered by
 ``engine.tests.test_phase``); what remains here is the flat gameplay state:
-hitpoints and the per-phase receipts.
+hitpoints, shot bookkeeping and the Playing phase's receipts.
 """
 
 from __future__ import annotations
@@ -27,11 +27,10 @@ def test_new_tag_state_starts_with_zeroed_gameplay_fields():
     assert tag.hitpoints == 0
 
 
-def test_new_tag_state_has_no_receipts():
+def test_new_tag_state_has_no_hitpoints_receipt():
     tag = TagState()
 
     assert tag.hitpoints_receipt is None
-    assert tag.game_over_receipt is None
 
 
 def test_new_tag_state_has_a_shot_state_with_no_ammo_and_no_cooldown_pending():
