@@ -1,4 +1,4 @@
-"""Tests for ``RlglPhaseState`` -- Game Level and receipt state and the
+"""Tests for ``RlglPhaseState`` -- Game Level and music state and the
 ``rlgl_phase_state`` get-or-create accessor."""
 
 from __future__ import annotations
@@ -20,14 +20,13 @@ def _make_state():
 # ---------------------------------------------------------------------------
 
 
-def test_new_phase_state_starts_at_level_one_with_no_receipts():
-    """A freshly constructed phase state begins at level 1 with no in-flight
-    receipts -- the bootstrap state the Ready phase's first entry expects."""
+def test_new_phase_state_starts_at_level_one_with_no_music():
+    """A freshly constructed phase state begins at level 1 with no music
+    playing -- the bootstrap state the Ready phase's first entry expects."""
     phase_state = RlglPhaseState()
 
     assert phase_state.level == 1
     assert phase_state.music_receipt is None
-    assert phase_state.win_sting_receipt is None
 
 
 # ---------------------------------------------------------------------------
@@ -62,7 +61,7 @@ def test_stop_music_is_a_no_op_when_nothing_is_playing():
 
 
 def test_rlgl_phase_state_caches_the_same_instance_across_calls():
-    """Game Level and receipt state must persist across ticks, so the accessor
+    """Game Level and music state must persist across ticks, so the accessor
     must return the same instance rather than rebuilding it each time."""
     state = _make_state()
 
