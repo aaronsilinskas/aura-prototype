@@ -418,6 +418,60 @@ def test_activating_a_second_boot_scene_raises_and_keeps_the_first() -> None:
     assert manager.active_state is first_state
 
 
+_UNLISTED_OWNER_RULE = """\
+from engine.phase import PhaseKey, PhaseRule, PhaseSlot
+
+_SHOWING = PhaseKey("showing")
+_DONE = PhaseKey("done")
+_SLOT = PhaseSlot("unlisted_machine", _SHOWING)
+
+
+class _Showing(PhaseRule):
+    def on_enter(self, state) -> None:
+        self.end_after(state, 1.0, _DONE)
+
+
+RULE = _Showing(_SHOWING, _SLOT)
+_Done = PhaseRule(_DONE, _SLOT)
+"""
+"""A rule file whose second phase owner is built but never exported, so no scene lists it."""
+
+
+def test_activating_a_boot_scene_missing_a_phase_owner_raises_naming_its_slot_and_phase(
+    pack_tree,
+) -> None:
+    rule_registry = pack_tree.scan(
+        rule_packs={"unlisted": {"rule": _UNLISTED_OWNER_RULE}}
+    ).rule_registry
+    scene_reg = make_scene_registry(("main", make_scene(rule_packs=[_ref("unlisted")])))
+    manager = _make_scene_manager(rule_registry=rule_registry, scene_registry=scene_reg)
+
+    with pytest.raises(ValueError, match=r"PhaseKey\('done'\).*'unlisted_machine'"):
+        manager.activate_boot_scene("main")
+
+    assert manager.active_state is None
+
+
+def test_an_overlay_missing_a_phase_owner_raises_and_leaves_the_covered_scene_active(
+    pack_tree,
+) -> None:
+    rule_registry = pack_tree.scan(
+        rule_packs={"unlisted": {"rule": _UNLISTED_OWNER_RULE}}
+    ).rule_registry
+    scene_reg = make_scene_registry(
+        ("base", make_scene()), ("broken", make_scene(rule_packs=[_ref("unlisted")]))
+    )
+    manager = _make_scene_manager(rule_registry=rule_registry, scene_registry=scene_reg)
+    manager.activate_boot_scene("base")
+    base_state = manager.active_state
+    manager.overlay("broken")
+
+    with pytest.raises(ValueError, match=r"PhaseKey\('done'\).*'unlisted_machine'"):
+        manager.update(_STEP)
+
+    assert manager.active_state is base_state
+
+
 def test_activating_the_boot_scene_enters_it_with_its_view(pack_tree) -> None:
     catalog = pack_tree.scan(
         effect_packs={"fx": {}},

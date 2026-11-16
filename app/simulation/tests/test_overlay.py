@@ -146,48 +146,36 @@ _TIMED_PHASE_RULE = """\
 from engine.phase import PhaseKey, PhaseRule, PhaseSlot
 from engine.state import GameState, Scope
 
-_SHOWING = PhaseKey("showing")
-_DONE = PhaseKey("done")
-_PHASE = PhaseSlot("timed_phase", _SHOWING)
+SHOWING = PhaseKey("showing")
+DONE = PhaseKey("done")
+PHASE = PhaseSlot("timed_phase", SHOWING)
 
 
 class _Showing(PhaseRule):
     def on_enter(self, state: GameState) -> None:
         state.effect_controls.set_effect(Scope.PERSONAL, "basic.solid", {"color": 0xFF0000})
-        self.end_after(state, 1.0, _DONE)
+        self.end_after(state, 1.0, DONE)
 
 
-class _Done(PhaseRule):
-    def on_enter(self, state: GameState) -> None:
-        state.effect_controls.set_effect(Scope.PERSONAL, "basic.solid", {"color": 0x00FF00})
-
-
-RULE = _Showing(_SHOWING, _PHASE)
-_Done(_DONE, _PHASE)
+RULE = _Showing(SHOWING, PHASE)
 """
 
 _CONDITION_PHASE_RULE = """\
 from engine.phase import PhaseKey, PhaseRule, PhaseSlot
 from engine.state import GameState, Scope
 
-_SHOWING = PhaseKey("showing")
-_DONE = PhaseKey("done")
-_PHASE = PhaseSlot("condition_phase", _SHOWING)
+SHOWING = PhaseKey("showing")
+DONE = PhaseKey("done")
+PHASE = PhaseSlot("condition_phase", SHOWING)
 
 
 class _Showing(PhaseRule):
     def on_enter(self, state: GameState) -> None:
         state.effect_controls.set_effect(Scope.PERSONAL, "basic.solid", {"color": 0xFF0000})
-        self.end_when(state, lambda s: s.total >= 1.0, _DONE)
+        self.end_when(state, lambda s: s.total >= 1.0, DONE)
 
 
-class _Done(PhaseRule):
-    def on_enter(self, state: GameState) -> None:
-        state.effect_controls.set_effect(Scope.PERSONAL, "basic.solid", {"color": 0x00FF00})
-
-
-RULE = _Showing(_SHOWING, _PHASE)
-_Done(_DONE, _PHASE)
+RULE = _Showing(SHOWING, PHASE)
 """
 
 _HUM_PHASE_RULE = """\
@@ -195,33 +183,49 @@ from engine.input import InputEvents
 from engine.phase import PhaseKey, PhaseRule, PhaseSlot
 from engine.state import GameState, Scope
 
-_HUMMING = PhaseKey("humming")
-_DONE = PhaseKey("done")
-_PHASE = PhaseSlot("hum_phase", _HUMMING)
+HUMMING = PhaseKey("humming")
+DONE = PhaseKey("done")
+PHASE = PhaseSlot("hum_phase", HUMMING)
 
 
 class _Humming(PhaseRule):
     def __init__(self) -> None:
-        super().__init__(_HUMMING, _PHASE)
+        super().__init__(HUMMING, PHASE)
         self.on(InputEvents.Sensors, self._handle)
 
     def on_enter(self, state: GameState) -> None:
         receipt = state.effect_controls.set_effect(Scope.ALL, "scene.hum", {})
-        self.end_when_stopped(state, receipt, _DONE)
+        self.end_when_stopped(state, receipt, DONE)
 
     def _handle(self, event: InputEvents.Sensors, state: GameState) -> None:
         if event.buttons.is_pressed("A"):
             state.effect_controls.stop_effect(Scope.ALL)
 
 
+RULE = _Humming()
+"""
+
+
+def _done_rule(scene: str) -> str:
+    """The rule file owning *scene*'s ``DONE`` phase, which lights green on entry.
+
+    It imports the phase slot from the scene's ``phase`` rule file: a phase's
+    owner must be in the scene's rules, so it is its own rule file.
+    """
+    return f"""\
+from aura_packs.scenes.{scene}.rules.phase import DONE, PHASE
+from engine.phase import PhaseRule
+from engine.state import GameState, Scope
+
+
 class _Done(PhaseRule):
     def on_enter(self, state: GameState) -> None:
-        state.effect_controls.set_effect(Scope.PERSONAL, "basic.solid", {"color": 0x00FF00})
+        state.effect_controls.set_effect(Scope.PERSONAL, "basic.solid", {{"color": 0x00FF00}})
 
 
-RULE = _Humming()
-_Done(_DONE, _PHASE)
+RULE = _Done(DONE, PHASE)
 """
+
 
 _HUM_EFFECT = """\
 from effects.effect import AudioPlaybackConfig, Effect, EffectAudio, EffectConfig, EffectVerb
@@ -250,8 +254,8 @@ def _package(directory: Path) -> Path:
     return directory
 
 
-def _install_card_scene(card: Path, scene: str, rule: str) -> None:
-    """Put *scene* on *card*, running the one rule module source *rule*."""
+def _install_card_scene(card: Path, scene: str, rules: dict[str, str]) -> None:
+    """Put *scene* on *card*, running *rules*: each rule file's name and module source."""
     scene_dir = _package(_package(_package(card / "aura_packs") / "scenes") / scene)
     (scene_dir / "scene.json").write_text(
         json.dumps(
@@ -262,7 +266,9 @@ def _install_card_scene(card: Path, scene: str, rule: str) -> None:
             }
         )
     )
-    (_package(scene_dir / "rules") / "rule.py").write_text(rule)
+    rules_dir = _package(scene_dir / "rules")
+    for name, source in rules.items():
+        (rules_dir / f"{name}.py").write_text(source)
 
 
 @pytest.fixture()
@@ -277,15 +283,21 @@ def card(tmp_path: Path) -> Path:
     game time reaches 1 s. ``hum_phase``: ``hum``'s sound for a phase
     declared to end when the sound stops, which an A tap does; then green.
     """
-    _install_card_scene(tmp_path, "counter", _TAP_COUNTER_RULE)
-    _install_card_scene(tmp_path, "pause", _PAUSE_RULE)
-    _install_card_scene(tmp_path, "glow", _GLOW_ONCE_RULE)
-    _install_card_scene(tmp_path, "idle", _IDLE_RULE)
-    _install_card_scene(tmp_path, "listen", _GREEN_ON_IR_RULE)
-    _install_card_scene(tmp_path, "hum", _HUM_ONCE_RULE)
-    _install_card_scene(tmp_path, "timed", _TIMED_PHASE_RULE)
-    _install_card_scene(tmp_path, "condition", _CONDITION_PHASE_RULE)
-    _install_card_scene(tmp_path, "hum_phase", _HUM_PHASE_RULE)
+    _install_card_scene(tmp_path, "counter", {"rule": _TAP_COUNTER_RULE})
+    _install_card_scene(tmp_path, "pause", {"rule": _PAUSE_RULE})
+    _install_card_scene(tmp_path, "glow", {"rule": _GLOW_ONCE_RULE})
+    _install_card_scene(tmp_path, "idle", {"rule": _IDLE_RULE})
+    _install_card_scene(tmp_path, "listen", {"rule": _GREEN_ON_IR_RULE})
+    _install_card_scene(tmp_path, "hum", {"rule": _HUM_ONCE_RULE})
+    _install_card_scene(
+        tmp_path, "timed", {"phase": _TIMED_PHASE_RULE, "done": _done_rule("timed")}
+    )
+    _install_card_scene(
+        tmp_path, "condition", {"phase": _CONDITION_PHASE_RULE, "done": _done_rule("condition")}
+    )
+    _install_card_scene(
+        tmp_path, "hum_phase", {"phase": _HUM_PHASE_RULE, "done": _done_rule("hum_phase")}
+    )
     for scene in ("hum", "hum_phase"):
         effects = _package(tmp_path / "aura_packs" / "scenes" / scene / "effects")
         (effects / "hum.py").write_text(_HUM_EFFECT)
