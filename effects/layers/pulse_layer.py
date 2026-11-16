@@ -23,12 +23,12 @@ class PulseLayer(Layer):
     """
 
     __slots__ = (
-        "_b_darken",
-        "_b_off",
-        "_b_on",
+        "_brighten_end",
         "_brightness",
         "_cycle_total",
+        "_darken_end",
         "_elapsed",
+        "_on_end",
         "at_peak",
     )
 
@@ -45,10 +45,10 @@ class PulseLayer(Layer):
         """
         if brighten_duration < 0 or on_duration < 0 or darken_duration < 0 or off_duration < 0:
             raise ValueError("Pulse durations must be non-negative")
-        self._b_on = brighten_duration
-        self._b_darken = brighten_duration + on_duration
-        self._b_off = self._b_darken + darken_duration
-        self._cycle_total = self._b_off + off_duration
+        self._brighten_end = brighten_duration
+        self._on_end = brighten_duration + on_duration
+        self._darken_end = self._on_end + darken_duration
+        self._cycle_total = self._darken_end + off_duration
         if self._cycle_total == 0.0:
             raise ValueError("At least one pulse phase duration must be non-zero")
         self._elapsed = 0.0
@@ -60,19 +60,19 @@ class PulseLayer(Layer):
         prev = self._elapsed
         self._elapsed = prev + elapsed
         cycle_total = self._cycle_total
-        b_on = self._b_on
-        self.at_peak = floor((self._elapsed - b_on) / cycle_total) > floor(
-            (prev - b_on) / cycle_total
+        brighten_end = self._brighten_end
+        self.at_peak = floor((self._elapsed - brighten_end) / cycle_total) > floor(
+            (prev - brighten_end) / cycle_total
         )
         e = self._elapsed % cycle_total
-        b_darken = self._b_darken
-        b_off = self._b_off
-        if e < b_on:
-            self._brightness = e / b_on
-        elif e < b_darken:
+        on_end = self._on_end
+        darken_end = self._darken_end
+        if e < brighten_end:
+            self._brightness = e / brighten_end
+        elif e < on_end:
             self._brightness = 1.0
-        elif e < b_off:
-            self._brightness = 1.0 - (e - b_darken) / (b_off - b_darken)
+        elif e < darken_end:
+            self._brightness = 1.0 - (e - on_end) / (darken_end - on_end)
         else:
             self._brightness = 0.0
 
