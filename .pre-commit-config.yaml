@@ -4,12 +4,6 @@ repos:
     hooks:
       - id: no-commit-to-branch
         args: [--branch, main]
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.17.5
-    hooks:
-      - id: ruff
-        args: [--fix]
-      - id: ruff-format
   - repo: https://github.com/rhysd/actionlint
     rev: 914e7df21a07ef503a81201c76d2b11c789d3fca # frozen: v1.7.12
     hooks:
@@ -22,6 +16,20 @@ repos:
       - id: check-dependabot
   - repo: local
     hooks:
+      # ruff runs from the uv environment, so commits and CI use the one version in uv.lock.
+      # --force-exclude applies pyproject.toml's exclude to the files pre-commit passes.
+      - id: ruff-check
+        name: ruff check
+        entry: uv run ruff check --fix --force-exclude
+        language: system
+        types_or: [python, pyi]
+        require_serial: true
+      - id: ruff-format
+        name: ruff format
+        entry: uv run ruff format --force-exclude
+        language: system
+        types_or: [python, pyi, markdown]
+        require_serial: true
       - id: lint-imports
         name: import-linter
         description: Enforce the module layering contracts declared in pyproject.toml.
