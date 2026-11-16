@@ -18,7 +18,7 @@ Single-context: root `GLOSSARY.md` (canonical terms + what to avoid), `docs/doma
 
 ### Project facts for shared workflows
 
-- **Check command**: `bash scripts/check.sh`. It syncs the uv environment, runs every pre-commit hook on all files (ruff, ruff format, import-linter, mypy, actionlint, check-dependabot), then `uv run pytest -q`. CI runs it on every PR and push to `main`.
+- **Check command**: `bash scripts/check.sh`. It syncs the uv environment, runs every hook in `.pre-commit-config.yaml` on all files except `no-commit-to-branch`, then `uv run pytest -q`. CI runs it on every PR and push to `main`.
 - **Main checkout**: usually holds unrelated uncommitted work (KiCad files under `electronics/`, drafts in progress). Work in a worktree based on `origin/main`, and read committed files with `git show origin/<branch>:<path>`.
 - **Coding standards**: `CODING_STANDARDS.md`.
 - **Dependency bumps**: arrive as weekly Dependabot PRs; `.github/dependabot.yml` says what it covers and how bumps are grouped. Don't bump those dependencies in a feature change; review and merge the Dependabot PR. Bump by hand what it skips: versions under a workflow step's `with:`, and `circuitpython-stubs` together with the device firmware.

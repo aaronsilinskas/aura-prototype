@@ -258,4 +258,4 @@ All code that ships to a device (`effects/`, `engine/`, `magic/`, `packs/`, `har
 
 ## Tests
 
-Over 3,000 tests, in `tests/` folders beside the code they cover. Run with `uv run pytest`, or the full check (hooks, then tests) with `bash scripts/check.sh`. All must pass before commit. Pre-commit hooks run `ruff` (lint), `ruff format`, `import-linter`, `mypy`, `actionlint` and `check-dependabot`.
+Over 3,000 tests, in `tests/` folders beside the code they cover. Run with `uv run pytest`, or the full check (hooks, then tests) with `bash scripts/check.sh`. All must pass before commit. `.pre-commit-config.yaml` lists the pre-commit hooks.
