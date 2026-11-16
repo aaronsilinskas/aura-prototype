@@ -1,11 +1,12 @@
-"""Automated triage's credential check: no secret leaves the Claude job inside a decision.
+"""Automated triage's decision check: Claude made a decision, and no secret leaves the job in it.
 
 Host-only (CPython), run by the triage workflow and never shipped. Claude's decision ends
 up in a public issue comment, and the job that runs Claude holds the Claude credential and
 a job token. The runner masks a secret only when it appears verbatim, so this check also
-looks for fragments of each secret and for its base64 and hex encodings. :func:`carries_secret`
-is pure; ``main`` is the workflow step's wrapper, which fails the job rather than pass a
-decision on.
+looks for fragments of each secret and for its base64 and hex encodings. A missing decision
+fails here too, so the run shows red instead of passing with nothing to apply.
+:func:`carries_secret` is pure; ``main`` is the workflow step's wrapper, which fails the job
+rather than pass a decision on.
 """
 
 import argparse

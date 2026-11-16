@@ -122,7 +122,7 @@ jobs:
             --disallowedTools Agent,Task,Skill,Workflow,CronCreate,RemoteTrigger,ScheduleWakeup,SendMessage,PushNotification,EnterWorktree
             --disallowedTools "Read(//proc/**)" "Read(//sys/**)" "Read(//dev/**)" "Read(//etc/**)" "Read(//tmp/**)" "Read(//var/**)" "Read(//run/**)" "Read(//root/**)" "Read(//opt/**)" "Read(//usr/**)" "Read(~/.*)" "Read(~/.*/**)" "Read(~/work/_temp/**)" "Read(~/work/_actions/**)" "Read(~/work/_tool/**)" "Read(~/actions-runner/**)" "Read(~/runners/**)"
             --json-schema '${{ steps.load.outputs.schema }}'
-      - name: Check the decision carries no credential
+      - name: Check there is a decision and it carries no credential
         id: secret-check
         env:
           DECISION: ${{ steps.claude.outputs.structured_output }}

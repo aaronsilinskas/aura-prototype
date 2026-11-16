@@ -37,7 +37,7 @@ _ACTION_MCP_CONFIG = json.dumps(
 )
 
 # The workflow's settings input sets no permission mode, so the action prefixes auto mode.
-_ACTION_PREFIXES = pytest.mark.parametrize(
+_EACH_ACTION_PREFIX = pytest.mark.parametrize(
     "auto_mode", [True, False], ids=["auto mode and MCP config", "MCP config only"]
 )
 
@@ -48,11 +48,17 @@ def _workflow_claude_args() -> str:
     return step["with"]["claude_args"]
 
 
-def _schema_as_the_load_step_writes_it() -> str:
-    """``jq -c 'del(.["$schema"])'``, then every apostrophe as ``\\u0027``."""
+def _decision_schema() -> dict:
+    """The committed decision schema without ``$schema``, as the load step sends it."""
     schema = json.loads(_SCHEMA.read_text(encoding="utf-8"))
     del schema["$schema"]
-    return json.dumps(schema, separators=(",", ":"), ensure_ascii=False).replace("'", "\\u0027")
+    return schema
+
+
+def _schema_as_the_load_step_writes_it() -> str:
+    """``jq -c 'del(.["$schema"])'``, then every apostrophe as ``\\u0027``."""
+    compact = json.dumps(_decision_schema(), separators=(",", ":"), ensure_ascii=False)
+    return compact.replace("'", "\\u0027")
 
 
 def _options(auto_mode: bool) -> SdkOptions:
@@ -62,29 +68,32 @@ def _options(auto_mode: bool) -> SdkOptions:
     return parse_sdk_options(agent_mode_claude_args(user_args, _ACTION_MCP_CONFIG, auto_mode))
 
 
-@_ACTION_PREFIXES
-def test_the_model_and_turn_limit_reach_the_cli(auto_mode):
-    options = _options(auto_mode)
-
-    assert (options.model, options.max_turns) == ("sonnet", 10)
+@_EACH_ACTION_PREFIX
+def test_the_model_reaches_the_cli(auto_mode):
+    assert _options(auto_mode).model == "sonnet"
 
 
-@_ACTION_PREFIXES
+@_EACH_ACTION_PREFIX
+def test_the_turn_limit_reaches_the_cli(auto_mode):
+    assert _options(auto_mode).max_turns == 10
+
+
+@_EACH_ACTION_PREFIX
 def test_settings_come_only_from_the_action(auto_mode):
     assert _options(auto_mode).setting_sources == ["user"]
 
 
-@_ACTION_PREFIXES
-def test_the_cli_denies_every_tool_call_no_allow_rule_covers(auto_mode):
+@_EACH_ACTION_PREFIX
+def test_dont_ask_permission_mode_reaches_the_cli(auto_mode):
     assert _options(auto_mode).permission_mode == "dontAsk"
 
 
-@_ACTION_PREFIXES
+@_EACH_ACTION_PREFIX
 def test_file_reads_inside_the_checkout_are_the_only_allow_rule(auto_mode):
     assert _options(auto_mode).allowed_tools == ["Read(./**)"]
 
 
-@_ACTION_PREFIXES
+@_EACH_ACTION_PREFIX
 def test_every_deny_rule_reaches_the_cli(auto_mode):
     required = {
         *("Bash", "Edit", "MultiEdit", "Write", "NotebookEdit", "WebFetch", "WebSearch"),
@@ -99,20 +108,23 @@ def test_every_deny_rule_reaches_the_cli(auto_mode):
         *("Read(~/actions-runner/**)", "Read(~/runners/**)"),
     }
 
-    assert required <= set(_options(auto_mode).disallowed_tools or [])
+    disallowed = _options(auto_mode).disallowed_tools
+    assert disallowed is not None
+    assert required <= set(disallowed)
 
 
-@_ACTION_PREFIXES
+@_EACH_ACTION_PREFIX
 def test_the_decision_schema_reaches_the_cli_intact(auto_mode):
     options = _options(auto_mode)
-    expected = json.loads(_SCHEMA.read_text(encoding="utf-8"))
-    del expected["$schema"]
+    schema = options.extra_args.get("json-schema")
 
     assert options.has_json_schema
-    assert json.loads(options.extra_args["json-schema"] or "") == expected
+    assert schema is not None
+    assert json.loads(schema) == _decision_schema()
 
 
 def test_claude_args_holds_no_shell_comment():
+    # Stricter than the action, which strips whole-line comments first: no comment at all.
     tokens = shell_quote_parse(_workflow_claude_args())
 
     assert [token for token in tokens if isinstance(token, dict) and "comment" in token] == []

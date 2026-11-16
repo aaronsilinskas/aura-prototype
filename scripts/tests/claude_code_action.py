@@ -12,10 +12,13 @@ Claude CLI really gets:
 - shell-quote 1.8.4's ``parse.js`` (the version ``base-action/bun.lock`` locks), called
   as the action calls it, with no environment. Its quirks are kept: an unquoted ``#``
   anywhere in a word comments out the rest of the whole string, and an unquoted ``$``
-  expands to nothing.
+  expands to nothing (except a name ``Object.prototype`` holds, such as ``$constructor``,
+  which JavaScript expands to that member's source; the port expands it to nothing).
 
 Only the ``claude_args`` path is ported; the action's other inputs (``model``,
 ``allowed_tools`` and the rest) are taken as unset, as the triage workflow leaves them.
+Nor are the options ``run.ts`` adds beside ``claude_args``: its own deny rules, which only
+add to the list, and ``ANTHROPIC_MODEL``, which would override ``--model``.
 """
 
 import json
@@ -76,7 +79,7 @@ def shell_quote_parse(string: str) -> list[ShellToken]:
     return tokens
 
 
-def _parse_word(s: str, string: str, start: int) -> tuple[list[ShellToken], bool]:
+def _parse_word(word: str, whole_input: str, start: int) -> tuple[list[ShellToken], bool]:
     """One chunk through shell-quote's scanner, and whether it opened a comment."""
     quote = ""
     escaped = False
@@ -87,33 +90,33 @@ def _parse_word(s: str, string: str, start: int) -> tuple[list[ShellToken], bool
     def expand_variable() -> str:
         nonlocal i
         i += 1
-        char = s[i : i + 1]
+        char = word[i : i + 1]
         if char == "{":
             i += 1
-            if s[i : i + 1] == "}":
-                raise ValueError("Bad substitution: " + s[i - 2 : i + 1])
-            end = s.find("}", i)
+            if word[i : i + 1] == "}":
+                raise ValueError("Bad substitution: " + word[i - 2 : i + 1])
+            end = word.find("}", i)
             if end < 0:
-                raise ValueError("Bad substitution: " + s[i:])
-            name = s[i:end]
+                raise ValueError("Bad substitution: " + word[i:])
+            name = word[i:end]
             i = end
         elif _SPECIAL_VARIABLE.match(char):
             name = char
             i += 1
         else:
-            rest = s[i:]
+            rest = word[i:]
             stop = _VARIABLE_END.search(rest)
             if stop is None:
                 name = rest
-                i = len(s)
+                i = len(word)
             else:
                 name = rest[: stop.start()]
                 i += stop.start() - 1
         # An empty environment: every named variable is unset, and a bare $ stays.
         return "" if name else "$"
 
-    while i < len(s):
-        c = s[i]
+    while i < len(word):
+        c = word[i]
         is_glob = is_glob or (not quote and c in "*?")
         if escaped:
             out += c
@@ -125,7 +128,7 @@ def _parse_word(s: str, string: str, start: int) -> tuple[list[ShellToken], bool
                 out += c
             elif c == "\\":
                 i += 1
-                c = s[i : i + 1]
+                c = word[i : i + 1]
                 out += c if c in ('"', "\\", "$") else "\\" + c
             elif c == "$":
                 out += expand_variable()
@@ -134,9 +137,9 @@ def _parse_word(s: str, string: str, start: int) -> tuple[list[ShellToken], bool
         elif c in ('"', "'"):
             quote = c
         elif _CONTROL_TOKEN.fullmatch(c):
-            return [{"op": s}], False
+            return [{"op": word}], False
         elif c == "#":
-            comment: ShellToken = {"comment": string[start + i + 1 :]}
+            comment: ShellToken = {"comment": whole_input[start + i + 1 :]}
             return ([out, comment] if out else [comment]), True
         elif c == "\\":
             escaped = True
@@ -153,7 +156,7 @@ def _parse_word(s: str, string: str, start: int) -> tuple[list[ShellToken], bool
 def agent_mode_claude_args(user_args: str, mcp_config: str, auto_mode: bool) -> str:
     """The ``claude_args`` the action hands its parser: its own flags, then the workflow's.
 
-    *auto_mode* is ``defaultsToAutoMode()``; *mcp_config* is the action's MCP config JSON.
+    ``auto_mode`` is ``defaultsToAutoMode()``; ``mcp_config`` is the action's MCP config JSON.
     """
     claude_args = "--permission-mode auto" if auto_mode else ""
     if json.loads(mcp_config).get("mcpServers"):
@@ -235,7 +238,7 @@ class SdkOptions:
 
 
 def parse_sdk_options(claude_args: str) -> SdkOptions:
-    """``parseSdkOptions`` for a run whose only option is *claude_args*."""
+    """``parseSdkOptions`` for a run whose only option is ``claude_args``."""
     extra_args = parse_claude_args(claude_args)
     has_json_schema = "json-schema" in extra_args
     model = extra_args.pop("model", None) or None
