@@ -6,6 +6,7 @@ drawn, what a scene's rules hear, what resolves and what raises.
 
 from __future__ import annotations
 
+import functools
 import os
 import tracemalloc
 
@@ -13,6 +14,7 @@ import pytest
 
 import engine
 from engine.capabilities import MissingCapabilityError
+from engine.effects import manager
 from engine.effects.output import EffectOutput
 from engine.engine import GameRule
 from engine.events import Event, EventGroup
@@ -44,6 +46,10 @@ _COLOR = [{"name": "color", "version": "1.0"}]
 _ENGINE_SOURCES = os.path.join(os.path.dirname(engine.__file__), "*")
 """Every engine source file: the ones a steady-state update must not grow."""
 _ENGINE_TESTS = os.path.join(os.path.dirname(engine.__file__), "tests", "*")
+_ENGINE_FILES = [
+    tracemalloc.Filter(True, _ENGINE_SOURCES),
+    tracemalloc.Filter(False, _ENGINE_TESTS),  # the spy output records every frame
+]
 
 
 class _Cover(Event):
@@ -52,6 +58,9 @@ class _Cover(Event):
 
 class _Tick(Event):
     """A steady-state tick's event, which no test rule handles."""
+
+
+_TICK = _Tick(_GROUP, "tick")  # heard by no handler, as most ticks' events are
 
 
 class _StepClock(Timer):
@@ -407,39 +416,99 @@ def test_the_runtimes_scene_controls_reboot_through_the_scene_reboot_port(pack_t
 # ---------------------------------------------------------------------------
 
 
-def test_steady_state_updates_accumulate_no_engine_memory(pack_tree) -> None:
+def _steady_runtime(pack_tree, output: SpyEffectOutput) -> SceneRuntime:
+    """A runtime painting *output*, ticked until every buffer and queue slot is at steady size."""
     catalog = _catalog(pack_tree)
     _rule(catalog, "base_rules").on(Event, _paint_red)
-    runtime = _runtime(catalog, _personal_output(), clock=_StepClock(0.25))
+    runtime = _runtime(catalog, output, clock=_StepClock(0.25))
     runtime.activate_boot_scene("base")
     runtime.queue_event(_PAINT)
     runtime.update()
-    tick = _Tick(_GROUP, "tick")  # heard by no handler, as most ticks' events are
-    for _ in range(3):  # let every buffer and queue slot reach its steady size
-        runtime.advance_clock()
-        runtime.queue_event(tick)
-        runtime.update()
+    for _ in range(3):
+        _steady_tick(runtime)
+    return runtime
 
-    engine_files = [
-        tracemalloc.Filter(True, _ENGINE_SOURCES),
-        tracemalloc.Filter(False, _ENGINE_TESTS),  # the spy output records every frame
-    ]
+
+def _steady_tick(runtime: SceneRuntime) -> None:
+    runtime.advance_clock()
+    runtime.queue_event(_TICK)
+    runtime.update()
+
+
+_STEADY_TICKS = 1000
+
+_ONE_OFF_BYTES = 128
+"""How far one engine line's traced memory may grow over the steady ticks.
+
+CPython reuses floats, small tuples and lists from per-type freelists, which
+tracemalloc doesn't see. If a freelist is short when tracing starts, the
+engine takes a few fresh, traced blocks once, and they stay held or parked on
+the freelist: up to 64 B on a line, however long the run. A per-tick
+accumulation, even one pointer per tick, passes this within the first few
+dozen of the ``_STEADY_TICKS``.
+"""
+
+
+def _engine_lines_grown_by_ticks(runtime: SceneRuntime) -> list[tracemalloc.StatisticDiff]:
+    """The engine source lines whose traced memory grew past ``_ONE_OFF_BYTES`` in steady ticks."""
     tracemalloc.start()
     try:
         # Traced from here, a list the effect system clears and refills each
         # tick holds one live block; only what accumulates tick on tick counts.
         for _ in range(10):
-            runtime.advance_clock()
-            runtime.queue_event(tick)
-            runtime.update()
-        before = tracemalloc.take_snapshot().filter_traces(engine_files)
-        for _ in range(100):
-            runtime.advance_clock()
-            runtime.queue_event(tick)
-            runtime.update()
-        after = tracemalloc.take_snapshot().filter_traces(engine_files)
+            _steady_tick(runtime)
+        before = tracemalloc.take_snapshot().filter_traces(_ENGINE_FILES)
+        for _ in range(_STEADY_TICKS):
+            _steady_tick(runtime)
+        after = tracemalloc.take_snapshot().filter_traces(_ENGINE_FILES)
     finally:
         tracemalloc.stop()
+    return [stat for stat in after.compare_to(before, "lineno") if stat.size_diff > _ONE_OFF_BYTES]
 
-    grown = [stat for stat in after.compare_to(before, "lineno") if stat.size_diff > 0]
-    assert grown == [], "\n".join(str(stat) for stat in grown)
+
+def _report(grown: list[tracemalloc.StatisticDiff]) -> str:
+    return "\n".join(str(stat) for stat in grown)
+
+
+def test_steady_state_updates_accumulate_no_engine_memory(pack_tree) -> None:
+    runtime = _steady_runtime(pack_tree, _personal_output())
+
+    grown = _engine_lines_grown_by_ticks(runtime)
+
+    assert grown == [], _report(grown)
+
+
+@pytest.mark.parametrize(
+    "fresh_object",
+    [
+        pytest.param(lambda i: (i, i), id="2-tuples"),
+        pytest.param(lambda i: (i, i, i, i), id="4-tuples"),
+        pytest.param(lambda i: i + 0.5, id="floats"),
+        pytest.param(lambda i: [i], id="lists"),
+    ],
+)
+def test_the_steady_state_check_passes_when_a_freelist_is_drained_before_tracing(
+    pack_tree, fresh_object
+) -> None:
+    runtime = _steady_runtime(pack_tree, _personal_output())
+    # Held objects empty CPython's freelist for their type, so the engine's
+    # next allocations of it are fresh, traced blocks: one-off, not a leak.
+    held = [fresh_object(i) for i in range(3000)]
+
+    grown = _engine_lines_grown_by_ticks(runtime)
+
+    assert len(held) == 3000  # keeps the freelist drained through the run
+    assert grown == [], _report(grown)
+
+
+def test_the_steady_state_check_catches_an_engine_list_that_grows_every_tick(pack_tree) -> None:
+    output = _personal_output()
+    grows_every_tick: list[None] = []
+    # The engine calls flush once per output per tick, so the list grows from
+    # an engine source line, as an engine accumulation would.
+    output.flush = functools.partial(grows_every_tick.append, None)  # type: ignore[method-assign]
+    runtime = _steady_runtime(pack_tree, output)
+
+    grown = _engine_lines_grown_by_ticks(runtime)
+
+    assert [stat.traceback[0].filename for stat in grown] == [manager.__file__]
