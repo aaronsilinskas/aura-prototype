@@ -8,7 +8,7 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: fortnightly
+      interval: weekly
     groups:
       github-actions-minor-and-patch:
         patterns: ["*"]
