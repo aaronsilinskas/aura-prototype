@@ -1,0 +1,125 @@
+# Automated triage: adding `needs-triage` to an issue (or dispatching a run for one) has Claude
+# triage it read-only, then a deterministic step applies the decision. The logic lives in
+# scripts/triage*.py; this file only wires the jobs together. See the "Automated triage"
+# section of docs/agents/triage-labels.md.
+name: Triage
+
+on:
+  issues:
+    types: [labeled]
+  workflow_dispatch:
+    inputs:
+      issue:
+        description: Issue number to triage again (it must be open and carry needs-triage)
+        required: true
+        type: number
+
+permissions: {}
+
+env:
+  ISSUE: ${{ github.event.issue.number || inputs.issue }}
+  GH_REPO: ${{ github.repository }}
+
+concurrency:
+  group: triage-${{ github.event.issue.number || inputs.issue }}
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: read
+    outputs:
+      run: ${{ steps.gate.outputs.run }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - name: Gate on the issue's live state
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name == 'issues' && github.event.action || github.event_name }}
+          LABEL: ${{ github.event.label.name }}
+          SENDER_TYPE: ${{ github.event.sender.type }}
+        run: >-
+          python3 -m scripts.triage --event "$EVENT" --issue "$ISSUE"
+          --label "$LABEL" --sender-type "$SENDER_TYPE"
+
+  triage:
+    needs: gate
+    if: needs.gate.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      issues: read
+    outputs:
+      decision: ${{ steps.claude.outputs.structured_output }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - name: Write the issue input
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -m scripts.triage_input --issue "$ISSUE"
+      - name: Load the committed prompt and decision schema
+        id: load
+        run: |
+          delimiter="EOF-$(openssl rand -hex 16)"
+          {
+            echo "prompt<<$delimiter"
+            cat scripts/triage_prompt.md
+            echo
+            echo "$delimiter"
+            # claude_args takes the schema inline in single quotes, so escape any apostrophe.
+            # $schema goes too: it names a draft the CLI's validator need not know.
+            printf 'schema=%s\n' "$(jq -c 'del(.["$schema"])' scripts/triage_decision.schema.json \
+              | sed "s/'/\\\\u0027/g")"
+          } >> "$GITHUB_OUTPUT"
+      - name: Triage with Claude (read-only)
+        id: claude
+        uses: anthropics/claude-code-action@f3b070c88125d33dbae5653df5f143101d4ea9dc # v1.0.276
+        with:
+          prompt: ${{ steps.load.outputs.prompt }}
+          github_token: ${{ github.token }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # API-key fallback: replace the line above with
+          # anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          display_report: "false"
+          claude_args: |
+            # Model and turn limit, set only here: trade triage quality against usage.
+            --model sonnet
+            --max-turns 10
+            # dontAsk denies every tool the allowlist doesn't name; the denylist backs it up.
+            --permission-mode dontAsk
+            --allowedTools Read,Grep,Glob
+            --disallowedTools Bash,Edit,MultiEdit,Write,NotebookEdit,WebFetch,WebSearch,mcp__github,mcp__github_comment,mcp__github_file_ops,mcp__github_inline_comment,mcp__github_ci
+            --json-schema '${{ steps.load.outputs.schema }}'
+
+  apply:
+    needs: [gate, triage]
+    # Runs when the triage job failed too, so a missing decision is logged and changes nothing.
+    if: always() && needs.gate.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - name: Validate and apply the decision
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DECISION: ${{ needs.triage.outputs.decision }}
+        run: |
+          printf '%s' "$DECISION" > "$RUNNER_TEMP/decision.json"
+          python3 -m scripts.triage_apply --issue "$ISSUE" --decision-file "$RUNNER_TEMP/decision.json"

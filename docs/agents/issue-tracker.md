@@ -15,6 +15,10 @@ Issues and specs for this repo live as GitHub issues in `aaronsilinskas/aura-pro
 
 Infer the repo from `git remote -v`; `gh` does this automatically when run inside a clone.
 
+## Automated triage
+
+Adding `needs-triage` to an issue starts an AI triage run on it; replies, edits and other labels start nothing. See **Automated triage** in [triage-labels.md](triage-labels.md) for what it sets, how to re-run it and the credential's renewal dates.
+
 ## Pull requests as a triage surface
 
 **PRs as a request surface: no.** _(Set to `yes` if this repo treats external PRs as feature requests; `/triage` reads this flag.)_
