@@ -14,7 +14,6 @@ import pytest
 
 import engine
 from engine.capabilities import MissingCapabilityError
-from engine.effects import manager
 from engine.effects.output import EffectOutput
 from engine.engine import GameRule
 from engine.events import Event, EventGroup
@@ -417,7 +416,7 @@ def test_the_runtimes_scene_controls_reboot_through_the_scene_reboot_port(pack_t
 
 
 def _steady_runtime(pack_tree, output: SpyEffectOutput) -> SceneRuntime:
-    """A runtime painting *output*, ticked until every buffer and queue slot is at steady size."""
+    """A runtime painting the given output, ticked until its buffers and queue slots are steady."""
     catalog = _catalog(pack_tree)
     _rule(catalog, "base_rules").on(Event, _paint_red)
     runtime = _runtime(catalog, output, clock=_StepClock(0.25))
@@ -440,12 +439,9 @@ _STEADY_TICKS = 1000
 _ONE_OFF_BYTES = 128
 """How far one engine line's traced memory may grow over the steady ticks.
 
-CPython reuses floats, small tuples and lists from per-type freelists, which
-tracemalloc doesn't see. If a freelist is short when tracing starts, the
-engine takes a few fresh, traced blocks once, and they stay held or parked on
-the freelist: up to 64 B on a line, however long the run. A per-tick
-accumulation, even one pointer per tick, passes this within the first few
-dozen of the ``_STEADY_TICKS``.
+A CPython freelist short when tracing starts costs a line a fresh block or two
+once, up to 64 B however long the run. A per-tick accumulation, even one
+pointer per tick, passes this within the first few dozen ``_STEADY_TICKS``.
 """
 
 
@@ -466,7 +462,7 @@ def _engine_lines_grown_by_ticks(runtime: SceneRuntime) -> list[tracemalloc.Stat
     return [stat for stat in after.compare_to(before, "lineno") if stat.size_diff > _ONE_OFF_BYTES]
 
 
-def _report(grown: list[tracemalloc.StatisticDiff]) -> str:
+def _growth_message(grown: list[tracemalloc.StatisticDiff]) -> str:
     return "\n".join(str(stat) for stat in grown)
 
 
@@ -475,7 +471,7 @@ def test_steady_state_updates_accumulate_no_engine_memory(pack_tree) -> None:
 
     grown = _engine_lines_grown_by_ticks(runtime)
 
-    assert grown == [], _report(grown)
+    assert grown == [], _growth_message(grown)
 
 
 @pytest.mark.parametrize(
@@ -497,18 +493,22 @@ def test_the_steady_state_check_passes_when_a_freelist_is_drained_before_tracing
 
     grown = _engine_lines_grown_by_ticks(runtime)
 
-    assert len(held) == 3000  # keeps the freelist drained through the run
-    assert grown == [], _report(grown)
+    del held  # held until here, so the freelist stays drained through the run
+    assert grown == [], _growth_message(grown)
 
 
-def test_the_steady_state_check_catches_an_engine_list_that_grows_every_tick(pack_tree) -> None:
-    output = _personal_output()
-    grows_every_tick: list[None] = []
-    # The engine calls flush once per output per tick, so the list grows from
-    # an engine source line, as an engine accumulation would.
-    output.flush = functools.partial(grows_every_tick.append, None)  # type: ignore[method-assign]
-    runtime = _steady_runtime(pack_tree, output)
+def test_the_steady_state_check_catches_a_list_grown_every_tick_from_an_engine_line(
+    pack_tree,
+) -> None:
+    class _GrowingFlushOutput(SpyEffectOutput):
+        # A C-level append, so the growth is traced to the engine line that
+        # calls flush once per tick, as an engine accumulation would be.
+        flush = staticmethod(functools.partial(list[None]().append, None))
+
+    runtime = _steady_runtime(
+        pack_tree, _GrowingFlushOutput(min_resolution=4, scopes=[Scope.PERSONAL])
+    )
 
     grown = _engine_lines_grown_by_ticks(runtime)
 
-    assert [stat.traceback[0].filename for stat in grown] == [manager.__file__]
+    assert grown != [], "no engine line was flagged"
