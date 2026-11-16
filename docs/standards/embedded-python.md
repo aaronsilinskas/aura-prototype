@@ -45,6 +45,7 @@ The device can't run `Generic`, so put the implementation in a plain runtime cla
 class _StateSlotBase:
     def __call__(self, state: GameState) -> object: ...  # the real body
 
+
 if TYPE_CHECKING:
     from typing import Generic
 
