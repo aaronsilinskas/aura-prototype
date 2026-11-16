@@ -45,3 +45,6 @@ fp-info-cache
 .claude/skills/
 .agents/
 skills-lock.json
+
+# Automated triage: the issue input a triage run writes (scripts/triage_input.py)
+triage-issue-input.md
