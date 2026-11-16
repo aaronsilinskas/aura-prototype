@@ -14,7 +14,7 @@
     },
     "already_implemented": {
       "type": "boolean",
-      "description": "Whether the request already works in the code."
+      "description": "Whether the request already works in the code. When true, state must be needs-triage."
     },
     "evidence": {
       "type": "string",
