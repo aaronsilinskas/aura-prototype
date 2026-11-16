@@ -45,29 +45,27 @@ These sit outside the triage state machine, like `idea`. Edit the right-hand col
 
 ## Automated triage
 
-`needs-triage` is the maintainer's switch for AI triage. Adding it to an open issue (creating the issue with it counts) runs the `Triage` workflow (`.github/workflows/triage.yml`): Claude reads the issue and the repo's committed docs and code read-only, with its file tools confined to the checkout, and returns a decision, and a separate deterministic step (`scripts/triage_apply.py`) validates it and applies it to that issue only.
+`needs-triage` is the maintainer's switch for AI triage. Adding it to an open issue (creating the issue with it counts) runs the `Triage` workflow (`.github/workflows/triage.yml`): Claude reads the issue and the repo's committed docs and code read-only, with its file tools confined to the checkout, and returns a decision, and a separate deterministic step validates it and applies it to that issue only.
+
+That workflow only calls the shared `triage` workflow from [mindwidgets/workflows](https://github.com/mindwidgets/workflows#triage), pinned to a release's commit SHA, which holds the mechanics: the gate, the prompt and decision schema, Claude's sandbox and the rules for editing it, the credential check and the apply step. Dependabot proposes a PR for each new release; read its release notes before merging.
 
 - **Who can start a run:** people with write access to the repo, so in practice only the maintainer. Someone with only the Triage role can add `needs-triage`, but the Claude step refuses an actor without write access, so that run fails and changes nothing. A dispatch needs write access too. Labels and comments the workflow writes itself start no run, and neither do events from bots.
 - **What it sets:** a category (`bug` or `enhancement`, replacing the other) and one state: `needs-info` (with triage notes asking the reporter specific questions), `ready-for-agent` (with an agent brief), `ready-for-human` (read it as "take a look"; an issue bigger than one PR, or needing design discussion, always lands here with a comment saying it needs a spec), or `needs-triage` kept with a recommendation when Claude can't decide. The new state replaces the old one, and it posts one comment starting with the AI disclaimer. The comment goes up before the labels change, so if the label edit fails the issue keeps `needs-triage` with the triage comment posted, rather than a new state without its comment.
 - **What it never does:** close an issue, apply `wontfix`, or touch any other label (`idea`, `spec`, `wayfinder:*`). An invalid decision or a failed run changes nothing, so `needs-triage` stays and the issue stays on the maintainer's list. A run where Claude returns no decision fails its Claude job, so it shows red rather than passing with nothing applied.
 - **What the comment can't do:** notify anyone but the issue's author, or link another issue or pull request. Other @-mentions and every `#12`, `GH-12`, `owner/repo#12` or issue URL get an invisible zero-width space, so they read as written but create no notification or cross-reference.
-- **Credentials stay in the Claude job:** before the decision leaves the job that holds the Claude credential, a check (`scripts/triage_secret_check.py`) fails the job if there is no decision or if it carries any part of that credential or the job token, plain or base64 or hex encoded. The apply step also rejects any decision carrying a credential-shaped token.
+- **Credentials stay in the Claude job:** before the decision leaves the job that holds the Claude credential, a check fails the job if there is no decision or if it carries any part of that credential or the job token, plain or base64 or hex encoded. The apply step also rejects any decision carrying a credential-shaped token.
 - **Re-triage:** re-add `needs-triage`, or dispatch the `Triage` workflow from the Actions tab with the issue number while the issue carries `needs-triage` (a dispatch is a retry, never a bypass). The new run reads the earlier triage notes.
 - **Replies and edits start nothing.** A reporter answering a `needs-info` question waits for the maintainer to re-add `needs-triage`.
 - **Contributors' issues wait for the maintainer.** An issue someone else opens is left alone until the maintainer adds `needs-triage`.
 - **Never add an issue template that auto-applies `needs-triage`.** It would let any reporter start a run.
 
-### Editing the workflow's `claude_args`
-
-`claude_args` carries Claude's whole sandbox: model, turn limit, `--setting-sources user`, `--permission-mode dontAsk`, the allow and deny rules and the decision schema. Never put a comment inside it; explain the flags in YAML comments above the key. `claude-code-action` puts its own flags in front of the first line, so a comment there is no longer a whole-line comment, and its parser treats an unquoted `#` (even mid-word) as a comment running to the end of the input: every flag after it is silently dropped, and Claude runs with no model, turn limit, schema or allow and deny rules, and with the checkout's own settings loaded. That happened once, on a run that still showed green. `scripts/tests/test_triage_workflow.py` runs `claude_args` through a port of the pinned action's parser and checks every restriction reaches the CLI; when you bump the action's pinned SHA, check its `base-action/src/parse-sdk-options.ts` and `src/modes/agent/index.ts` against that port (`scripts/tests/claude_code_action.py`).
-
 ### Claude credential
 
-The workflow authenticates with the maintainer's Claude subscription through the `CLAUDE_CODE_OAUTH_TOKEN` repository secret. The token expires one year after it is minted; renew it eleven months after minting.
+The workflow authenticates with the maintainer's Claude subscription through the `CLAUDE_CODE_OAUTH_TOKEN` repository secret, which `.github/workflows/triage.yml` passes to the shared workflow by name. The token expires one year after it is minted; renew it eleven months after minting.
 
 - **Minted:** 2026-11-16 (expires 2027-11-16)
 - **Renew by:** 2027-10-16 (keep a calendar reminder for this date)
 
 To renew: run `claude setup-token` locally, replace the `CLAUDE_CODE_OAUTH_TOKEN` secret (repo admin), and update the two dates above. An expired or missing token fails the run visibly and leaves `needs-triage` on the issue.
 
-To switch to a Claude Console API key instead, add an `ANTHROPIC_API_KEY` secret and swap the one marked line in the workflow.
+To switch to a Claude Console API key instead, add an `ANTHROPIC_API_KEY` secret and swap the one marked line under `secrets:` in the workflow. Pass one credential, not both.
