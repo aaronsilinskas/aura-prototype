@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Triage decision",
+  "description": "Claude's structured triage decision for one issue. scripts/triage_apply.py validates it again before applying it.",
+  "type": "object",
+  "properties": {
+    "category": {
+      "type": "string",
+      "enum": ["bug", "enhancement"]
+    },
+    "state": {
+      "type": "string",
+      "enum": ["needs-info", "ready-for-agent", "ready-for-human", "needs-triage"]
+    },
+    "already_implemented": {
+      "type": "boolean",
+      "description": "Whether the request already works in the code. When true, state must be needs-triage."
+    },
+    "evidence": {
+      "type": "string",
+      "description": "Where in the code you looked, and what you found."
+    },
+    "comment": {
+      "type": "string",
+      "description": "Markdown body of the triage comment."
+    },
+    "agent_brief": {
+      "type": "string",
+      "description": "Required when state is ready-for-agent, and left out otherwise: goal, acceptance criteria and files to start from."
+    },
+    "reasoning": {
+      "type": "string",
+      "description": "Short reasoning for the run log only."
+    }
+  },
+  "required": ["category", "state", "already_implemented", "evidence", "comment", "reasoning"],
+  "additionalProperties": false
+}
