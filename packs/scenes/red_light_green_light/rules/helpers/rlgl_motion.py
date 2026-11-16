@@ -13,17 +13,17 @@ lazily builds the object on first use and caches it under a single
 
 from __future__ import annotations
 
-try:
-    from typing import Final
-except ImportError:
-    pass
-
 from engine.input import AccelerationData
 from engine.state import StateSlot
 from packs.scenes.red_light_green_light.rules.helpers.motion_detector import (
     linear_magnitude,
     low_pass,
 )
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from typing import Final
 
 _MOTION_KEY: Final = "rlgl_motion"
 

@@ -21,11 +21,6 @@ achievable rate whatever ``send_rate_hz`` asks for.
 
 from __future__ import annotations
 
-try:
-    from typing import Final
-except ImportError:
-    pass
-
 from engine.engine import GameRule
 from engine.input import InputEvents
 from engine.network import LINE
@@ -33,6 +28,11 @@ from engine.state import GameState
 from packs.scenes.ir_range_transmitter.rules.helpers.transmitter_config import (
     transmitter_config,
 )
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from typing import Final
 
 _SEQUENCE_KEY: Final = "irtx_sequence"
 _LAST_SEND_KEY: Final = "irtx_last_send_total"

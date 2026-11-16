@@ -18,11 +18,6 @@ redundant identical calls, not a correctness requirement.
 
 from __future__ import annotations
 
-try:
-    from typing import Final
-except ImportError:
-    pass  # Not available on all embedded runtimes
-
 from engine.engine import GameRule
 from engine.input import InputEvents
 from engine.network import NetworkEvents
@@ -32,6 +27,11 @@ from packs.scenes.ir_range_receiver.rules.helpers.reception_quality_meter import
     STATE_PARTIAL,
     ReceptionQuality,
 )
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from typing import Final
 
 _LAST_RENDER_KEY: Final = "ir_range_last_render"
 _NEXT_PRINT_KEY: Final = "ir_range_next_print"

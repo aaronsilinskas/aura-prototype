@@ -1,22 +1,12 @@
 from __future__ import annotations
 
-try:
-    from collections.abc import Callable, Iterable, Iterator
-    from typing import TypeAlias
-except ImportError:
-    pass
+TYPE_CHECKING = False
 
-try:
-    from typing import TypeVar
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable, Iterator
+    from typing import Final, TypeAlias, TypeVar
 
     T = TypeVar("T")
-except ImportError:
-    pass  # Not available on CircuitPython
-
-try:
-    from typing import Final
-except ImportError:
-    pass  # Not available on CircuitPython
 
 
 class EffectVerb:

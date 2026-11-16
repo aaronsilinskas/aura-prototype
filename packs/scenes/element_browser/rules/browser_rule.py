@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-try:
-    from typing import Final
-except ImportError:
-    pass  # typing not available on all embedded runtimes
-
 from engine.engine import GameRule
 from engine.input import InputEvents
 from engine.state import GameState, Scope
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from typing import Final
 
 _ELEMENT_PAGES: Final = (
     (

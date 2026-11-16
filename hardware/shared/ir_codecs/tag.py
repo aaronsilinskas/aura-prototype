@@ -30,14 +30,16 @@ Module-level ``ENCODER`` / ``DECODER`` attributes point at this codec's class
 pair — the resolution convention a later ticket relies on (name → module).
 """
 
+from __future__ import annotations
+
 from array import array
 
 from hardware.shared.ir_codecs.base import InfraredDecoder, InfraredEncoder
 
-try:
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
     from typing import Final
-except ImportError:
-    pass  # typing not available on all embedded runtimes
 
 # ---------------------------------------------------------------------------
 # Wire-frame timing constants (µs)

@@ -10,14 +10,14 @@ it is given.
 
 from __future__ import annotations
 
-try:
-    from typing import Final
-except ImportError:
-    pass  # Not available on CircuitPython
-
 from engine.log import Logger
 from hardware.shared.device_state import DeviceStateStore
 from hardware.shared.scene_selection import SCENE_DEPLOY_TOKEN_KEY, non_empty_string_or_none
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from typing import Final
 
 __all__ = ["PersistedScene"]
 

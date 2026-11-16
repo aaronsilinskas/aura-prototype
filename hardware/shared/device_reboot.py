@@ -8,14 +8,14 @@ and wires it into the booted scene as its ``SceneReboot`` port.
 
 from __future__ import annotations
 
-try:
-    from collections.abc import Callable
-except ImportError:
-    pass  # Not available on CircuitPython
-
 from engine.log import Logger
 from engine.state import SceneReboot
 from hardware.shared.persisted_scene import PersistedScene
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 __all__ = ["DeviceSceneReboot"]
 

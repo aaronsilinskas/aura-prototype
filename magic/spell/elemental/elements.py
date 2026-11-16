@@ -1,7 +1,9 @@
-try:
+from __future__ import annotations
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
     from typing import Final
-except ImportError:
-    pass
 
 
 class ElementTags:

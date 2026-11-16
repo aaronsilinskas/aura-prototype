@@ -10,16 +10,16 @@ and no ``DeviceConfig`` exists until parsing returns, which is where the
 
 from __future__ import annotations
 
-try:
-    from typing import Final
-except ImportError:
-    pass
-
 from hardware.shared.device_config import (
     MatrixPixelsConfig,
     NeoPixelPixelsConfig,
     NeoPixelStripConfig,
 )
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from typing import Final
 
 __all__ = ["tune_neopixel_brightness"]
 

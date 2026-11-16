@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-try:
-    from typing import Final
-except ImportError:
-    pass  # Not available on CircuitPython
-
 from effects.effect import PixelBuffer
 from engine.state import EffectReceipt, MergeStrategy
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from typing import Final
 
 _FULL_BRIGHTNESS: Final = 1.0
 

@@ -10,11 +10,6 @@ and ``matrix.show()`` are used, which is all a test fake needs.
 
 from __future__ import annotations
 
-try:
-    from typing import Final
-except ImportError:
-    pass
-
 from array import array
 
 from effects.effect import PixelBuffer
@@ -24,6 +19,8 @@ from hardware.shared.matrix_output import MatrixEffectOutput
 TYPE_CHECKING = False
 
 if TYPE_CHECKING:
+    from typing import Final
+
     from adafruit_is31fl3741.adafruit_rgbmatrixqt import Adafruit_RGBMatrixQT
 
 IS31FL3741_COLS: Final = 13

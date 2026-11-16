@@ -9,12 +9,12 @@ effect table shared by ``rgb_rule`` (entry effect and Button A re-application).
 
 from __future__ import annotations
 
-try:
-    from typing import Final
-except ImportError:
-    pass
-
 from engine.state import Scope
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from typing import Final
 
 # Shared payload for the IR/radio send-test round trip.
 HW_TEST_PAYLOAD: Final = b"hw_test"

@@ -1,10 +1,12 @@
-try:
-    from collections.abc import Callable
-except ImportError:
-    pass
+from __future__ import annotations
 
 from engine.input import ButtonData
 from hardware.shared.polled_part import PolledPart
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 DEBOUNCE_INTERVAL = 0.05
 """Seconds a pin level must hold before it is committed, unless a debouncer is given another."""
@@ -46,7 +48,7 @@ class DebouncedButtons(PolledPart):
 
     def __init__(
         self,
-        buttons: "list[tuple[str, Callable[[], bool]]]",
+        buttons: list[tuple[str, Callable[[], bool]]],
         interval: float = DEBOUNCE_INTERVAL,
     ) -> None:
         self._interval = interval

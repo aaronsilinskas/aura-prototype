@@ -12,14 +12,16 @@ The module-level ``ENCODER`` / ``DECODER`` names let a codec be resolved by
 module (name → class pair), the convention shared across IR codec modules.
 """
 
+from __future__ import annotations
+
 from array import array
 
 from hardware.shared.ir_codecs.base import InfraredDecoder, InfraredEncoder
 
-try:
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
     from typing import Final
-except ImportError:
-    pass  # typing not available on all embedded runtimes
 
 # ---------------------------------------------------------------------------
 # Wire-frame timing constants (µs)

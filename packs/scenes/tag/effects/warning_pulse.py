@@ -11,10 +11,7 @@ plays a one-shot ``scene.warning_pulse_peak`` clip and a single ``SHARP_CLICK``
 buzz, so every pulse buzzes uniformly.
 """
 
-try:
-    from typing import Final
-except ImportError:
-    pass  # Not available on CircuitPython
+from __future__ import annotations
 
 from effects.effect import (
     AudioPlaybackConfig,
@@ -27,6 +24,11 @@ from effects.effect import (
 from engine.effects.builder import EffectBuilder
 from packs.effects.basic.helpers.pulse_effect import PulseEffect
 from packs.effects.basic.pulse import PulseBuilder
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from typing import Final
 
 _pulse = PulseBuilder()
 

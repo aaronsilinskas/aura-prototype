@@ -12,10 +12,10 @@ from engine.engine import GameRule
 from engine.input import InputEvents
 from engine.state import GameState
 
-try:
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
     from typing import Final
-except ImportError:
-    pass  # Not available on CircuitPython/MicroPython
 
 NAMESPACE: Final = "return_to_lobby"
 _HELD_KEY: Final = "return_to_lobby_held"

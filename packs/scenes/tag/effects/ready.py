@@ -7,11 +7,6 @@ waiting for a button press to start the game.
 
 from __future__ import annotations
 
-try:
-    from typing import Final
-except ImportError:
-    pass
-
 from effects.effect import Effect, EffectConfig
 from effects.layers.add_colors_renderer import AddColorsRenderer
 from effects.layers.scroll import ScrollOffset
@@ -20,6 +15,11 @@ from effects.layers.shape_layer import ShapeLayer
 from effects.palette import PaletteLUT256
 from effects.shape import Shape
 from engine.effects.builder import EffectBuilder
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from typing import Final
 
 # Black -> red: the laser body lights up red, the dead zones stay dark.
 _RED_PALETTE: Final = bytes([0, 0, 0, 0, 255, 255, 0, 0])

@@ -10,10 +10,10 @@ transmit rate.
 
 from __future__ import annotations
 
-try:
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
     from typing import Final
-except ImportError:
-    pass  # Not available on all embedded runtimes
 
 __all__ = [
     "COLOR_GREEN",

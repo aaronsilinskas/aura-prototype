@@ -12,13 +12,13 @@ precedent.
 
 from __future__ import annotations
 
-try:
-    from typing import Final
-except ImportError:
-    pass
-
 from engine.settings import SCENE_NAMESPACE, Settings
 from engine.state import GameState, StateSlot
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from typing import Final
 
 _CONFIG_KEY: Final = "ir_range_config"
 

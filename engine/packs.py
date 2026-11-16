@@ -6,12 +6,12 @@ import engine._path as _path
 from engine.settings import SettingDeclaration
 from engine.version import Version
 
-try:
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
     from typing import TypeVar
 
     T = TypeVar("T")
-except ImportError:
-    pass
 
 
 ITEM_EXTENSIONS = (".py", ".mpy")

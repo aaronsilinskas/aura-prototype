@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import random
 
-try:
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
     from collections.abc import Callable
     from typing import TypeAlias
-except ImportError:
-    pass  # No typing support on CircuitPython yet
 
 GAMMA_FACTOR = 2.7
 

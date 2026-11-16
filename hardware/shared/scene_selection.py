@@ -6,10 +6,10 @@ Pure and board-free. The card side, the Persisted scene record, is
 
 from __future__ import annotations
 
-try:
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
     from typing import Final
-except ImportError:
-    pass
 
 __all__ = [
     "SCENE_DEPLOY_TOKEN_KEY",

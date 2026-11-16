@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import math
 
-try:
+from effects.value import GAMMA_FACTOR, DynamicValue, ValueGenerator
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
     from collections.abc import Callable
     from typing import TypeAlias
-except ImportError:
-    pass
-
-from effects.value import GAMMA_FACTOR, DynamicValue, ValueGenerator
 
 EffectShapeFunc: TypeAlias = "Callable[[float], float]"
 

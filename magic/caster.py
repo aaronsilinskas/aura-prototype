@@ -1,9 +1,11 @@
-try:
-    from typing import Final
-except ImportError:
-    pass
+from __future__ import annotations
 
 from magic.aura import Spell
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from typing import Final
 
 
 class CastType:

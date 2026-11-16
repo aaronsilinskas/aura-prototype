@@ -40,11 +40,11 @@ from engine.settings import (
 )
 from engine.version import Version
 
-try:
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
     from typing import Any, TypeAlias
-except ImportError:
-    pass  # Not available on CircuitPython
 
 _REQUIRED_SCENE_KEYS = ("version", "effect_packs", "rule_packs")
 

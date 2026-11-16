@@ -1,12 +1,14 @@
-try:
+from __future__ import annotations
+
+from magic.values import MinMaxValue, ValueWithModifiers
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
     from collections.abc import Iterator
     from typing import Final, TypeVar
 
     T = TypeVar("T")
-except ImportError:
-    pass
-
-from magic.values import MinMaxValue, ValueWithModifiers
 
 
 class SpellLevelScaler:
@@ -38,22 +40,22 @@ class Spell:
         self._tags: list[str] = tags
         self._level: int = 1
 
-    def start(self, aura: "Aura") -> None:
+    def start(self, aura: Aura) -> None:
         """Called when the spell is added to the aura. Can be used to set up initial state.
         Note: This is mainly used for passive modifiers like cast delay or resistances that are
         removed when the spell is stopped. Do not apply damage, healing, or other immediate
         effects here."""
         pass
 
-    def update(self, aura: "Aura", elapsed_time: float) -> bool:
+    def update(self, aura: Aura, elapsed_time: float) -> bool:
         """Advances the spell; returns ``True`` when it should be removed from the aura."""
         raise NotImplementedError()
 
-    def stop(self, aura: "Aura") -> None:
+    def stop(self, aura: Aura) -> None:
         """Called when the spell is removed from the aura. Can be used to clean up state."""
         pass
 
-    def modify_event(self, aura: "Aura", event: "AuraEvent") -> None:
+    def modify_event(self, aura: Aura, event: AuraEvent) -> None:
         """Modify an incoming event if needed, will only be called for active spells."""
         pass
 
@@ -62,7 +64,7 @@ class Spell:
         raise NotImplementedError()
 
     @property
-    def tags(self) -> "Iterator[str]":
+    def tags(self) -> Iterator[str]:
         return iter(self._tags)
 
     @property
@@ -141,7 +143,7 @@ class RemoveSpellEvent(AuraEvent):
 class EventListener:
     """Interface for objects that listen to aura events."""
 
-    def on_spell_event(self, aura: "Aura", event: AuraEvent) -> None:
+    def on_spell_event(self, aura: Aura, event: AuraEvent) -> None:
         """Called when an event occurs in the aura."""
         pass
 
@@ -162,7 +164,7 @@ class Spells:
             return []
         return [spell for spell in self._spells if all(tag in spell.tags for tag in tags)]
 
-    def get_by_class(self, cls: "type[T]") -> "list[T]":
+    def get_by_class(self, cls: type[T]) -> list[T]:
         """Finds spells by their class type."""
         matching: list[T] = []
         for spell in self._spells:
@@ -174,7 +176,7 @@ class Spells:
     def __len__(self) -> int:
         return len(self._spells)
 
-    def __iter__(self) -> "Iterator[Spell]":
+    def __iter__(self) -> Iterator[Spell]:
         return iter(self._spells)
 
 

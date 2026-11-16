@@ -10,15 +10,6 @@ enabled, never probed by physical presence.
 
 from __future__ import annotations
 
-try:
-    from collections.abc import Callable
-    from typing import TypeVar
-
-    GatedSection = TypeVar("GatedSection", bound="_Gated")
-    T = TypeVar("T")
-except ImportError:
-    pass
-
 import time
 
 from engine.capabilities import IR_RECEIVE, button_capability, ir_emitter_capability
@@ -55,7 +46,8 @@ from hardware.shared.radio_transceiver import RadioTransceiver
 TYPE_CHECKING = False
 
 if TYPE_CHECKING:
-    from typing import Protocol
+    from collections.abc import Callable
+    from typing import Protocol, TypeVar
 
     from hardware.shared.device_parts import Bus
 
@@ -64,6 +56,9 @@ if TYPE_CHECKING:
 
         @property
         def enabled(self) -> bool: ...
+
+    GatedSection = TypeVar("GatedSection", bound="_Gated")
+    T = TypeVar("T")
 
 
 __all__ = ["assemble_device", "button_label", "open_i2c"]

@@ -8,12 +8,12 @@ operations.
 
 from __future__ import annotations
 
-try:
-    from typing import Final
-except ImportError:
-    pass
-
 from engine.state import EffectReceipt, StateSlot
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from typing import Final
 
 
 class Flash:

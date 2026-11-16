@@ -1,12 +1,14 @@
-try:
-    from typing import Final
-except ImportError:
-    pass  # Not available on CircuitPython
+from __future__ import annotations
 
 from effects.effect import EffectConfig, EffectVerb
 from effects.layers.pulse_layer import PulseLayer
 from effects.layers.renderer import LayerRenderer
 from effects.palette import Palette
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from typing import Final
 
 
 class PulseEffect(LayerRenderer):

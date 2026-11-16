@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from typing import Final
+
 __all__ = [
     "SCENE_NAMESPACE",
     "SettingDeclaration",
@@ -11,11 +16,6 @@ __all__ = [
     "parse_declarations",
     "resolve_settings",
 ]
-
-try:
-    from typing import Final
-except ImportError:
-    pass  # Not available on CircuitPython
 
 SCENE_NAMESPACE: Final = "scene"
 """The namespace of a scene's own Settings; no pack may take the name."""

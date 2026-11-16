@@ -13,11 +13,11 @@ from __future__ import annotations
 
 import sys
 
-try:
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
     from collections.abc import Callable
     from typing import ClassVar
-except ImportError:
-    pass  # Not available on CircuitPython
 
 __all__ = ["Logger"]
 

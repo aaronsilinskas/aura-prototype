@@ -1,5 +1,7 @@
 """Compile device .py modules to .mpy in a gitignored staging tree before deploy."""
 
+from __future__ import annotations
+
 import hashlib
 import os
 import re
@@ -7,13 +9,13 @@ import shutil
 import subprocess
 from pathlib import Path
 
-try:
+from scripts.ship_list import ShipEntry, ship_list
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
     from collections.abc import Callable
     from typing import Final
-except ImportError:
-    pass
-
-from scripts.ship_list import ShipEntry, ship_list
 
 _HASH_SUFFIX: Final = ".srcsha256"
 

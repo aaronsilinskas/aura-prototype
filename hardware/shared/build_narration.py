@@ -12,15 +12,15 @@ like the rest of ``hardware/shared``.
 
 from __future__ import annotations
 
-try:
+from engine.log import Logger
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
     from collections.abc import Callable
     from typing import TypeVar
 
     T = TypeVar("T")
-except ImportError:
-    pass  # Not available on CircuitPython
-
-from engine.log import Logger
 
 __all__ = ["narrate_skip", "narrate_step"]
 

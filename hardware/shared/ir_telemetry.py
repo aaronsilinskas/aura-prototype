@@ -5,10 +5,12 @@ gated on a counter actually changing since the last poll. No ``pulseio``
 import — safe on CPython, CircuitPython 10.x, and MicroPython.
 """
 
-try:
+from __future__ import annotations
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
     from typing import Final
-except ImportError:
-    pass  # Not available on all embedded runtimes
 
 __all__ = ["IrTelemetryGate", "IrTelemetrySnapshot", "format_ir_telemetry_line"]
 

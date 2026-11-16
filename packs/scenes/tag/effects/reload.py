@@ -9,15 +9,15 @@ loop stays intact.
 
 from __future__ import annotations
 
-try:
-    from typing import Final
-except ImportError:
-    pass
-
 from effects.effect import AudioPlaybackConfig, Effect, EffectAudio, EffectConfig, EffectVerb
 from effects.layers.progress_layer import ProgressLayer
 from engine.effects.builder import EffectBuilder
 from packs.scenes.tag.effects.helpers.progress_fill_effect import ProgressFillEffect
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from typing import Final
 
 _RELOAD_AUDIO = EffectAudio(
     clips={EffectVerb.START: AudioPlaybackConfig(name="scene.reload", loop=True)}

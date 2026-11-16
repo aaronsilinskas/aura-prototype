@@ -1,7 +1,9 @@
-try:
+from __future__ import annotations
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
-except ImportError:
-    pass
 
 
 class Duration:

@@ -1,7 +1,4 @@
-try:
-    from typing import Final
-except ImportError:
-    pass  # Not available on CircuitPython
+from __future__ import annotations
 
 from effects.effect import (
     AudioPlaybackConfig,
@@ -16,6 +13,11 @@ from effects.layers.pulse_layer import PulseLayer
 from effects.palette import PaletteLUT256
 from engine.effects.builder import EffectBuilder
 from packs.effects.basic.helpers.pulse_effect import PulseEffect
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from typing import Final
 
 # Gold flash: black → #FFD700
 _GOLD_PALETTE: Final = PaletteLUT256(bytes([0, 0x00, 0x00, 0x00, 255, 0xFF, 0xD7, 0x00]))

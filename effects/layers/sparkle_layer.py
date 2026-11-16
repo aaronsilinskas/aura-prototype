@@ -1,13 +1,15 @@
-import random
+from __future__ import annotations
 
-try:
-    from typing import Final
-except ImportError:
-    pass
+import random
 
 from effects.layers.layer import Layer
 from effects.value import DynamicValue
 from effects.value import ValueGenerator as VG
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from typing import Final
 
 
 class SparkleLayer(Layer):

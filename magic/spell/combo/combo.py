@@ -1,11 +1,13 @@
 """Detects sets of spells on an Aura and replaces them with a combined spell."""
 
-try:
-    from collections.abc import Iterator
-except ImportError:
-    pass
+from __future__ import annotations
 
 from magic.aura import AddSpellEvent, Aura, AuraEvent, EventListener
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 
 class SpellCombination:
@@ -23,7 +25,7 @@ class SpellCombinations(EventListener):
     def __init__(self) -> None:
         self._combinations: list[SpellCombination] = []
 
-    def on_spell_event(self, aura: "Aura", event: AuraEvent) -> None:
+    def on_spell_event(self, aura: Aura, event: AuraEvent) -> None:
         """Runs every registered combination check when a spell is added."""
         if isinstance(event, AddSpellEvent):
             for combo in self._combinations:
@@ -41,5 +43,5 @@ class SpellCombinations(EventListener):
     def __len__(self) -> int:
         return len(self._combinations)
 
-    def __iter__(self) -> "Iterator[SpellCombination]":
+    def __iter__(self) -> Iterator[SpellCombination]:
         return iter(self._combinations)

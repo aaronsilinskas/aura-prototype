@@ -32,11 +32,6 @@ from __future__ import annotations
 
 import binascii
 
-try:
-    from collections.abc import Iterable, Iterator
-except ImportError:
-    pass  # Not available on all embedded runtimes
-
 from hardware.shared.device_storage import DeviceStorage
 from hardware.shared.sd_sync_protocol import (
     CHUNK_SIZE,
@@ -46,6 +41,11 @@ from hardware.shared.sd_sync_protocol import (
     encode_frame,
     encode_listing,
 )
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Iterator
 
 __all__ = ["SdSyncServer"]
 
