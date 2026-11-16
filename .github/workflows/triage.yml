@@ -1,9 +1,8 @@
 # Automated triage: adding `needs-triage` to an issue (or dispatching a run for one) has Claude
 # triage it read-only, then a deterministic step applies the decision. The work runs in the
 # shared triage workflow from mindwidgets/workflows; this file owns only its triggers,
-# permissions and concurrency. Its default inputs (the label doc, the project docs, sonnet,
-# 10 turns) fit this repo, so it sets none. See the "Automated triage" section of
-# docs/agents/triage-labels.md.
+# permissions and concurrency, and relies on its default inputs. See the "Automated triage"
+# section of docs/agents/triage-labels.md.
 name: Triage
 
 on:
