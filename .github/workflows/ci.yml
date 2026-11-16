@@ -29,5 +29,7 @@ jobs:
       - run: uv run lint-imports
       - run: uv run mypy
       - run: uv run pytest -q
-      # The actionlint hook pinned in .pre-commit-config.yaml, so CI and commits run the same one.
+      # The actionlint and check-dependabot hooks pinned in .pre-commit-config.yaml, so CI and
+      # commits run the same ones.
       - run: uv run pre-commit run actionlint --all-files
+      - run: uv run pre-commit run check-dependabot --all-files
