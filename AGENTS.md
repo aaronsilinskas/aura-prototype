@@ -21,6 +21,7 @@ Single-context: root `GLOSSARY.md` (canonical terms + what to avoid), `docs/doma
 - **Test suite**: `uv run pytest -q`.
 - **Main checkout**: usually holds unrelated uncommitted work (KiCad files under `electronics/`, drafts in progress). Work in a worktree based on `origin/main`, and read committed files with `git show origin/<branch>:<path>`.
 - **Coding standards**: `CODING_STANDARDS.md`.
+- **Dependency bumps**: arrive as weekly Dependabot PRs (`.github/dependabot.yml`) for GitHub Actions, uv packages and pre-commit hooks, minor and patch grouped per ecosystem and each major on its own. Don't bump these in a feature change; review and merge the Dependabot PR. Versions under a workflow step's `with:` (such as a pinned tool version) aren't covered and are bumped by hand.
 
 ## Working on aura with an agent
 
