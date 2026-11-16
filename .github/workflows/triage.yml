@@ -95,28 +95,34 @@ jobs:
           display_report: "false"
           # Block every file-tool read outside the checkout, whatever the rules below allow.
           settings: '{"permissions":{"blockReadsOutsideWorkingDirectories":true}}'
+          # Never put a comment inside claude_args, only here above it. The action puts its own
+          # flags in front of the first line, so a comment there is no longer a whole line and
+          # its parser drops every flag after the `#` (an unquoted `#` mid-word counts too).
+          # scripts/tests/test_triage_workflow.py checks every flag below reaches the CLI.
+          # One bullet per line of claude_args, in order:
+          # - Model and turn limit, set only here: trade triage quality against usage.
+          # - Settings come only from the action (above), never from a file in the checkout.
+          # - dontAsk denies every tool call the allow rules don't cover; the denylist backs it up.
+          # - Reads only inside the checkout. Read rules also govern Grep and Glob, and
+          #   Grep(path)/Glob(path) rules match nothing, so neither gets a rule of its own:
+          #   dontAsk lets both search the checkout and denies them anywhere else.
+          # - Deny writes, shells, the web and the action's GitHub tools.
+          # - Nor anything that starts other work: subagents, skills, workflows, schedules.
+          # - Explicit denies where a credential could be read: the process environment
+          #   (/proc/self/environ), system and temp directories, the home directory's dotfiles
+          #   and the runner's own directories beside the checkout (~ is /home/runner and the
+          #   checkout is under ~/work, so ~ itself can't be denied: a deny beats every allow).
+          # - The decision schema, which the action needs to return a structured decision.
           claude_args: |
-            # Model and turn limit, set only here: trade triage quality against usage.
-            --model sonnet
-            --max-turns 10
-            # Settings come only from the action (above), never from a file in the checkout.
+            --model sonnet --max-turns 10
             --setting-sources user
-            # dontAsk denies every tool call the allow rules don't cover; the denylist backs it up.
             --permission-mode dontAsk
-            # Reads only inside the checkout. Read rules also govern Grep and Glob, and
-            # Grep(path)/Glob(path) rules match nothing, so neither gets a rule of its own:
-            # dontAsk lets both search the checkout and denies them anywhere else.
             --allowedTools "Read(./**)"
             --disallowedTools Bash,Edit,MultiEdit,Write,NotebookEdit,WebFetch,WebSearch,mcp__github,mcp__github_comment,mcp__github_file_ops,mcp__github_inline_comment,mcp__github_ci
-            # Nor anything that starts other work: subagents, skills, workflows, schedules.
             --disallowedTools Agent,Task,Skill,Workflow,CronCreate,RemoteTrigger,ScheduleWakeup,SendMessage,PushNotification,EnterWorktree
-            # Explicit denies where a credential could be read: the process environment
-            # (/proc/self/environ), system and temp directories, the home directory's dotfiles
-            # and the runner's own directories beside the checkout (~ is /home/runner and the
-            # checkout is under ~/work, so ~ itself can't be denied: a deny beats every allow).
             --disallowedTools "Read(//proc/**)" "Read(//sys/**)" "Read(//dev/**)" "Read(//etc/**)" "Read(//tmp/**)" "Read(//var/**)" "Read(//run/**)" "Read(//root/**)" "Read(//opt/**)" "Read(//usr/**)" "Read(~/.*)" "Read(~/.*/**)" "Read(~/work/_temp/**)" "Read(~/work/_actions/**)" "Read(~/work/_tool/**)" "Read(~/actions-runner/**)" "Read(~/runners/**)"
             --json-schema '${{ steps.load.outputs.schema }}'
-      - name: Check the decision carries no credential
+      - name: Check there is a decision and it carries no credential
         id: secret-check
         env:
           DECISION: ${{ steps.claude.outputs.structured_output }}

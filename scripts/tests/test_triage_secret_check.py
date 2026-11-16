@@ -87,3 +87,13 @@ def test_the_step_never_logs_the_decision(monkeypatch, tmp_path, capsys):
         _run(monkeypatch, tmp_path, _decision(_TOKEN), CLAUDE_CODE_OAUTH_TOKEN=_TOKEN)
 
     assert _TOKEN[:16] not in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("decision", ["", " \n"], ids=["empty", "whitespace"])
+def test_the_step_fails_when_claude_produced_no_decision(monkeypatch, tmp_path, capsys, decision):
+    with pytest.raises(SystemExit) as failed:
+        _run(monkeypatch, tmp_path, decision, CLAUDE_CODE_OAUTH_TOKEN=_TOKEN)
+
+    assert failed.value.code != 0
+    assert (tmp_path / "github_output").read_text() == ""
+    assert "no credential" not in capsys.readouterr().out
