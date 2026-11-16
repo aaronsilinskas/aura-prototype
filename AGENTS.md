@@ -21,6 +21,7 @@ Single-context: root `GLOSSARY.md` (canonical terms + what to avoid), `docs/doma
 - **Test suite**: `uv run pytest -q`.
 - **Main checkout**: usually holds unrelated uncommitted work (KiCad files under `electronics/`, drafts in progress). Work in a worktree based on `origin/main`, and read committed files with `git show origin/<branch>:<path>`.
 - **Coding standards**: `CODING_STANDARDS.md`.
+- **Dependency bumps**: arrive as weekly Dependabot PRs; `.github/dependabot.yml` says what it covers and how bumps are grouped. Don't bump those dependencies in a feature change; review and merge the Dependabot PR. Bump by hand what it skips: versions under a workflow step's `with:`, and `circuitpython-stubs` together with the device firmware.
 
 ## Working on aura with an agent
 

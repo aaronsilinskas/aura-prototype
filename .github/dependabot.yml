@@ -1,8 +1,35 @@
-# Proposes a PR for each new release of a pinned action or shared workflow, moving the SHA pin
-# and its version comment together.
+# Proposes weekly PRs that move the repo's dependencies to their latest stable release: pinned
+# actions and shared workflows (the SHA pin and its version comment together), uv packages and
+# pre-commit hooks. Minor and patch bumps share one PR per ecosystem; each major arrives in its
+# own PR, so a breaking one can't block routine bumps. Dependabot doesn't read values under a
+# workflow step's `with:` (such as a pinned tool version); bump those by hand.
 version: 2
 updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    groups:
+      github-actions-minor-and-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      uv-minor-and-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]
+    ignore:
+      # Pinned to the device firmware (CIRCUITPYTHON_VERSION in scripts/setup_mpy_cross.sh) and
+      # bumped together with it by hand.
+      - dependency-name: circuitpython-stubs
+  - package-ecosystem: pre-commit
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      pre-commit-minor-and-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]
