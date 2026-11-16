@@ -111,7 +111,7 @@ _Avoid_: constructing a fresh `PhaseSlot` per rule (import the scene's one); pas
 
 ### PhaseRule
 A `GameRule` owning one phase's lifecycle: `on_enter`/`on_exit`, phase-gated handlers, and `transition_to`; exactly one per `(machine, phase)`. On entry it may declare how its phase ends: after a duration, when a receipt stops, or when a condition on game state holds.
-_Avoid_: hand-rolled entry flags (use `on_enter`); storing a receipt in scene state only to poll it for the phase's end; reaching `super().on(...)` (bypasses the phase guard); transitioning from `on_enter`; transitioning to a phase no `PhaseRule` owns
+_Avoid_: hand-rolled entry flags (use `on_enter`); storing a receipt in scene state only to poll it for the phase's end; reaching `super().on(...)` (bypasses the phase guard); transitioning from `on_enter`; transitioning to a phase no `PhaseRule` owns; leaving a phase's owner out of the scene's rules (every owner must be some rule file's `RULE`)
 
 ### InPhaseRule
 A `GameRule` whose handlers fire only while a given phase is active, with no lifecycle hooks and no transitions; any number may share a phase.

@@ -13,3 +13,4 @@
 - `on_enter` must not call `transition_to`, and the target of `transition_to` must have an owning `PhaseRule`; both raise.
 - A scene's initial phase has no transition, so its `on_enter` runs on the first event any phase rule on its slot hears, before that rule's handler, whatever the rule order.
 - Tests must not construct a second instance of a scene's phase rule against the scene's slot; they use the module's `RULE` or build their own slot.
+- Ownership still lives on the slot, but the engine knows about phases in one place: when a scene starts, `SceneManager` checks that its rules include every owner registered with a listed phase rule's slot, and raises `ValueError` otherwise (#1392). An unlisted owner enters its phase but never checks its declared end, so the phase would hang silently.

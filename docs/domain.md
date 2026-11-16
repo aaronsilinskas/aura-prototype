@@ -38,7 +38,8 @@ engine/           Event-driven game loop (CircuitPython/MicroPython-safe)
   scene.py        Scene, SceneRegistry, SceneLocalRegistry, SceneManager, SceneControls
   scene_runtime.py SceneRuntime (the matched set built from a PackCatalog; above scene
                   and pack_catalog in the import graph)
-  phase.py        PhaseKey, PhaseMachine, PhaseSlot, PhaseRule, InPhaseRule
+  phase.py        PhaseKey, PhaseMachine, PhaseSlot, PhaseRule, InPhaseRule,
+                  check_phase_owners_listed (SceneManager's scene-start check)
   events.py       Event, EventGroup, EffectEvent
   timer.py        Timer
   lerp.py         level_lerp, level_lerp_int (the one level interpolation, for Game and
