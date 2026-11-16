@@ -57,7 +57,7 @@ from engine.state import EffectReceipt, GameState, StateSlot
 TYPE_CHECKING = False
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Sequence
     from typing import TypeVar
 
     T = TypeVar("T", bound=Event)
@@ -68,6 +68,7 @@ __all__ = [
     "PhaseMachine",
     "PhaseRule",
     "PhaseSlot",
+    "check_phase_owners_listed",
 ]
 
 
@@ -235,6 +236,14 @@ class PhaseSlot:
     def owner_of(self, phase: PhaseKey) -> PhaseRule | None:
         """Return the :class:`PhaseRule` owning *phase*, or ``None`` if none has been built."""
         return self._owners.get(phase)
+
+    def _check_owners_listed(self, listed: set[int]) -> None:
+        """Raise ``ValueError`` if an owner's ``id`` is not in *listed*."""
+        for phase, owner in self._owners.items():
+            if id(owner) not in listed:
+                raise ValueError(
+                    f"Phase {phase!r} of {self.key!r} has an owner not in the scene's rules"
+                )
 
     def _register_owner(self, rule: PhaseRule) -> None:
         if rule.phase in self._owners:
@@ -421,3 +430,21 @@ class InPhaseRule(_PhaseGuardedRule):
     Any number of ``InPhaseRule``s may share a phase, and an ``InPhaseRule``
     may share a phase with that phase's owning :class:`PhaseRule`.
     """
+
+
+def check_phase_owners_listed(rules: Sequence[GameRule]) -> None:
+    """Check that *rules* include every owner of the phases their phase rules guard.
+
+    An owner left out of a scene's rules still enters its phase, but never
+    hears the ``Sensors`` event that checks its declared end, so the phase
+    would never end.
+
+    Raises:
+        ValueError: naming the phase and its slot's key, if an owner
+            registered with a listed rule's :class:`PhaseSlot` is not in
+            *rules*.
+    """
+    listed = {id(rule) for rule in rules}
+    for rule in rules:
+        if isinstance(rule, _PhaseGuardedRule):
+            rule._phase_slot._check_owners_listed(listed)

@@ -20,6 +20,7 @@ from engine.effects.admin import EffectAdmin, HeldEffects, SceneView
 from engine.engine import GameRule, Version
 from engine.log import Logger
 from engine.packs import PackRegistry, UnknownItemError, load_item
+from engine.phase import check_phase_owners_listed
 from engine.settings import Settings
 from engine.state import (
     EffectControls,
@@ -334,6 +335,10 @@ class SceneManager(SceneControls):
     ``activate_boot_scene`` and ``overlay`` call ``scene_registry.get(name)``,
     which raises ``ValueError`` for unknown names.
 
+    Starting a scene, as the boot scene or when a pending overlay applies,
+    raises ``ValueError`` before it ticks if its rules leave out the owner
+    of a phase one of them guards (``check_phase_owners_listed``).
+
     Each scene's ``GameState`` carries *effect_controls*, *network_controls*,
     *capabilities*, this manager as its ``SceneControls`` and the scene's
     Settings.
@@ -549,6 +554,8 @@ class SceneManager(SceneControls):
         return combined
 
     def _new_run(self, scene: Scene) -> SceneRun:
+        rules = self._resolve_rules(scene)
+        check_phase_owners_listed(rules)
         state = GameState(
             self._effect_controls,
             self,
@@ -556,7 +563,7 @@ class SceneManager(SceneControls):
             settings=scene.settings,
             capabilities=self._capabilities,
         )
-        return SceneRun(state, self._resolve_rules(scene))
+        return SceneRun(state, rules)
 
     def _do_overlay(self, scene: Scene) -> None:
         """Suspend the current top, covering its effects, and push *scene* above it."""
