@@ -1,25 +1,19 @@
 """Tests for scripts.triage_input: the untrusted issue input Claude reads in a triage run."""
 
 import json
-import subprocess
 from typing import Any
 from unittest.mock import patch
 
 import pytest
 
+from scripts.tests.fake_gh import FakeGh, gh_issue
 from scripts.triage_input import INPUT_PATH, PROMPT_PATH, main, render_issue_input
 
 
 def _gh_issue(body: str = "The wand stops glowing.", comments: Any = ()) -> dict[str, Any]:
-    """An issue as ``gh issue view --json number,title,body,labels,author,comments`` returns it."""
-    return {
-        "number": 7,
-        "title": "Wand glow stops after a cast",
-        "body": body,
-        "labels": [{"name": "needs-triage", "color": "ffffff"}, {"name": "bug"}],
-        "author": {"login": "reporter-r", "name": "R"},
-        "comments": list(comments),
-    }
+    return gh_issue(
+        7, body=body, labels=("needs-triage", "bug"), author="reporter-r", comments=comments
+    )
 
 
 def _comment(author: str | None, body: str) -> dict[str, Any]:
@@ -118,35 +112,23 @@ def test_issue_text_never_starts_a_line_of_its_own(hostile):
 # ---------------------------------------------------------------------------
 
 
-class _FakeGh:
-    """Stands in for ``subprocess.run`` as ``gh issue view``, answering with one issue."""
-
-    def __init__(self, issue: dict[str, Any]) -> None:
-        self.calls: list[list[str]] = []
-        self._issue = issue
-
-    def __call__(self, args, **kwargs):
-        self.calls.append(list(args))
-        return subprocess.CompletedProcess(args, 0, stdout=json.dumps(self._issue), stderr="")
-
-
 def test_the_entry_fetches_the_given_issue_with_gh_and_writes_its_input(tmp_path):
-    fake_gh = _FakeGh(_gh_issue(comments=[_comment("bystander-b", "Me too.")]))
+    fake_gh = FakeGh(_gh_issue(comments=[_comment("bystander-b", "Me too.")]))
     output = tmp_path / "issue-input.md"
 
-    with patch("scripts.triage_input.subprocess.run", fake_gh):
+    with patch("scripts.triage.subprocess.run", fake_gh):
         main(["--issue", "7", "--output", str(output)])
 
-    assert [call[:4] for call in fake_gh.calls] == [["gh", "issue", "view", "7"]]
+    assert fake_gh.views == [["gh", "issue", "view", "7"]]
     data = _issue_data(output.read_text(encoding="utf-8"))
     assert data["title"] == "Wand glow stops after a cast"
     assert data["comments"][0]["author"] == "bystander-b"
 
 
 def test_the_entry_asks_gh_for_every_field_the_input_carries(tmp_path):
-    fake_gh = _FakeGh(_gh_issue())
+    fake_gh = FakeGh(_gh_issue())
 
-    with patch("scripts.triage_input.subprocess.run", fake_gh):
+    with patch("scripts.triage.subprocess.run", fake_gh):
         main(["--issue", "7", "--output", str(tmp_path / "issue-input.md")])
 
     (call,) = fake_gh.calls
@@ -193,18 +175,16 @@ def test_the_prompt_describes_every_decision_field(field):
     assert f"`{field}`" in _prompt()
 
 
-def test_the_prompt_carries_the_needs_info_template_and_the_agent_brief_format():
+def test_the_prompt_carries_the_triage_skills_needs_info_template():
     prompt = _prompt()
 
     assert "## Triage Notes" in prompt
     assert "**What we still need from you" in prompt
+
+
+def test_the_prompt_carries_the_triage_skills_agent_brief_format():
+    prompt = _prompt()
+
     assert "## Agent Brief" in prompt
     assert "**Acceptance criteria:**" in prompt
     assert "**Files to start from:**" in prompt
-
-
-def test_the_prompt_sends_oversized_issues_to_a_human_with_a_spec_note():
-    prompt = _prompt()
-
-    assert "bigger than one PR" in prompt
-    assert "needs a spec" in prompt

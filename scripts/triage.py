@@ -1,16 +1,18 @@
 """Automated triage's deterministic logic: the gate that decides whether an event starts a run.
 
-Host-only (CPython), run by the triage workflow and never shipped. The gate is pure: an
-event and the issue's live state in, a run-or-skip verdict out. ``read_issue_state`` is
-the thin ``gh`` reader for that live state, and ``main`` is the workflow step's wrapper.
+Host-only (CPython), run by the triage workflow and never shipped. :func:`gate` is pure: an
+event and the issue's live :class:`IssueState` in, a run-or-skip verdict out.
+:func:`read_issue_state` is the thin ``gh`` reader for that live state, built on
+:func:`view_issue`, the one ``gh issue view`` call every triage step reads an issue with.
+``main`` is the gate step's wrapper.
 """
 
 import argparse
 import json
 import os
 import subprocess
-from collections.abc import Sequence
-from typing import Final, NamedTuple
+from collections.abc import Iterable, Mapping, Sequence
+from typing import Any, Final, NamedTuple
 
 NEEDS_TRIAGE: Final = "needs-triage"
 
@@ -19,12 +21,17 @@ _TRIGGER_KINDS: Final = frozenset({_LABELED, "workflow_dispatch"})
 
 
 class IssueState(NamedTuple):
-    """An issue's live state as GitHub reports it, read fresh rather than from an event payload."""
+    """An issue's live state as GitHub reports it, read fresh rather than from an event payload.
+
+    The gate reads its state and labels; the apply step reads its labels and its author, the
+    one login a triage comment may mention.
+    """
 
     number: int
     is_open: bool
     is_pull_request: bool
     labels: frozenset[str]
+    author: str
 
 
 class TriageEvent(NamedTuple):
@@ -67,23 +74,40 @@ def gate(event: TriageEvent, issue: IssueState) -> GateVerdict:
     return GateVerdict(True, f"#{issue.number} is open and carries {NEEDS_TRIAGE!r}")
 
 
-def read_issue_state(number: int) -> IssueState:
-    """Read issue *number*'s live state with ``gh issue view``; raises if ``gh`` fails.
-
-    ``gh issue view`` also answers for a pull request number, which only its URL tells apart.
-    """
+def view_issue(number: int, fields: Iterable[str]) -> dict[str, Any]:
+    """Read *fields* of issue *number* with ``gh issue view --json``; raises if ``gh`` fails."""
     result = subprocess.run(
-        ["gh", "issue", "view", str(number), "--json", "state,labels,url"],
+        ["gh", "issue", "view", str(number), "--json", ",".join(fields)],
         capture_output=True,
         text=True,
         check=True,
     )
-    issue = json.loads(result.stdout)
+    issue: dict[str, Any] = json.loads(result.stdout)
+    return issue
+
+
+def login(user: Mapping[str, Any] | None) -> str:
+    """A ``gh`` user's login; GitHub reports a deleted account as no user, read as ``ghost``."""
+    return user["login"] if user else "ghost"
+
+
+def label_names(issue: Mapping[str, Any]) -> frozenset[str]:
+    """The names of a ``gh issue view --json labels`` issue's labels."""
+    return frozenset(label["name"] for label in issue["labels"])
+
+
+def read_issue_state(number: int) -> IssueState:
+    """Read issue *number*'s live :class:`IssueState`; raises if ``gh`` fails.
+
+    ``gh issue view`` also answers for a pull request number, which only its URL tells apart.
+    """
+    issue = view_issue(number, ("state", "labels", "url", "author"))
     return IssueState(
         number=number,
         is_open=issue["state"] == "OPEN",
         is_pull_request="/pull/" in issue["url"],
-        labels=frozenset(label["name"] for label in issue["labels"]),
+        labels=label_names(issue),
+        author=login(issue["author"]),
     )
 
 
