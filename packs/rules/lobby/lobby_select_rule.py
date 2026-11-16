@@ -34,10 +34,10 @@ from engine.input import InputEvents
 from engine.state import GameState, StateSlot
 from packs.rules.lobby.helpers.lobby_config import LobbyConfig
 
-try:
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
     from typing import Final
-except ImportError:
-    pass  # Not available on CircuitPython/MicroPython
 
 _INDEX_KEY: Final = "lobby_index"
 

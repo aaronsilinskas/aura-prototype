@@ -9,14 +9,16 @@ attributes, no hand-maintained registry to update.
 No ``pulseio`` import -- safe on CPython, CircuitPython 10.x, and MicroPython.
 """
 
+from __future__ import annotations
+
 import os
 
-try:
-    from typing import Final
-except ImportError:
-    pass
-
 from hardware.shared.ir_codecs.base import InfraredDecoder, InfraredEncoder
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from typing import Final
 
 __all__ = ["UnknownCodecError", "codec_for"]
 

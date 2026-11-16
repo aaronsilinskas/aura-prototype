@@ -12,12 +12,12 @@ from __future__ import annotations
 
 import math
 
-try:
-    from typing import Final
-except ImportError:
-    pass
-
 from engine.input import AccelerationData
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from typing import Final
 
 RED_MAX_MOTION_THRESHOLD: Final = 0.35
 """Player must not exceed this magnitude (m/s²) during a Red Light phase."""

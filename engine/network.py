@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 from engine.events import Event, EventGroup
 
-try:
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
     from typing import Final
-except ImportError:
-    pass
 
 __all__ = [
     "AREA_OF_EFFECT",

@@ -23,16 +23,18 @@ Usage
     uv run python scripts/normalize_sounds.py --root path/to/root
 """
 
+from __future__ import annotations
+
 import argparse
 import re
 import subprocess
 import sys
 from pathlib import Path
 
-try:
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
     from typing import Final
-except ImportError:
-    pass
 
 _SAMPLE_RATE: Final = 11025
 _CHANNELS: Final = 1

@@ -14,14 +14,6 @@ __all__ = [
     "StateSlot",
 ]
 
-try:
-    from collections.abc import Callable
-    from typing import Final, TypeVar
-
-    T = TypeVar("T")
-except ImportError:
-    pass  # Not available on CircuitPython
-
 from effects.effect import PixelBuffer
 from engine.capabilities import Capabilities
 from engine.events import Event
@@ -30,8 +22,8 @@ from engine.settings import Settings
 TYPE_CHECKING = False
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
-    from typing import Protocol
+    from collections.abc import Callable, Sequence
+    from typing import Final, Protocol, TypeVar
 
     # What SceneRun needs of a GameRule, typed structurally so this module
     # takes no import edge, even a checker-only one, on engine.engine: the
@@ -39,6 +31,8 @@ if TYPE_CHECKING:
     # reaches engine.engine through any import from here.
     class _Rule(Protocol):
         def handle_event(self, event: Event, state: GameState) -> None: ...
+
+    T = TypeVar("T")
 
 
 class ScopeValue:

@@ -8,13 +8,6 @@ try:
 except ImportError:
     pass  # Not available on CircuitPython/MicroPython
 
-try:
-    from typing import Literal, TypeVar
-
-    T = TypeVar("T")
-except ImportError:
-    pass  # Not available on CircuitPython/MicroPython
-
 from engine.capabilities import MissingCapabilityError
 from engine.effects.admin import EffectAdmin, HeldEffects, SceneView
 from engine.engine import GameRule, Version
@@ -30,6 +23,13 @@ from engine.state import (
     SceneReboot,
     SceneRun,
 )
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from typing import Literal, TypeVar
+
+    T = TypeVar("T")
 
 
 class SceneLocalRegistry:

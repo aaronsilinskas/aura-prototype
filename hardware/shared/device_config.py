@@ -4,21 +4,14 @@ from __future__ import annotations
 
 import json
 
-try:
-    from collections.abc import Callable
-    from typing import Final, TypeVar
-
-    BusSection = TypeVar("BusSection", "I2CConfig", "SPIConfig")
-except ImportError:
-    pass
-
 from engine.network import IR_EMITTERS
 from engine.state import Scope
 
 TYPE_CHECKING = False
 
 if TYPE_CHECKING:
-    from typing import Protocol
+    from collections.abc import Callable
+    from typing import Final, Protocol, TypeVar
 
     class _Slotted(Protocol):
         """A config section, rebuilt by ``_disabled_copy`` from its ``__slots__``."""
@@ -27,6 +20,8 @@ if TYPE_CHECKING:
         def __slots__(self) -> tuple[str, ...]: ...
 
     SlottedSection = TypeVar("SlottedSection", bound=_Slotted)
+
+    BusSection = TypeVar("BusSection", "I2CConfig", "SPIConfig")
 
 __all__ = [
     "DEFAULT_BUS",

@@ -17,6 +17,8 @@ Install with ``uv sync`` (pinned in ``[dependency-groups] dev`` via ``mpy-cross`
 Matches the CircuitPython minor release in use.  Invoked as ``python -m mpy_cross``.
 """
 
+from __future__ import annotations
+
 import argparse
 import json
 import os
@@ -40,11 +42,11 @@ from scripts.build import (
 )
 from scripts.ship_list import MODULE_DIRS, governed_mount_files, ship_list
 
-try:
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
     from collections.abc import Callable
     from typing import Final
-except ImportError:
-    pass
 
 DEFAULT_MOUNT: Final = "/Volumes/CIRCUITPY"
 
@@ -67,8 +69,8 @@ def _sync_file(
     src: Path,
     dest: Path,
     label: str,
-    copied: "list[Path]",
-    skipped: "list[Path]",
+    copied: list[Path],
+    skipped: list[Path],
     dry_run: bool = False,
     force: bool = False,
 ) -> None:
@@ -112,12 +114,12 @@ def _write_scene(mount: Path, scene: str) -> None:
 
 
 def deploy(
-    example_file: "Path | None",
+    example_file: Path | None,
     mount: Path,
-    source_root: "Path | None" = None,
+    source_root: Path | None = None,
     dry_run: bool = False,
-    scene: "str | None" = None,
-    compile: "Callable[[Path, Path], None] | None" = None,
+    scene: str | None = None,
+    compile: Callable[[Path, Path], None] | None = None,
     use_source: bool = False,
 ) -> int:
     """Deploy to mount. Returns 0 on success, 1 on error.

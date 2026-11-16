@@ -7,11 +7,6 @@ game at level 1 and transitions to Red Warning.
 
 from __future__ import annotations
 
-try:
-    from typing import Final
-except ImportError:
-    pass  # typing not available on all embedded runtimes
-
 from engine.input import InputEvents
 from engine.phase import PhaseRule
 from engine.state import GameState, Scope
@@ -22,6 +17,11 @@ from packs.scenes.red_light_green_light.rules.helpers.phases import (
 )
 from packs.scenes.red_light_green_light.rules.helpers.rlgl_config import rlgl_config
 from packs.scenes.red_light_green_light.rules.helpers.rlgl_phase_state import rlgl_phase_state
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from typing import Final
 
 _STARTING_LEVEL: Final = 1
 

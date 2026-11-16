@@ -1,13 +1,15 @@
-import math
+from __future__ import annotations
 
-try:
-    from typing import Final
-except ImportError:
-    pass
+import math
 
 from magic.aura import Aura, AuraEvent, DamageEvent, Spell, SpellTags
 from magic.spell.elemental.elements import ElementTags
 from magic.values import Duration
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from typing import Final
 
 GRAVITY: Final = 9.81  # m/s²
 

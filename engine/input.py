@@ -1,14 +1,12 @@
-from engine.events import Event, EventGroup
+from __future__ import annotations
 
-try:
-    from typing import Final
-except ImportError:
-    pass
+from engine.events import Event, EventGroup
 
 TYPE_CHECKING = False
 
 if TYPE_CHECKING:
     from collections.abc import ItemsView
+    from typing import Final
 
 
 class ButtonData:
@@ -70,7 +68,7 @@ class ButtonData:
         """Return the raw state constant for *name*, or ``None`` if unknown."""
         return self._states.get(name)
 
-    def items(self) -> "ItemsView[str, int]":
+    def items(self) -> ItemsView[str, int]:
         """Iterate over ``(button_name, state)`` pairs for all buttons."""
         return self._states.items()
 
@@ -150,8 +148,8 @@ class InputEvents:
         def __init__(
             self,
             buttons: ButtonData,
-            acceleration: "AccelerationData | None" = None,
-            magnetic: "MagneticData | None" = None,
+            acceleration: AccelerationData | None = None,
+            magnetic: MagneticData | None = None,
         ) -> None:
             super().__init__(InputEvents.GROUP, "sensors")
             self.buttons = buttons

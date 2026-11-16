@@ -21,14 +21,14 @@ string representation fails loudly here instead of silently drifting.
 
 from __future__ import annotations
 
-try:
-    from collections.abc import Callable
-    from typing import Final
-except ImportError:
-    pass  # Not available on CircuitPython
-
 from engine.settings import Settings
 from engine.state import Scope, ScopeValue
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from typing import Final
 
 NAMESPACE: Final = "lobby"
 

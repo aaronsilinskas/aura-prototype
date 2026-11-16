@@ -13,10 +13,7 @@ overridden. Each ``PulseEffect.PEAK`` (one per pulse) plays a one-shot
 ``scene.warning_sting_peak`` clip and a single ``STRONG_CLICK`` buzz.
 """
 
-try:
-    from typing import Final
-except ImportError:
-    pass  # Not available on CircuitPython
+from __future__ import annotations
 
 from effects.effect import (
     AudioPlaybackConfig,
@@ -29,6 +26,11 @@ from effects.effect import (
 from engine.effects.builder import EffectBuilder
 from packs.effects.basic.helpers.pulse_effect import PulseEffect
 from packs.effects.basic.pulse import PulseBuilder
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from typing import Final
 
 _pulse = PulseBuilder()
 

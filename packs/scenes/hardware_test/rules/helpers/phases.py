@@ -17,12 +17,12 @@ literal or integer never will. All six modes share the one machine held by
 
 from __future__ import annotations
 
-try:
-    from typing import Final
-except ImportError:
-    pass  # typing not available on all embedded runtimes
-
 from engine.phase import PhaseKey, PhaseSlot
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from typing import Final
 
 # ---------------------------------------------------------------------------
 # Phase keys — identity-typed singletons owned by the scene

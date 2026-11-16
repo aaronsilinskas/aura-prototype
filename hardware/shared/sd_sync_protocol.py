@@ -24,13 +24,15 @@ No ``board``/``busio``/CircuitPython-only import -- safe on CPython,
 CircuitPython 10.x, and MicroPython.
 """
 
+from __future__ import annotations
+
 import binascii
 
-try:
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
     from collections.abc import Iterator
     from typing import Final
-except ImportError:
-    pass  # Not available on all embedded runtimes
 
 __all__ = [
     "CHUNK_SIZE",
@@ -113,7 +115,7 @@ def decode_frame(line: bytes) -> Frame:
     return Frame(kind, text, payload)
 
 
-def encode_listing(entries: "list[tuple[str, int]]") -> bytes:
+def encode_listing(entries: list[tuple[str, int]]) -> bytes:
     """Serialize (path, size) pairs into a ``list`` response frame's payload.
 
     One ``"path\\tsize"`` line per entry, newline-joined, UTF-8 encoded --
@@ -125,7 +127,7 @@ def encode_listing(entries: "list[tuple[str, int]]") -> bytes:
     return "\n".join(f"{path}\t{size}" for path, size in entries).encode("utf-8")
 
 
-def decode_listing(payload: bytes) -> "list[tuple[str, int]]":
+def decode_listing(payload: bytes) -> list[tuple[str, int]]:
     """Parse a payload produced by :func:`encode_listing` back into (path, size) pairs.
 
     Empty *payload* decodes to an empty list, matching an empty or
@@ -140,7 +142,7 @@ def decode_listing(payload: bytes) -> "list[tuple[str, int]]":
     return entries
 
 
-def iter_chunks(data: bytes, chunk_size: int = CHUNK_SIZE) -> "Iterator[bytes]":
+def iter_chunks(data: bytes, chunk_size: int = CHUNK_SIZE) -> Iterator[bytes]:
     """Yield *data* sliced into pieces of at most *chunk_size* bytes.
 
     Slicing ``bytes`` copies the slice but never the parts already yielded and

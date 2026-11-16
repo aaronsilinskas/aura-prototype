@@ -14,12 +14,12 @@ clears it, with the shot receipts, in its ``on_exit``. ``tag_state`` is a
 
 from __future__ import annotations
 
-try:
-    from typing import Final
-except ImportError:
-    pass
-
 from engine.state import EffectReceipt, StateSlot
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from typing import Final
 
 _STATE_KEY: Final = "tag_state"
 

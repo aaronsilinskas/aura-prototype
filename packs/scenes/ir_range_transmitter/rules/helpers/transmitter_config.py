@@ -11,13 +11,13 @@ precedent in the red_light_green_light and tag scenes.
 
 from __future__ import annotations
 
-try:
-    from typing import Final
-except ImportError:
-    pass
-
 from engine.settings import SCENE_NAMESPACE, Settings
 from engine.state import GameState, StateSlot
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from typing import Final
 
 _CONFIG_KEY: Final = "irtx_config"
 

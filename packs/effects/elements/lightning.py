@@ -1,9 +1,6 @@
-import random
+from __future__ import annotations
 
-try:
-    from typing import Final
-except ImportError:
-    pass  # Not available on CircuitPython
+import random
 
 from effects.effect import Effect, EffectConfig, EffectVerb
 from effects.layers.add_samples_renderer import AddSamplesRenderer
@@ -12,6 +9,11 @@ from effects.level import effect_level
 from effects.palette import Palette, PaletteLUT256
 from effects.shape import EffectShapeFunc, Shape
 from engine.effects.builder import EffectBuilder
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from typing import Final
 
 # fmt: off
 _LIGHTNING_PALETTE = bytes([  0,   0,   0,   0,

@@ -12,11 +12,6 @@ transition) remains owned by :class:`TagPlayingRule`.
 
 from __future__ import annotations
 
-try:
-    from typing import Final
-except ImportError:
-    pass  # typing not available on all embedded runtimes
-
 from engine.input import InputEvents
 from engine.network import LINE
 from engine.phase import InPhaseRule
@@ -26,6 +21,11 @@ from packs.scenes.tag.rules.helpers.tag_config import TagConfig, tag_config
 from packs.scenes.tag.rules.helpers.tag_state import TagState, tag_state
 from packs.scenes.tag.rules.playing_rule import AMMO_COLOR
 from packs.scenes.tag.tag_data import TagData, encode_tag_data
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from typing import Final
 
 _SHOT_DAMAGE: Final = 1
 

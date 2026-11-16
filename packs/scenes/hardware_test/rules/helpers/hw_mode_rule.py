@@ -17,11 +17,6 @@ only ever called for ``Sensors`` events.
 
 from __future__ import annotations
 
-try:
-    from typing import Final
-except ImportError:
-    pass
-
 from engine.input import InputEvents
 from engine.phase import PhaseKey, PhaseRule
 from engine.state import GameState, Scope, ScopeValue, StateSlot
@@ -32,6 +27,11 @@ from packs.scenes.hardware_test.rules.helpers.phases import (
     hw_phase,
     next_in_cycle,
 )
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from typing import Final
 
 FLASH_DURATION: Final = 0.5
 

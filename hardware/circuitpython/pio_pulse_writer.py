@@ -37,11 +37,6 @@ raw loop counts.
 
 from __future__ import annotations
 
-try:
-    from typing import Final
-except ImportError:
-    pass
-
 from array import array
 
 from hardware.shared.ir_transport import PulseWriter
@@ -49,6 +44,8 @@ from hardware.shared.ir_transport import PulseWriter
 TYPE_CHECKING = False
 
 if TYPE_CHECKING:
+    from typing import Final
+
     import microcontroller
     import rp2pio
 

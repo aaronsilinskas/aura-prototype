@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
-try:
-    from collections.abc import Callable
-    from typing import Final
-except ImportError:
-    pass
-
 from engine.input import AccelerationData, MagneticData
 from engine.log import Logger
 from hardware.shared.polled_part import PolledPart
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from typing import Final
 
 __all__ = ["RECOVERY_READS", "PolledSensor"]
 

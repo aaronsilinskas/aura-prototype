@@ -21,17 +21,19 @@ primitives, so they inherit ``read_bytes``/``write_bytes``'s escape-rejection
 and durable atomic-as-FAT-allows write guarantees for free.
 """
 
+from __future__ import annotations
+
 import errno
 import json
 import os
 
 from engine._path import isdir
 
-try:
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
     from typing import BinaryIO, Final
-except ImportError:
-    pass
 
 __all__ = ["DeviceStorage"]
 
@@ -74,7 +76,7 @@ class DeviceStorage:
         """
         return self._mount_root
 
-    def read_bytes(self, name: str) -> "bytes | None":
+    def read_bytes(self, name: str) -> bytes | None:
         """Return the full contents of *name*, or ``None`` if never written.
 
         A ``DeviceStorage`` instance always means "card mounted", so
@@ -96,7 +98,7 @@ class DeviceStorage:
                 raise  # Anything but "not written yet" is a real failure.
             return None
 
-    def read_chunks(self, name: str, chunk_size: int) -> "Iterator[bytes] | None":
+    def read_chunks(self, name: str, chunk_size: int) -> Iterator[bytes] | None:
         """Yield *name*'s contents in *chunk_size*-byte pieces, or ``None`` if never written.
 
         Opens the file once and reads it *chunk_size* bytes at a time, so a
@@ -124,7 +126,7 @@ class DeviceStorage:
             return None
         return self._read_open_file_in_chunks(f, chunk_size)
 
-    def _read_open_file_in_chunks(self, f: "BinaryIO", chunk_size: int) -> "Iterator[bytes]":
+    def _read_open_file_in_chunks(self, f: BinaryIO, chunk_size: int) -> Iterator[bytes]:
         """Yield successive *chunk_size* reads from already-open file *f*, closing it when done.
 
         A separate generator function so :meth:`read_chunks` itself stays a
@@ -157,7 +159,7 @@ class DeviceStorage:
         """
         self.write_chunks(name, (data,))
 
-    def write_chunks(self, name: str, chunks: "Iterable[bytes]") -> None:
+    def write_chunks(self, name: str, chunks: Iterable[bytes]) -> None:
         """Durably, atomically-as-FAT-allows replace *name* with the concatenation of *chunks*.
 
         FAT ``os.rename`` raises ``EEXIST`` on an existing target, so true
@@ -198,7 +200,7 @@ class DeviceStorage:
         os.rename(temp_path, resolved)
         os.sync()
 
-    def read_json(self, name: str) -> "dict | None":
+    def read_json(self, name: str) -> dict | None:
         """Return *name*'s contents parsed as JSON, or ``None`` if never written.
 
         A thin decode wrapped around :meth:`read_bytes`; stays a faithful
@@ -251,7 +253,7 @@ class DeviceStorage:
         """
         return self._resolve(subpath)
 
-    def walk(self, subpath: str = "") -> "list[tuple[str, int]]":
+    def walk(self, subpath: str = "") -> list[tuple[str, int]]:
         """Recursively list every file under *subpath*, sorted by mount-relative path.
 
         Files only -- directories are never reported as entries, only implied
@@ -283,7 +285,7 @@ class DeviceStorage:
         return entries
 
     def _walk_into(
-        self, dir_path: str, relative_prefix: str, entries: "list[tuple[str, int]]"
+        self, dir_path: str, relative_prefix: str, entries: list[tuple[str, int]]
     ) -> None:
         """Append every file under *dir_path* to *entries*, recursing into subdirectories.
 

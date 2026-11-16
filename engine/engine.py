@@ -1,16 +1,16 @@
 from __future__ import annotations
 
-try:
+from engine.events import Event
+from engine.state import GameState
+from engine.version import Version
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
     from collections.abc import Callable
     from typing import TypeVar
 
     T = TypeVar("T", bound="Event")
-except ImportError:
-    pass  # No typing support on CircuitPython yet
-
-from engine.events import Event
-from engine.state import GameState
-from engine.version import Version
 
 __all__ = ["GameRule", "Version"]
 

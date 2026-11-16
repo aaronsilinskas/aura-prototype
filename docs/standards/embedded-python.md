@@ -24,6 +24,19 @@ if TYPE_CHECKING:
 
 The device never imports `typing` and skips the block. mypy treats the name as true, so the guarded imports are still checked. Don't use `try: from typing import TYPE_CHECKING / except ImportError: TYPE_CHECKING = False`: mypy rejects the fallback assignment ("cannot assign to final").
 
+Don't import `typing` inside a `try:` block either (`try: from typing import Final / except ImportError: pass`). `engine/tests/test_checker_only_imports.py` fails on that form in any module outside a `tests/` directory and names the file and line. A module whose annotations name a guarded import needs `from __future__ import annotations`: CPython before 3.14 evaluates module-level annotations such as `NAME: Final = 1` eagerly.
+
+## Long Strings
+
+mpy-cross rejects adjacent string literals split across lines, so ruff's ISC002 rejects them in device code (`allow-multiline = false` in `pyproject.toml`). To break a long string, join the pieces with an explicit `+` inside parentheses:
+
+```python
+raise ValueError(
+    f"audio pin {name} is not a pin on this board; "
+    + "name one of the board pins listed in device.json under audio"
+)
+```
+
 ## Generics are checker-only subclasses (ADR-0007)
 
 The device can't run `Generic`, so put the implementation in a plain runtime class and declare the generic as a subclass of it under `TYPE_CHECKING`. Re-declare only the signatures that mention the type parameter, and bind the public name to the runtime class under `else:`:

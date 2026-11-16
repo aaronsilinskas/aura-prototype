@@ -17,12 +17,12 @@ it lazily builds the object on first use and caches it under a single
 
 from __future__ import annotations
 
-try:
-    from typing import Final
-except ImportError:
-    pass
-
 from engine.state import EffectReceipt, StateSlot
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from typing import Final
 
 _PHASE_STATE_KEY: Final = "rlgl_phase_state"
 
