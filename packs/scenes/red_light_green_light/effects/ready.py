@@ -49,12 +49,7 @@ class _ReadyPixels(EffectPixels):
 
 class _Builder(EffectBuilder):
     def __call__(self, name: str, config: EffectConfig) -> Effect:
-        layer = PulseLayer(
-            _BRIGHTEN,
-            _BRIGHTEN + _ON,
-            _BRIGHTEN + _ON + _DARKEN,
-            _CYCLE_TOTAL,
-        )
+        layer = PulseLayer(_BRIGHTEN, _ON, _DARKEN, _OFF)
         return Effect(
             name=name,
             pixels=_ReadyPixels(layer),

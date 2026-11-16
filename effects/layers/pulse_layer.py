@@ -15,8 +15,8 @@ class PulseLayer(Layer):
         monotonically increasing accumulator, never reduced modulo the cycle,
         so the interval-crossing detection below stays correct across cycle
         boundaries; ``update`` applies the modulo locally to pick the phase.
-      - ``at_peak`` is set to ``True`` on the tick when the cursor crosses the
-        ``_b_on`` boundary (via interval-crossing detection).
+      - ``at_peak`` is set to ``True`` on the tick when the cursor reaches the
+        end of the brighten phase (via interval-crossing detection).
     Sampling model:
       - ``sample()`` returns the same brightness for every position; both
         ``position`` and ``pixel_count`` are ignored.
@@ -34,15 +34,23 @@ class PulseLayer(Layer):
 
     def __init__(
         self,
-        b_on: float,
-        b_darken: float,
-        b_off: float,
-        cycle_total: float,
+        brighten_duration: float,
+        on_duration: float,
+        darken_duration: float,
+        off_duration: float,
     ) -> None:
-        self._b_on = b_on
-        self._b_darken = b_darken
-        self._b_off = b_off
-        self._cycle_total = cycle_total
+        """Build a pulse from its four phase durations, in seconds.
+
+        Raises ``ValueError`` if any duration is negative or all four are zero.
+        """
+        if brighten_duration < 0 or on_duration < 0 or darken_duration < 0 or off_duration < 0:
+            raise ValueError("Pulse durations must be non-negative")
+        self._b_on = brighten_duration
+        self._b_darken = brighten_duration + on_duration
+        self._b_off = self._b_darken + darken_duration
+        self._cycle_total = self._b_off + off_duration
+        if self._cycle_total == 0.0:
+            raise ValueError("At least one pulse phase duration must be non-zero")
         self._elapsed = 0.0
         self._brightness = 0.0
         self.at_peak = False

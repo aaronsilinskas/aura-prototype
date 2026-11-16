@@ -15,8 +15,8 @@ class PulseBuilder(EffectBuilder):
     Brightness is an output-level concern applied by ``MatrixEffectOutput`` at
     render time.
 
-    Raises ``ValueError`` if any duration is negative or if all durations sum
-    to zero.
+    Raises ``ValueError``, from :class:`PulseLayer`, if any duration is
+    negative or if all durations are zero.
     """
 
     def __call__(self, name: str, config: EffectConfig) -> Effect:
@@ -27,12 +27,6 @@ class PulseBuilder(EffectBuilder):
         darken_duration = config.get_option("darken_duration", 0.5)
         off_duration = config.get_option("off_duration", 0.5)
 
-        if brighten_duration < 0 or on_duration < 0 or darken_duration < 0 or off_duration < 0:
-            raise ValueError("Pulse durations must be non-negative")
-        cycle_total = brighten_duration + on_duration + darken_duration + off_duration
-        if cycle_total == 0.0:
-            raise ValueError("At least one pulse phase duration must be non-zero")
-
         sr = (start_color >> 16) & 0xFF
         sg = (start_color >> 8) & 0xFF
         sb = start_color & 0xFF
@@ -41,10 +35,7 @@ class PulseBuilder(EffectBuilder):
         eb = end_color & 0xFF
         palette = PaletteLUT256(bytes([0, sr, sg, sb, 255, er, eg, eb]))
 
-        b_on = brighten_duration
-        b_darken = brighten_duration + on_duration
-        b_off = brighten_duration + on_duration + darken_duration
-        layer = PulseLayer(b_on, b_darken, b_off, cycle_total)
+        layer = PulseLayer(brighten_duration, on_duration, darken_duration, off_duration)
 
         return Effect(name=name, pixels=PulseEffect(layer, palette, config))
 
