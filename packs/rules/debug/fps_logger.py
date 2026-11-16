@@ -7,10 +7,10 @@ from engine.input import InputEvents
 from engine.state import GameState
 from packs.rules.debug import NAMESPACE
 
-try:
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
     from collections.abc import Callable
-except ImportError:
-    pass
 
 
 class FpsLoggerRule(GameRule):

@@ -27,10 +27,10 @@ from hardware.shared.ir_codecs import codec_for
 from hardware.shared.ir_codecs.base import InfraredDecoder, InfraredEncoder
 from hardware.shared.persisted_scene import PersistedScene
 
-try:
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
     from collections.abc import Callable
-except ImportError:
-    pass  # collections.abc not available on all embedded runtimes
 
 __all__ = ["SceneBoot", "build_scene_boot"]
 

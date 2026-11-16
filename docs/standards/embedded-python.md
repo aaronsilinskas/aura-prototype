@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 
 The device never imports `typing` and skips the block. mypy treats the name as true, so the guarded imports are still checked. Don't use `try: from typing import TYPE_CHECKING / except ImportError: TYPE_CHECKING = False`: mypy rejects the fallback assignment ("cannot assign to final").
 
-Don't import `typing` inside a `try:` block either (`try: from typing import Final / except ImportError: pass`). `engine/tests/test_checker_only_imports.py` fails on that form in any module outside a `tests/` directory and names the file and line. A module whose annotations name a guarded import needs `from __future__ import annotations`: CPython before 3.14 evaluates module-level annotations such as `NAME: Final = 1` eagerly.
+Don't import `typing` or `collections.abc` inside a `try:` block either (`try: from typing import Final / except ImportError: pass`). `engine/tests/test_checker_only_imports.py` fails on that form in any module outside a `tests/` directory and names the file and line. A module whose annotations name a guarded import needs `from __future__ import annotations`: CPython before 3.14 evaluates module-level annotations such as `NAME: Final = 1` eagerly.
 
 ## Long Strings
 

@@ -9,11 +9,6 @@ builds what it is asked for. One adapter per platform.
 
 from __future__ import annotations
 
-try:
-    from collections.abc import Callable
-except ImportError:
-    pass
-
 from engine.effects.output import EffectOutput
 from hardware.shared.device_config import (
     AudioConfig,
@@ -31,6 +26,7 @@ from hardware.shared.radio_transport import RadioTransport
 TYPE_CHECKING = False
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from typing import Any
 
     # A platform's bus object: the Device assembly only passes it along, and
