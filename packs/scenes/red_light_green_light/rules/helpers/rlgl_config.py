@@ -23,11 +23,6 @@ from engine.state import GameState, StateSlot
 
 _CONFIG_KEY: Final = "rlgl_config"
 
-# Level-1 warning pulse sub-duration ratios (brighten / on / darken = 0.3 / 0.4 / 0.3)
-_WARNING_BRIGHTEN_RATIO: Final = 0.3
-_WARNING_ON_RATIO: Final = 0.4
-_WARNING_DARKEN_RATIO: Final = 0.3
-
 
 class RlglConfig:
     """Immutable duration/threshold configuration for the RLGL scene, each
@@ -88,18 +83,6 @@ class RlglConfig:
     def warning_duration(self, level: int) -> float:
         """Return the warning phase duration = 3 x pulse_duration(level)."""
         return 3.0 * self.warning_pulse_duration(level)
-
-    def warning_sting_opts(self, level: int) -> dict[str, object]:
-        """Build warning sting options with sub-durations scaled to the pulse duration."""
-        pulse = self.warning_pulse_duration(level)
-        return {
-            "start_color": 0x000000,
-            "end_color": 0xFFFF00,
-            "brighten_duration": pulse * _WARNING_BRIGHTEN_RATIO,
-            "on_duration": pulse * _WARNING_ON_RATIO,
-            "darken_duration": pulse * _WARNING_DARKEN_RATIO,
-            "off_duration": 0.0,
-        }
 
 
 def _from_state(state: GameState) -> RlglConfig:

@@ -30,7 +30,7 @@ def test_pulse_effect_emits_peak_when_the_brighten_phase_ends() -> None:
     events: list[EffectVerb] = []
     effect = _build(listeners=[events.append])
 
-    effect.pixels.update(0.6)  # past the default 0.5 s brighten phase → crosses b_on
+    effect.pixels.update(0.6)  # past the default 0.5 s brighten phase → crosses the end of brighten
 
     assert events == [PulseEffect.PEAK]
 
@@ -42,7 +42,7 @@ def test_pulse_effect_no_listener_call_during_brighten() -> None:
     events: list[str] = []
     effect = _build(listeners=[events.append])
 
-    effect.pixels.update(0.2)  # still in brighten, hasn't crossed b_on
+    effect.pixels.update(0.2)  # still in brighten, hasn't crossed its end
 
     assert events == []
 
@@ -61,7 +61,7 @@ def test_pulse_effect_no_listener_call_during_darken() -> None:
     events: list[str] = []
     effect = _build(listeners=[events.append])
 
-    effect.pixels.update(0.6)  # crosses b_on → peak fires
+    effect.pixels.update(0.6)  # crosses the end of brighten → peak fires
     events.clear()
     effect.pixels.update(0.8)  # into darken phase, no new crossing
     assert events == []
@@ -71,7 +71,7 @@ def test_pulse_effect_no_listener_call_during_off() -> None:
     events: list[str] = []
     effect = _build(listeners=[events.append])
 
-    effect.pixels.update(0.6)  # crosses b_on
+    effect.pixels.update(0.6)  # crosses the end of brighten
     events.clear()
     effect.pixels.update(1.3)  # into off phase (elapsed=1.9), no new crossing
     assert events == []
@@ -82,7 +82,7 @@ def test_pulse_effect_no_listener_call_during_off() -> None:
 
 def test_pulse_effect_peak_with_no_listeners_is_silent() -> None:
     effect = _build()  # no listeners
-    effect.pixels.update(0.6)  # crosses b_on
+    effect.pixels.update(0.6)  # crosses the end of brighten
     # Should not raise
 
 
@@ -97,5 +97,5 @@ def test_pulse_effect_emits_peak_once_on_the_second_cycle_peak() -> None:
 
     effect.pixels.update(2.0)  # full cycle, no peak
     events.clear()
-    effect.pixels.update(0.6)  # second cycle crosses b_on
+    effect.pixels.update(0.6)  # second cycle crosses the end of brighten
     assert events == [PulseEffect.PEAK]

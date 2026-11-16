@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from effects.effect import Effect, EffectConfig, PixelBuffer
-from packs.scenes.tag.effects import ammo_empty, fire_shot, hit
+from packs.scenes.tag.effects import ammo_empty, fire_shot, hit, warning_pulse
 
 _GREEN = 0x00FF00
 _GREEN_PULSE: dict[str, object] = {"start_color": _GREEN, "end_color": _GREEN}
@@ -35,3 +35,46 @@ def test_hit_pulses_in_the_colors_the_caller_passes() -> None:
     effect = hit.BUILD("scene.hit", EffectConfig(resolution=4, options=_GREEN_PULSE))
 
     assert _render(effect) == [_GREEN] * 4
+
+
+def _warning_pulse(options: dict[str, object]) -> Effect:
+    return warning_pulse.BUILD("scene.warning_pulse", EffectConfig(resolution=4, options=options))
+
+
+_HALF_GRAY = [0x7F7F7F] * 4
+_WHITE = [0xFFFFFF] * 4
+
+
+def test_warning_pulse_fades_from_black_to_white() -> None:
+    effect = _warning_pulse({"pulse_duration": 0.6})
+
+    assert _render(effect) == [0x000000] * 4
+    assert _render(effect, elapsed=0.3) == _WHITE
+
+
+def test_warning_pulse_spends_half_its_duration_brightening_and_half_darkening() -> None:
+    two_seconds: dict[str, object] = {"pulse_duration": 2.0}
+
+    assert _render(_warning_pulse(two_seconds), elapsed=0.5) == _HALF_GRAY
+    assert _render(_warning_pulse(two_seconds), elapsed=1.0) == _WHITE
+    assert _render(_warning_pulse(two_seconds), elapsed=1.5) == _HALF_GRAY
+
+
+def test_warning_pulse_keeps_its_own_colors_and_split_whatever_the_caller_passes() -> None:
+    caller_look: dict[str, object] = {
+        "pulse_duration": 2.0,
+        **_GREEN_PULSE,
+        "brighten_duration": 0.1,
+        "on_duration": 0.1,
+        "darken_duration": 0.1,
+        "off_duration": 5.0,
+    }
+
+    assert _render(_warning_pulse(caller_look), elapsed=0.5) == _HALF_GRAY
+    assert _render(_warning_pulse(caller_look), elapsed=1.0) == _WHITE
+
+
+def test_warning_pulse_pulses_once_a_second_when_no_pulse_duration_is_passed() -> None:
+    assert _render(_warning_pulse({}), elapsed=0.25) == _HALF_GRAY
+    assert _render(_warning_pulse({}), elapsed=0.5) == _WHITE
+    assert _render(_warning_pulse({}), elapsed=1.25) == _HALF_GRAY
