@@ -237,6 +237,14 @@ class PhaseSlot:
         """Return the :class:`PhaseRule` owning *phase*, or ``None`` if none has been built."""
         return self._owners.get(phase)
 
+    def _check_owners_listed(self, listed: set[int]) -> None:
+        """Raise ``ValueError`` if an owner's ``id`` is not in *listed*."""
+        for phase, owner in self._owners.items():
+            if id(owner) not in listed:
+                raise ValueError(
+                    f"Phase {phase!r} of {self.key!r} has an owner not in the scene's rules"
+                )
+
     def _register_owner(self, rule: PhaseRule) -> None:
         if rule.phase in self._owners:
             raise ValueError(f"Phase {rule.phase!r} of {self.key!r} already has an owner")
@@ -425,12 +433,11 @@ class InPhaseRule(_PhaseGuardedRule):
 
 
 def check_phase_owners_listed(rules: Sequence[GameRule]) -> None:
-    """Check that *rules* include every owner of each phase a phase rule among them guards.
+    """Check that *rules* include every owner of the phases their phase rules guard.
 
     An owner left out of a scene's rules still enters its phase, but never
     hears the ``Sensors`` event that checks its declared end, so the phase
-    would never end.  :class:`~engine.scene.SceneManager` calls this once
-    per scene start, before the scene ticks.
+    would never end.
 
     Raises:
         ValueError: naming the phase and its slot's key, if an owner
@@ -439,11 +446,5 @@ def check_phase_owners_listed(rules: Sequence[GameRule]) -> None:
     """
     listed = {id(rule) for rule in rules}
     for rule in rules:
-        if not isinstance(rule, _PhaseGuardedRule):
-            continue
-        slot = rule._phase_slot
-        for phase, owner in slot._owners.items():
-            if id(owner) not in listed:
-                raise ValueError(
-                    f"Phase {phase!r} of {slot.key!r} has an owner not in the scene's rules"
-                )
+        if isinstance(rule, _PhaseGuardedRule):
+            rule._phase_slot._check_owners_listed(listed)

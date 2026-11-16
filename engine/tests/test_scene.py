@@ -437,17 +437,24 @@ _Done = PhaseRule(_DONE, _SLOT)
 """A rule file whose second phase owner is built but never exported, so no scene lists it."""
 
 
-def test_activating_a_boot_scene_missing_a_phase_owner_raises_naming_its_slot_and_phase(
-    pack_tree,
-) -> None:
+def _unlisted_owner_scene_manager(pack_tree) -> SceneManager:
+    """A manager whose scene ``broken`` runs ``_UNLISTED_OWNER_RULE``; ``base`` runs nothing."""
     rule_registry = pack_tree.scan(
         rule_packs={"unlisted": {"rule": _UNLISTED_OWNER_RULE}}
     ).rule_registry
-    scene_reg = make_scene_registry(("main", make_scene(rule_packs=[_ref("unlisted")])))
-    manager = _make_scene_manager(rule_registry=rule_registry, scene_registry=scene_reg)
+    scene_reg = make_scene_registry(
+        ("base", make_scene()), ("broken", make_scene(rule_packs=[_ref("unlisted")]))
+    )
+    return _make_scene_manager(rule_registry=rule_registry, scene_registry=scene_reg)
+
+
+def test_activating_a_boot_scene_missing_a_phase_owner_raises_naming_it_and_activates_nothing(
+    pack_tree,
+) -> None:
+    manager = _unlisted_owner_scene_manager(pack_tree)
 
     with pytest.raises(ValueError, match=r"PhaseKey\('done'\).*'unlisted_machine'"):
-        manager.activate_boot_scene("main")
+        manager.activate_boot_scene("broken")
 
     assert manager.active_state is None
 
@@ -455,13 +462,7 @@ def test_activating_a_boot_scene_missing_a_phase_owner_raises_naming_its_slot_an
 def test_an_overlay_missing_a_phase_owner_raises_and_leaves_the_covered_scene_active(
     pack_tree,
 ) -> None:
-    rule_registry = pack_tree.scan(
-        rule_packs={"unlisted": {"rule": _UNLISTED_OWNER_RULE}}
-    ).rule_registry
-    scene_reg = make_scene_registry(
-        ("base", make_scene()), ("broken", make_scene(rule_packs=[_ref("unlisted")]))
-    )
-    manager = _make_scene_manager(rule_registry=rule_registry, scene_registry=scene_reg)
+    manager = _unlisted_owner_scene_manager(pack_tree)
     manager.activate_boot_scene("base")
     base_state = manager.active_state
     manager.overlay("broken")

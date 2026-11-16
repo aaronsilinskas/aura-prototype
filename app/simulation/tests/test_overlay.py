@@ -271,6 +271,11 @@ def _install_card_scene(card: Path, scene: str, rules: dict[str, str]) -> None:
         (rules_dir / f"{name}.py").write_text(source)
 
 
+def _install_phase_scene(card: Path, scene: str, phase_rule: str) -> None:
+    """Put *scene* on *card*, running *phase_rule* as rule file ``phase`` beside ``done``."""
+    _install_card_scene(card, scene, {"phase": phase_rule, "done": _done_rule(scene)})
+
+
 @pytest.fixture()
 def card(tmp_path: Path) -> Path:
     """A card with these scenes, all on the default Aura IR codec.
@@ -289,15 +294,9 @@ def card(tmp_path: Path) -> Path:
     _install_card_scene(tmp_path, "idle", {"rule": _IDLE_RULE})
     _install_card_scene(tmp_path, "listen", {"rule": _GREEN_ON_IR_RULE})
     _install_card_scene(tmp_path, "hum", {"rule": _HUM_ONCE_RULE})
-    _install_card_scene(
-        tmp_path, "timed", {"phase": _TIMED_PHASE_RULE, "done": _done_rule("timed")}
-    )
-    _install_card_scene(
-        tmp_path, "condition", {"phase": _CONDITION_PHASE_RULE, "done": _done_rule("condition")}
-    )
-    _install_card_scene(
-        tmp_path, "hum_phase", {"phase": _HUM_PHASE_RULE, "done": _done_rule("hum_phase")}
-    )
+    _install_phase_scene(tmp_path, "timed", _TIMED_PHASE_RULE)
+    _install_phase_scene(tmp_path, "condition", _CONDITION_PHASE_RULE)
+    _install_phase_scene(tmp_path, "hum_phase", _HUM_PHASE_RULE)
     for scene in ("hum", "hum_phase"):
         effects = _package(tmp_path / "aura_packs" / "scenes" / scene / "effects")
         (effects / "hum.py").write_text(_HUM_EFFECT)
