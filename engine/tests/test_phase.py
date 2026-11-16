@@ -9,10 +9,13 @@ private entry flag.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import pytest
 
 from engine.engine import GameRule
 from engine.events import Event, EventGroup
+from engine.input import ButtonData, InputEvents
 from engine.phase import (
     InPhaseRule,
     PhaseKey,
@@ -20,7 +23,7 @@ from engine.phase import (
     PhaseRule,
     PhaseSlot,
 )
-from engine.state import GameState, SceneControls, SceneRun, Scope
+from engine.state import EffectReceipt, GameState, SceneControls, SceneRun, Scope
 from engine.tests.helpers import SpyEffectControls
 
 _GROUP = EventGroup("phase_test")
@@ -125,6 +128,43 @@ class _InPhaseEmitter(InPhaseRule):
 
     def _tick(self, event: _TickEvent, state: GameState) -> None:
         state.effect_controls.add_effect(Scope.PERSONAL, "in:" + self._label, {})
+
+
+class _ElapsedRecordingOwner(PhaseRule):
+    """PhaseRule recording its phase elapsed each tick, leaving for *next_phase* at 1 s."""
+
+    def __init__(self, phase: PhaseKey, phase_slot: PhaseSlot, next_phase: PhaseKey) -> None:
+        super().__init__(phase, phase_slot)
+        self._next_phase = next_phase
+        self.readings: list[float] = []
+        self.on(_TickEvent, self._tick)
+
+    def _tick(self, event: _TickEvent, state: GameState) -> None:
+        elapsed = self.phase_elapsed(state)
+        self.readings.append(elapsed)
+        if elapsed >= 1.0:
+            self.transition_to(state, self._next_phase)
+
+
+class _ElapsedRecordingBystander(InPhaseRule):
+    """InPhaseRule recording its phase elapsed each tick its phase is active."""
+
+    def __init__(self, phase: PhaseKey, phase_slot: PhaseSlot) -> None:
+        super().__init__(phase, phase_slot)
+        self.readings: list[float] = []
+        self.on(_TickEvent, self._tick)
+
+    def _tick(self, event: _TickEvent, state: GameState) -> None:
+        self.readings.append(self.phase_elapsed(state))
+
+
+def _run_timed(rules: list, ticks: int, step: float) -> None:
+    """Run *rules* through *ticks* SceneRun ticks of *step* seconds, one event each."""
+    state = GameState(SpyEffectControls(), SceneControls())
+    run = SceneRun(state, rules)
+    for _ in range(ticks):
+        state.queue_event(_TickEvent())
+        run.tick(step)
 
 
 def _run(rules: list, ticks: int, events_per_tick: int = 1) -> list[str]:
@@ -513,3 +553,289 @@ def test_shared_phase_slot_resolves_the_same_machine_for_phase_rule_and_in_phase
 
     assert via_module_level_reference is via_phase_rule
     assert via_module_level_reference is via_in_phase_rule
+
+
+# ---------------------------------------------------------------------------
+# Phase elapsed — each rule reads how long its own phase has run
+# ---------------------------------------------------------------------------
+
+
+def test_a_phase_rule_reads_how_long_its_phase_has_run() -> None:
+    slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
+    owner = _ElapsedRecordingOwner(_PHASE_A, slot, next_phase=_PHASE_B)
+    _LifecycleRule(_PHASE_B, "b", phase_slot=slot)
+
+    _run_timed([owner], ticks=2, step=0.25)
+
+    assert owner.readings == pytest.approx([0.25, 0.5])
+
+
+def test_an_in_phase_rule_reads_how_long_its_phase_has_run() -> None:
+    slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
+    leaving = _LifecycleRule(_PHASE_A, "a", phase_slot=slot, transitions_to=_PHASE_B)
+    _LifecycleRule(_PHASE_B, "b", phase_slot=slot)
+    bystander = _ElapsedRecordingBystander(_PHASE_B, slot)
+
+    # B is entered at 0.25 s, on tick 1.
+    _run_timed([leaving, bystander], ticks=3, step=0.25)
+
+    assert bystander.readings == pytest.approx([0.25, 0.5])
+
+
+def test_a_phase_rules_reading_restarts_from_zero_when_its_phase_is_re_entered() -> None:
+    slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
+    owner = _ElapsedRecordingOwner(_PHASE_A, slot, next_phase=_PHASE_B)
+    bouncer = _LifecycleRule(_PHASE_B, "b", phase_slot=slot, transitions_to=_PHASE_A)
+
+    # A leaves at 1.0 s (tick 2); B sends it back at 1.5 s (tick 3).
+    _run_timed([owner, bouncer], ticks=4, step=0.5)
+
+    assert owner.readings == pytest.approx([0.5, 1.0, 0.5])
+
+
+def test_an_in_phase_rules_reading_restarts_from_zero_when_its_phase_is_re_entered() -> None:
+    slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
+    bystander = _ElapsedRecordingBystander(_PHASE_A, slot)
+    owner = _ElapsedRecordingOwner(_PHASE_A, slot, next_phase=_PHASE_B)
+    bouncer = _LifecycleRule(_PHASE_B, "b", phase_slot=slot, transitions_to=_PHASE_A)
+
+    # A leaves at 1.0 s (tick 2); B sends it back at 1.5 s (tick 3).
+    _run_timed([bystander, owner, bouncer], ticks=4, step=0.5)
+
+    assert bystander.readings == pytest.approx([0.5, 1.0, 0.5])
+
+
+# ---------------------------------------------------------------------------
+# Declared ends — a PhaseRule declares in on_enter how its phase ends
+# ---------------------------------------------------------------------------
+
+
+_PHASE_C = PhaseKey("c")
+
+_Declare = Callable[[PhaseRule, GameState], None]
+
+
+class _EndsBy(PhaseRule):
+    """PhaseRule whose ``on_enter`` runs *declare*, optionally transitioning on its first tick.
+
+    With *handles_sensors*, its ``Sensors`` handler emits ``sensors:<label>``
+    each time it runs.
+    """
+
+    def __init__(
+        self,
+        phase: PhaseKey,
+        phase_slot: PhaseSlot,
+        declare: _Declare,
+        transitions_to: PhaseKey | None = None,
+        handles_sensors: bool = False,
+        label: str = "",
+    ) -> None:
+        super().__init__(phase, phase_slot)
+        self._declare = declare
+        self._transitions_to = transitions_to
+        self._label = label
+        if handles_sensors or transitions_to is not None:
+            self.on(InputEvents.Sensors, self._sensors)
+
+    def on_enter(self, state: GameState) -> None:
+        self._declare(self, state)
+
+    def _sensors(self, event: InputEvents.Sensors, state: GameState) -> None:
+        state.effect_controls.add_effect(Scope.PERSONAL, "sensors:" + self._label, {})
+        if self._transitions_to is not None:
+            next_phase, self._transitions_to = self._transitions_to, None
+            self.transition_to(state, next_phase)
+
+
+class _AtTime(GameRule):
+    """Plain rule running *action* once, on the first ``Sensors`` at or after *seconds*."""
+
+    def __init__(self, seconds: float, action: Callable[[GameState], None]) -> None:
+        self._seconds = seconds
+        self._action: Callable[[GameState], None] | None = action
+        self.on(InputEvents.Sensors, self._sensors)
+
+    def _sensors(self, event: InputEvents.Sensors, state: GameState) -> None:
+        if self._action is not None and state.total >= self._seconds:
+            self._action(state)
+            self._action = None
+
+
+# Each returns an end declaration that fires at 1 s, and the rules that make
+# it fire, which go before the declaring rule.
+_EndingAtOneSecond = Callable[[PhaseKey], tuple[_Declare, list[GameRule]]]
+
+
+def _ends_after_one_second(next_phase: PhaseKey) -> tuple[_Declare, list[GameRule]]:
+    return (lambda rule, state: rule.end_after(state, 1.0, next_phase)), []
+
+
+def _ends_on_a_flag_set_at_one_second(next_phase: PhaseKey) -> tuple[_Declare, list[GameRule]]:
+    return (lambda rule, state: rule.end_when(state, lambda s: s.get("over", False), next_phase)), [
+        _AtTime(1.0, lambda s: s.set("over", True))
+    ]
+
+
+def _ends_on_a_receipt_stopped_at_one_second(
+    next_phase: PhaseKey,
+) -> tuple[_Declare, list[GameRule]]:
+    receipt = EffectReceipt(1)
+    return (lambda rule, state: rule.end_when_stopped(state, receipt, next_phase)), [
+        _AtTime(1.0, lambda s: receipt.stop())
+    ]
+
+
+_EVERY_KIND_OF_END = [
+    pytest.param(_ends_after_one_second, id="duration"),
+    pytest.param(_ends_on_a_flag_set_at_one_second, id="condition"),
+    pytest.param(_ends_on_a_receipt_stopped_at_one_second, id="receipt"),
+]
+
+
+def _declare_nothing(rule: PhaseRule, state: GameState) -> None:
+    pass
+
+
+def _run_sensors(
+    rules: list, slot: PhaseSlot, ticks: int, spy: SpyEffectControls | None = None
+) -> list[PhaseKey]:
+    """Run *rules* through *ticks* SceneRun ticks of 0.5 s, one ``Sensors`` each.
+
+    Returns the active phase after each tick.
+    """
+    state = GameState(spy or SpyEffectControls(), SceneControls())
+    run = SceneRun(state, rules)
+    sensors = InputEvents.Sensors(ButtonData(states={}))
+    phases = []
+    for _ in range(ticks):
+        state.queue_event(sensors)
+        run.tick(0.5)
+        phases.append(slot(state).phase)
+    return phases
+
+
+@pytest.mark.parametrize("ending_at_one_second", _EVERY_KIND_OF_END)
+def test_a_declared_end_moves_the_phase_to_its_named_phase_on_the_tick_it_holds(
+    ending_at_one_second: _EndingAtOneSecond,
+) -> None:
+    slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
+    declare, triggers = ending_at_one_second(_PHASE_B)
+    ending = _EndsBy(_PHASE_A, slot, declare)
+    _DeafOwner(_PHASE_B, "b", slot)
+
+    phases = _run_sensors([*triggers, ending], slot, ticks=3)
+
+    assert phases == [_PHASE_A, _PHASE_B, _PHASE_B]
+
+
+@pytest.mark.parametrize("ending_at_one_second", _EVERY_KIND_OF_END)
+def test_a_transition_the_rule_makes_itself_cancels_its_declared_end(
+    ending_at_one_second: _EndingAtOneSecond,
+) -> None:
+    slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
+    declare, triggers = ending_at_one_second(_PHASE_B)
+    ending = _EndsBy(_PHASE_A, slot, declare, transitions_to=_PHASE_C)
+    _DeafOwner(_PHASE_B, "b", slot)
+    next_owner = _DeafOwner(_PHASE_C, "c", slot)
+
+    phases = _run_sensors([*triggers, ending, next_owner], slot, ticks=3)
+
+    assert phases == [_PHASE_C, _PHASE_C, _PHASE_C]
+
+
+@pytest.mark.parametrize("ending_at_one_second", _EVERY_KIND_OF_END)
+def test_a_phase_re_entered_after_its_end_was_cancelled_declares_it_again(
+    ending_at_one_second: _EndingAtOneSecond,
+) -> None:
+    slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
+    declare, triggers = ending_at_one_second(_PHASE_B)
+    ending = _EndsBy(_PHASE_A, slot, declare, transitions_to=_PHASE_C)
+    bouncer = _EndsBy(_PHASE_C, slot, _declare_nothing, transitions_to=_PHASE_A)
+    _DeafOwner(_PHASE_B, "b", slot)
+
+    phases = _run_sensors([*triggers, ending, bouncer], slot, ticks=2)
+
+    assert phases == [_PHASE_C, _PHASE_A]
+
+
+def test_a_second_end_declared_in_one_phase_entry_raises() -> None:
+    slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
+
+    def declare_twice(rule: PhaseRule, state: GameState) -> None:
+        rule.end_after(state, 1.0, _PHASE_B)
+        rule.end_when(state, lambda s: False, _PHASE_B)
+
+    ending = _EndsBy(_PHASE_A, slot, declare_twice)
+    _DeafOwner(_PHASE_B, "b", slot)
+
+    with pytest.raises(RuntimeError, match="already declared"):
+        _run_sensors([ending], slot, ticks=1)
+
+
+def test_declaring_an_end_from_a_handler_raises() -> None:
+    slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
+    _DeafOwner(_PHASE_B, "b", slot)
+
+    class _DeclaresFromHandler(PhaseRule):
+        def __init__(self) -> None:
+            super().__init__(_PHASE_A, slot)
+            self.on(InputEvents.Sensors, self._sensors)
+
+        def _sensors(self, event: InputEvents.Sensors, state: GameState) -> None:
+            self.end_after(state, 1.0, _PHASE_B)
+
+    with pytest.raises(RuntimeError, match="outside its on_enter"):
+        _run_sensors([_DeclaresFromHandler()], slot, ticks=1)
+
+
+def test_declaring_an_end_from_another_phases_on_enter_raises() -> None:
+    slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
+    _DeafOwner(_PHASE_C, "c", slot)
+    bystander = _EndsBy(_PHASE_B, slot, _declare_nothing)
+    reaches_over = _EndsBy(
+        _PHASE_A, slot, lambda rule, state: bystander.end_after(state, 1.0, _PHASE_C)
+    )
+
+    with pytest.raises(RuntimeError, match="outside its on_enter"):
+        _run_sensors([reaches_over], slot, ticks=1)
+
+
+def test_in_phase_rules_cannot_declare_an_end() -> None:
+    bystander = _InPhaseEmitter(_PHASE_A, "bystander", PhaseSlot(_MACHINE_KEY, _PHASE_A))
+
+    assert not hasattr(bystander, "end_when")
+    assert not hasattr(bystander, "end_after")
+    assert not hasattr(bystander, "end_when_stopped")
+
+
+def test_a_declared_end_fires_before_the_rules_sensors_handler_which_skips_that_tick() -> None:
+    slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
+    spy = SpyEffectControls()
+    declare, _ = _ends_after_one_second(_PHASE_B)
+    ending = _EndsBy(_PHASE_A, slot, declare, handles_sensors=True, label="a")
+    _DeafOwner(_PHASE_B, "b", slot)
+
+    phases = _run_sensors([ending], slot, ticks=3, spy=spy)
+
+    assert phases == [_PHASE_A, _PHASE_B, _PHASE_B]
+    assert [name for _, name, _ in spy.add_effect_calls] == ["sensors:a", "enter:b"]
+
+
+def test_cancelling_an_end_declared_on_a_receipt_leaves_its_effect_running() -> None:
+    slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
+    spy = SpyEffectControls()
+    receipt = EffectReceipt(1)
+    ending = _EndsBy(
+        _PHASE_A,
+        slot,
+        lambda rule, state: rule.end_when_stopped(state, receipt, _PHASE_B),
+        transitions_to=_PHASE_C,
+    )
+    _DeafOwner(_PHASE_B, "b", slot)
+    _DeafOwner(_PHASE_C, "c", slot)
+
+    _run_sensors([ending], slot, ticks=2, spy=spy)
+
+    assert not receipt.is_stopped()
+    assert spy.stop_effect_calls == []

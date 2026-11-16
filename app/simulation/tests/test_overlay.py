@@ -142,6 +142,87 @@ class _HumOnce(GameRule):
 RULE = _HumOnce()
 """
 
+_TIMED_PHASE_RULE = """\
+from engine.phase import PhaseKey, PhaseRule, PhaseSlot
+from engine.state import GameState, Scope
+
+_SHOWING = PhaseKey("showing")
+_DONE = PhaseKey("done")
+_PHASE = PhaseSlot("timed_phase", _SHOWING)
+
+
+class _Showing(PhaseRule):
+    def on_enter(self, state: GameState) -> None:
+        state.effect_controls.set_effect(Scope.PERSONAL, "basic.solid", {"color": 0xFF0000})
+        self.end_after(state, 1.0, _DONE)
+
+
+class _Done(PhaseRule):
+    def on_enter(self, state: GameState) -> None:
+        state.effect_controls.set_effect(Scope.PERSONAL, "basic.solid", {"color": 0x00FF00})
+
+
+RULE = _Showing(_SHOWING, _PHASE)
+_Done(_DONE, _PHASE)
+"""
+
+_CONDITION_PHASE_RULE = """\
+from engine.phase import PhaseKey, PhaseRule, PhaseSlot
+from engine.state import GameState, Scope
+
+_SHOWING = PhaseKey("showing")
+_DONE = PhaseKey("done")
+_PHASE = PhaseSlot("condition_phase", _SHOWING)
+
+
+class _Showing(PhaseRule):
+    def on_enter(self, state: GameState) -> None:
+        state.effect_controls.set_effect(Scope.PERSONAL, "basic.solid", {"color": 0xFF0000})
+        self.end_when(state, lambda s: s.total >= 1.0, _DONE)
+
+
+class _Done(PhaseRule):
+    def on_enter(self, state: GameState) -> None:
+        state.effect_controls.set_effect(Scope.PERSONAL, "basic.solid", {"color": 0x00FF00})
+
+
+RULE = _Showing(_SHOWING, _PHASE)
+_Done(_DONE, _PHASE)
+"""
+
+_HUM_PHASE_RULE = """\
+from engine.input import InputEvents
+from engine.phase import PhaseKey, PhaseRule, PhaseSlot
+from engine.state import GameState, Scope
+
+_HUMMING = PhaseKey("humming")
+_DONE = PhaseKey("done")
+_PHASE = PhaseSlot("hum_phase", _HUMMING)
+
+
+class _Humming(PhaseRule):
+    def __init__(self) -> None:
+        super().__init__(_HUMMING, _PHASE)
+        self.on(InputEvents.Sensors, self._handle)
+
+    def on_enter(self, state: GameState) -> None:
+        receipt = state.effect_controls.set_effect(Scope.ALL, "scene.hum", {})
+        self.end_when_stopped(state, receipt, _DONE)
+
+    def _handle(self, event: InputEvents.Sensors, state: GameState) -> None:
+        if event.buttons.is_pressed("A"):
+            state.effect_controls.stop_effect(Scope.ALL)
+
+
+class _Done(PhaseRule):
+    def on_enter(self, state: GameState) -> None:
+        state.effect_controls.set_effect(Scope.PERSONAL, "basic.solid", {"color": 0x00FF00})
+
+
+RULE = _Humming()
+_Done(_DONE, _PHASE)
+"""
+
 _HUM_EFFECT = """\
 from effects.effect import AudioPlaybackConfig, Effect, EffectAudio, EffectConfig, EffectVerb
 from engine.effects.builder import EffectBuilder
@@ -191,7 +272,10 @@ def card(tmp_path: Path) -> Path:
     ``counter``: A taps step its light red, green, yellow, re-set every tick.
     ``pause``: blue every tick. ``glow``: red, set once. ``idle``: does
     nothing. ``listen``: green once an IR shot is decoded. ``hum``: starts
-    a looping sound, once.
+    a looping sound, once. ``timed``: red for a phase declared to end after
+    1 s, then green. ``condition``: the same, its phase declared to end once
+    game time reaches 1 s. ``hum_phase``: ``hum``'s sound for a phase
+    declared to end when the sound stops, which an A tap does; then green.
     """
     _install_card_scene(tmp_path, "counter", _TAP_COUNTER_RULE)
     _install_card_scene(tmp_path, "pause", _PAUSE_RULE)
@@ -199,9 +283,12 @@ def card(tmp_path: Path) -> Path:
     _install_card_scene(tmp_path, "idle", _IDLE_RULE)
     _install_card_scene(tmp_path, "listen", _GREEN_ON_IR_RULE)
     _install_card_scene(tmp_path, "hum", _HUM_ONCE_RULE)
-    (_package(tmp_path / "aura_packs" / "scenes" / "hum" / "effects") / "hum.py").write_text(
-        _HUM_EFFECT
-    )
+    _install_card_scene(tmp_path, "timed", _TIMED_PHASE_RULE)
+    _install_card_scene(tmp_path, "condition", _CONDITION_PHASE_RULE)
+    _install_card_scene(tmp_path, "hum_phase", _HUM_PHASE_RULE)
+    for scene in ("hum", "hum_phase"):
+        effects = _package(tmp_path / "aura_packs" / "scenes" / scene / "effects")
+        (effects / "hum.py").write_text(_HUM_EFFECT)
     return tmp_path
 
 
@@ -266,6 +353,60 @@ def test_a_pop_takes_effect_at_the_end_of_the_next_tick(simulation, card):
 
     assert lit_before_the_next_tick
     assert device.strip(Scope.PERSONAL).all_lit(_RED)
+
+
+def test_a_phase_declared_to_end_after_a_duration_does_not_count_time_spent_covered(
+    simulation, card
+):
+    device = simulation.add_device("red", scene="timed", card=card)
+    simulation.advance(0.5)
+    device.overlay("idle")
+    simulation.advance(2.0)
+
+    device.pop()
+    simulation.advance(0.1)
+    lit_soon_after_pop = device.strip(Scope.PERSONAL).all_lit(_RED)
+    simulation.advance(0.6)
+
+    assert lit_soon_after_pop
+    assert device.strip(Scope.PERSONAL).all_lit(_GREEN)
+
+
+def test_a_phase_declared_to_end_on_a_game_time_condition_does_not_count_time_spent_covered(
+    simulation, card
+):
+    device = simulation.add_device("red", scene="condition", card=card)
+    simulation.advance(0.5)
+    device.overlay("idle")
+    simulation.advance(2.0)
+
+    device.pop()
+    simulation.advance(0.1)
+    lit_soon_after_pop = device.strip(Scope.PERSONAL).all_lit(_RED)
+    simulation.advance(0.6)
+
+    assert lit_soon_after_pop
+    assert device.strip(Scope.PERSONAL).all_lit(_GREEN)
+
+
+def test_a_phase_declared_to_end_when_its_effect_stops_outlasts_a_cover_that_holds_the_effect(
+    simulation, card
+):
+    # Covering holds the phase's looping sound rather than stopping it, so
+    # the phase is still running after pop and ends when the sound does.
+    device = simulation.add_device("red", scene="hum_phase", card=card)
+    simulation.advance(0.1)
+    device.overlay("idle")
+    simulation.advance(1.0)
+
+    device.pop()
+    simulation.advance(0.1)
+    humming_after_pop = device.is_playing(_HUM)
+    device.tap("A")
+    simulation.advance(0.1)
+
+    assert humming_after_pop
+    assert device.strip(Scope.PERSONAL).all_lit(_GREEN)
 
 
 def test_covering_with_a_scene_the_device_cannot_run_raises(simulation, card):

@@ -740,7 +740,7 @@ class _RecordsPhaseElapsed(PhaseRule):
         self.on(Event, self._record)
 
     def _record(self, event, state) -> None:
-        state.set("phase_elapsed", _SLOT(state).elapsed(state.total))
+        state.set("phase_elapsed", self.phase_elapsed(state))
 
 
 RULE = _RecordsPhaseElapsed()

@@ -52,6 +52,16 @@ def test_each_tick_delivers_one_sensors_event_carrying_the_debounced_button_stat
     assert sensors.buttons.get("A") == ButtonData.UP
 
 
+def test_every_tick_queues_a_sensors_event_even_with_no_part_to_read(probe):
+    # A PhaseRule's declared end is checked on Sensors, so it must arrive every tick.
+    tick = probe.boot(_hw(probe)).tick
+
+    for _ in range(5):
+        tick()
+
+    assert len(probe.events(InputEvents.Sensors)) == 5
+
+
 def test_ticks_reuse_one_sensors_event_and_button_buffer_instead_of_allocating(probe):
     tick = probe.boot(_hw(probe, buttons=DebouncedButtons([("A", lambda: True)]))).tick
 

@@ -1,15 +1,13 @@
 """Tag scene Starting phase rule.
 
-On entry, sets the looping warning-pulse effect once. Transitions to Playing
-after ``count x duration`` seconds (RLGL ``warning_duration`` time-counting
-style — the elapsed phase time from the shared :class:`PhaseMachine` is compared
-to the total countdown duration, not by listening for individual peaks),
-stopping the pulse on the way out.
+On entry, sets the looping warning-pulse effect once and declares that the
+phase ends after the countdown, ``count x duration`` seconds (timed as a
+whole, not by listening for individual peaks), going to Playing. The pulse is
+stopped on the way out.
 """
 
 from __future__ import annotations
 
-from engine.input import InputEvents
 from engine.phase import PhaseRule
 from engine.state import GameState, Scope
 from packs.scenes.tag.rules.helpers.phases import (
@@ -25,7 +23,6 @@ class TagStartingRule(PhaseRule):
 
     def __init__(self) -> None:
         super().__init__(PHASE_STARTING, tag_phase)
-        self.on(InputEvents.Sensors, self._handle)
 
     def on_enter(self, state: GameState) -> None:
         config = tag_config(state)
@@ -40,14 +37,10 @@ class TagStartingRule(PhaseRule):
                 "off_duration": 0.0,
             },
         )
+        self.end_after(state, config.warning_duration(), PHASE_PLAYING)
 
     def on_exit(self, state: GameState) -> None:
         state.effect_controls.stop_effect(Scope.ALL)
-
-    def _handle(self, event: InputEvents.Sensors, state: GameState) -> None:
-        config = tag_config(state)
-        if tag_phase(state).elapsed(state.total) >= config.warning_duration():
-            self.transition_to(state, PHASE_PLAYING)
 
 
 RULE = TagStartingRule()

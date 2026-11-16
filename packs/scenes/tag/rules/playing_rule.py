@@ -7,8 +7,9 @@ issues the full amber ammo bar on ``Scope.Global.BUFF`` and layers the one-shot
 ``scene.go`` cue on ``Scope.PERSONAL`` via ``add_effect`` (sound + strong buzz
 marking the instant Playing begins). Button-A shot firing and its felt
 feedback are owned by :class:`TagShootingRule`; this rule retains only the
-phase lifecycle: hitpoints, the progress bar, the ammo bar, the GO cue, and
-the game-over transition when hitpoints reach zero or below.
+phase lifecycle: hitpoints, the progress bar, the ammo bar and the GO cue.
+On entry it also declares that the phase ends once hitpoints reach zero or
+below, going to Game Over.
 
 ``Scope.Global.BUFF`` is a single mutually-exclusive "what's currently shown
 for ammo" slot: the amber bar, ``scene.ammo_empty``, and ``scene.reload`` all
@@ -19,12 +20,6 @@ of those effects (or none) may be occupying it at the time.
 
 from __future__ import annotations
 
-try:
-    from typing import Final
-except ImportError:
-    pass
-
-from engine.input import InputEvents
 from engine.phase import PhaseRule
 from engine.state import GameState, Scope
 from packs.scenes.tag.rules.helpers.phases import (
@@ -35,6 +30,11 @@ from packs.scenes.tag.rules.helpers.phases import (
 from packs.scenes.tag.rules.helpers.tag_config import tag_config
 from packs.scenes.tag.rules.helpers.tag_state import tag_state
 
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from typing import Final
+
 AMMO_COLOR: Final = 0xFFBF00
 
 
@@ -43,7 +43,6 @@ class TagPlayingRule(PhaseRule):
 
     def __init__(self) -> None:
         super().__init__(PHASE_PLAYING, tag_phase)
-        self.on(InputEvents.Sensors, self._handle)
 
     def on_enter(self, state: GameState) -> None:
         tag = tag_state(state)
@@ -60,6 +59,7 @@ class TagPlayingRule(PhaseRule):
         )
 
         state.effect_controls.add_effect(Scope.PERSONAL, "scene.go", {})
+        self.end_when(state, _out_of_hitpoints, PHASE_GAME_OVER)
 
     def on_exit(self, state: GameState) -> None:
         tag = tag_state(state)
@@ -74,11 +74,9 @@ class TagPlayingRule(PhaseRule):
             tag.shot.reload_receipt = None
         tag.shot.reload_started_at = None
 
-    def _handle(self, event: InputEvents.Sensors, state: GameState) -> None:
-        tag = tag_state(state)
 
-        if tag.hitpoints <= 0:
-            self.transition_to(state, PHASE_GAME_OVER)
+def _out_of_hitpoints(state: GameState) -> bool:
+    return tag_state(state).hitpoints <= 0
 
 
 RULE = TagPlayingRule()
