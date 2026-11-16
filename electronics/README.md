@@ -10,8 +10,9 @@ from:
   imports at runtime.
 
 `electronics/` contains no Python and is not a package. It carries no import
-contracts, isn't touched by `ruff`, `import-linter` or `mypy`, and the Python-only
-pre-commit hooks never rewrite the PCB-tool files in here.
+contracts and isn't checked by `import-linter` or `mypy`. The pre-commit hooks that
+rewrite files (`ruff check --fix`, and `ruff format` on Python and Markdown) never
+touch the PCB-tool files in here.
 
 Boards are drawn in one of two tools, used as peers: **KiCad** and
 **EasyEDA Pro**. Each PCB is committed to a single tool (never mixed within one

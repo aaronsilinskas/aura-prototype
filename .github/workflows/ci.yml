@@ -23,13 +23,4 @@ jobs:
         with:
           python-version: "3.14"
           enable-cache: true
-      - run: uv sync --locked
-      - run: uv run ruff check .
-      - run: uv run ruff format --check .
-      - run: uv run lint-imports
-      - run: uv run mypy
-      - run: uv run pytest -q
-      # The actionlint and check-dependabot hooks pinned in .pre-commit-config.yaml, so CI and
-      # commits run the same ones.
-      - run: uv run pre-commit run actionlint --all-files
-      - run: uv run pre-commit run check-dependabot --all-files
+      - run: bash scripts/check.sh

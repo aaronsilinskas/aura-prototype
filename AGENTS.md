@@ -18,7 +18,7 @@ Single-context: root `GLOSSARY.md` (canonical terms + what to avoid), `docs/doma
 
 ### Project facts for shared workflows
 
-- **Test suite**: `uv run pytest -q`.
+- **Check command**: `bash scripts/check.sh`. It syncs the uv environment, runs every hook in `.pre-commit-config.yaml` on all files except `no-commit-to-branch`, then `uv run pytest -q`. CI runs it on every PR and push to `main`.
 - **Main checkout**: usually holds unrelated uncommitted work (KiCad files under `electronics/`, drafts in progress). Work in a worktree based on `origin/main`, and read committed files with `git show origin/<branch>:<path>`.
 - **Coding standards**: `CODING_STANDARDS.md`.
 - **Dependency bumps**: arrive as weekly Dependabot PRs; `.github/dependabot.yml` says what it covers and how bumps are grouped. Don't bump those dependencies in a feature change; review and merge the Dependabot PR. Bump by hand what it skips: versions under a workflow step's `with:`, and `circuitpython-stubs` together with the device firmware.
@@ -34,7 +34,7 @@ npx skills add aaronsilinskas/ai-skills -a claude-code --copy -y
 
 Then, once per clone: `uv sync` and `uv run pre-commit install`.
 
-To make a change: build it with the `tdd` skill, review it with `code-review` against `CODING_STANDARDS.md`, run `uv run pytest -q`, and open a PR. Propose larger features as an issue first.
+To make a change: build it with the `tdd` skill, review it with `code-review` against `CODING_STANDARDS.md`, run `bash scripts/check.sh`, and open a PR. Propose larger features as an issue first.
 
 ## Maintainer workflows
 
