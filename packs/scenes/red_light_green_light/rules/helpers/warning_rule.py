@@ -25,6 +25,8 @@ class RlglWarningRule(PhaseRule):
         level = rlgl_phase_state(state).level
         config = rlgl_config(state)
         state.effect_controls.set_effect(
-            Scope.NON_AMBIENT, "scene.warning_sting", config.warning_sting_opts(level)
+            Scope.NON_AMBIENT,
+            "scene.warning_sting",
+            {"pulse_duration": config.warning_pulse_duration(level)},
         )
         self.end_after(state, config.warning_duration(level), self._next_phase)

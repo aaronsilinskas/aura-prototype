@@ -1,4 +1,4 @@
-"""Tests for ``RlglConfig`` -- warning sting options, the cross-Setting check
+"""Tests for ``RlglConfig`` -- the level-scaled warning pulse duration, the cross-Setting check
 (gravity tracking slower than motion smoothing), and the ``rlgl_config``
 get-or-create accessor.
 
@@ -22,32 +22,20 @@ def _settings(**values: object) -> Settings:
 
 
 # ---------------------------------------------------------------------------
-# Warning sting options builder
+# Level-scaled warning pulse duration
 # ---------------------------------------------------------------------------
 
 
-def test_warning_sting_opts_uses_breathe_cycle_ratios_of_pulse_duration():
+def test_warning_pulse_duration_is_the_max_at_level_one():
     config = RlglConfig(_settings(warning_pulse_max=1.0, warning_pulse_min=0.4, max_level=10))
 
-    opts = config.warning_sting_opts(1)
-
-    assert opts["start_color"] == 0x000000
-    assert opts["end_color"] == 0xFFFF00
-    assert opts["brighten_duration"] == pytest.approx(0.3)
-    assert opts["on_duration"] == pytest.approx(0.4)
-    assert opts["darken_duration"] == pytest.approx(0.3)
-    assert opts["off_duration"] == 0.0
+    assert config.warning_pulse_duration(1) == pytest.approx(1.0)
 
 
-def test_warning_sting_opts_scales_sub_durations_with_level():
+def test_warning_pulse_duration_shortens_to_the_min_at_max_level():
     config = RlglConfig(_settings(warning_pulse_max=1.0, warning_pulse_min=0.4, max_level=10))
 
-    opts = config.warning_sting_opts(10)
-
-    pulse = 0.4
-    assert opts["brighten_duration"] == pytest.approx(pulse * 0.3)
-    assert opts["on_duration"] == pytest.approx(pulse * 0.4)
-    assert opts["darken_duration"] == pytest.approx(pulse * 0.3)
+    assert config.warning_pulse_duration(10) == pytest.approx(0.4)
 
 
 # ---------------------------------------------------------------------------
