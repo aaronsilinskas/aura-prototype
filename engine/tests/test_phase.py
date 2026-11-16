@@ -662,26 +662,35 @@ class _AtTime(GameRule):
             self._action = None
 
 
-def _ending_at_one_second(kind: str, next_phase: PhaseKey) -> tuple[_Declare, list[GameRule]]:
-    """Return a *kind* end declaration that fires at 1 s, and the rules that make it fire.
+# Each returns an end declaration that fires at 1 s, and the rules that make
+# it fire, which go before the declaring rule.
+_EndingAtOneSecond = Callable[[PhaseKey], tuple[_Declare, list[GameRule]]]
 
-    The rules go before the declaring rule.  *kind* is ``"duration"``,
-    ``"condition"`` (a game state flag set at 1 s) or ``"receipt"`` (an
-    effect receipt stopped at 1 s).
-    """
-    if kind == "duration":
-        return (lambda rule, state: rule.end_after(state, 1.0, next_phase)), []
-    if kind == "condition":
-        return (
-            lambda rule, state: rule.end_when(state, lambda s: s.get("over", False), next_phase)
-        ), [_AtTime(1.0, lambda s: s.set("over", True))]
+
+def _ends_after_one_second(next_phase: PhaseKey) -> tuple[_Declare, list[GameRule]]:
+    return (lambda rule, state: rule.end_after(state, 1.0, next_phase)), []
+
+
+def _ends_on_a_flag_set_at_one_second(next_phase: PhaseKey) -> tuple[_Declare, list[GameRule]]:
+    return (lambda rule, state: rule.end_when(state, lambda s: s.get("over", False), next_phase)), [
+        _AtTime(1.0, lambda s: s.set("over", True))
+    ]
+
+
+def _ends_on_a_receipt_stopped_at_one_second(
+    next_phase: PhaseKey,
+) -> tuple[_Declare, list[GameRule]]:
     receipt = EffectReceipt(1)
     return (lambda rule, state: rule.end_when_stopped(state, receipt, next_phase)), [
         _AtTime(1.0, lambda s: receipt.stop())
     ]
 
 
-_KINDS = ["duration", "condition", "receipt"]
+_EVERY_KIND_OF_END = [
+    pytest.param(_ends_after_one_second, id="duration"),
+    pytest.param(_ends_on_a_flag_set_at_one_second, id="condition"),
+    pytest.param(_ends_on_a_receipt_stopped_at_one_second, id="receipt"),
+]
 
 
 def _declare_nothing(rule: PhaseRule, state: GameState) -> None:
@@ -706,10 +715,12 @@ def _run_sensors(
     return phases
 
 
-@pytest.mark.parametrize("kind", _KINDS)
-def test_a_declared_end_moves_the_phase_to_its_named_phase_on_the_tick_it_holds(kind: str) -> None:
+@pytest.mark.parametrize("ending_at_one_second", _EVERY_KIND_OF_END)
+def test_a_declared_end_moves_the_phase_to_its_named_phase_on_the_tick_it_holds(
+    ending_at_one_second: _EndingAtOneSecond,
+) -> None:
     slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
-    declare, triggers = _ending_at_one_second(kind, _PHASE_B)
+    declare, triggers = ending_at_one_second(_PHASE_B)
     ending = _EndsBy(_PHASE_A, slot, declare)
     _DeafOwner(_PHASE_B, "b", slot)
 
@@ -718,10 +729,12 @@ def test_a_declared_end_moves_the_phase_to_its_named_phase_on_the_tick_it_holds(
     assert phases == [_PHASE_A, _PHASE_B, _PHASE_B]
 
 
-@pytest.mark.parametrize("kind", _KINDS)
-def test_a_transition_the_rule_makes_itself_cancels_its_declared_end(kind: str) -> None:
+@pytest.mark.parametrize("ending_at_one_second", _EVERY_KIND_OF_END)
+def test_a_transition_the_rule_makes_itself_cancels_its_declared_end(
+    ending_at_one_second: _EndingAtOneSecond,
+) -> None:
     slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
-    declare, triggers = _ending_at_one_second(kind, _PHASE_B)
+    declare, triggers = ending_at_one_second(_PHASE_B)
     ending = _EndsBy(_PHASE_A, slot, declare, transitions_to=_PHASE_C)
     _DeafOwner(_PHASE_B, "b", slot)
     next_owner = _DeafOwner(_PHASE_C, "c", slot)
@@ -731,10 +744,12 @@ def test_a_transition_the_rule_makes_itself_cancels_its_declared_end(kind: str) 
     assert phases == [_PHASE_C, _PHASE_C, _PHASE_C]
 
 
-@pytest.mark.parametrize("kind", _KINDS)
-def test_a_phase_re_entered_after_its_end_was_cancelled_declares_it_again(kind: str) -> None:
+@pytest.mark.parametrize("ending_at_one_second", _EVERY_KIND_OF_END)
+def test_a_phase_re_entered_after_its_end_was_cancelled_declares_it_again(
+    ending_at_one_second: _EndingAtOneSecond,
+) -> None:
     slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
-    declare, triggers = _ending_at_one_second(kind, _PHASE_B)
+    declare, triggers = ending_at_one_second(_PHASE_B)
     ending = _EndsBy(_PHASE_A, slot, declare, transitions_to=_PHASE_C)
     bouncer = _EndsBy(_PHASE_C, slot, _declare_nothing, transitions_to=_PHASE_A)
     _DeafOwner(_PHASE_B, "b", slot)
@@ -797,7 +812,7 @@ def test_in_phase_rules_cannot_declare_an_end() -> None:
 def test_a_declared_end_fires_before_the_rules_sensors_handler_which_skips_that_tick() -> None:
     slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
     spy = SpyEffectControls()
-    declare, _ = _ending_at_one_second("duration", _PHASE_B)
+    declare, _ = _ends_after_one_second(_PHASE_B)
     ending = _EndsBy(_PHASE_A, slot, declare, handles_sensors=True, label="a")
     _DeafOwner(_PHASE_B, "b", slot)
 

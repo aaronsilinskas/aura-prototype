@@ -20,11 +20,6 @@ of those effects (or none) may be occupying it at the time.
 
 from __future__ import annotations
 
-try:
-    from typing import Final
-except ImportError:
-    pass
-
 from engine.phase import PhaseRule
 from engine.state import GameState, Scope
 from packs.scenes.tag.rules.helpers.phases import (
@@ -34,6 +29,11 @@ from packs.scenes.tag.rules.helpers.phases import (
 )
 from packs.scenes.tag.rules.helpers.tag_config import tag_config
 from packs.scenes.tag.rules.helpers.tag_state import tag_state
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from typing import Final
 
 AMMO_COLOR: Final = 0xFFBF00
 

@@ -49,18 +49,18 @@ in game time, so like the phase itself it pauses under an Overlay.
 
 from __future__ import annotations
 
-try:
-    from collections.abc import Callable
-    from typing import TypeVar
-
-    T = TypeVar("T", bound="Event")
-except ImportError:
-    pass  # No typing support on CircuitPython yet
-
 from engine.engine import GameRule
 from engine.events import Event
 from engine.input import InputEvents
 from engine.state import EffectReceipt, GameState, StateSlot
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from typing import TypeVar
+
+    T = TypeVar("T", bound=Event)
 
 __all__ = [
     "InPhaseRule",
@@ -87,6 +87,16 @@ class PhaseKey:
 
     def __repr__(self) -> str:
         return f"PhaseKey({self._name!r})"
+
+
+class _PendingEnd:
+    """A phase entry's declared end: the condition that ends it and the phase it moves to."""
+
+    __slots__ = ("condition", "next_phase")
+
+    def __init__(self, condition: Callable[[GameState], bool], next_phase: PhaseKey) -> None:
+        self.condition = condition
+        self.next_phase = next_phase
 
 
 class PhaseMachine:
@@ -117,8 +127,7 @@ class PhaseMachine:
         self._entry_dispatch = 0
         self._enter_pending = True
         self._entering = False
-        # The current phase's declared end: its condition and next phase.
-        self._pending_end: tuple[Callable[[GameState], bool], PhaseKey] | None = None
+        self._pending_end: _PendingEnd | None = None
 
     def enter(self, phase: PhaseKey, now: float, dispatch: int) -> None:
         """Atomically move to *phase* at *now* on *dispatch* and mark ``on_enter`` pending.
@@ -140,6 +149,37 @@ class PhaseMachine:
     def elapsed(self, now: float) -> float:
         """Return the time elapsed since :attr:`phase_start`."""
         return now - self.phase_start
+
+    def _declare_end(
+        self, phase: PhaseKey, condition: Callable[[GameState], bool], next_phase: PhaseKey
+    ) -> None:
+        """Record that this entry of *phase* ends, moving to *next_phase*, once *condition* holds.
+
+        Private to this module: only :meth:`PhaseRule.end_when` calls it, so
+        only the owning rule can declare its phase's end.
+
+        Raises:
+            RuntimeError: if *phase*'s ``on_enter`` is not running, or if this
+                entry already declared an end.
+        """
+        if not self._entering or self.phase is not phase:
+            raise RuntimeError(f"End of {phase!r} declared outside its on_enter")
+        if self._pending_end is not None:
+            raise RuntimeError(f"End of {phase!r} already declared for this entry")
+        self._pending_end = _PendingEnd(condition, next_phase)
+
+    def _take_due_end(self, state: GameState) -> PhaseKey | None:
+        """Return the declared end's next phase if its condition holds on *state*, clearing it.
+
+        Returns ``None``, keeping the end, while its condition does not hold
+        or when none is declared.  Private to this module: only the owning
+        :class:`PhaseRule` calls it, then transitions to the returned phase.
+        """
+        pending_end = self._pending_end
+        if pending_end is None or not pending_end.condition(state):
+            return None
+        self._pending_end = None
+        return pending_end.next_phase
 
     def take_enter_pending(self) -> bool:
         """Return ``True`` if the current phase's ``on_enter`` is pending, clearing the flag.
@@ -210,8 +250,9 @@ class _PhaseGuardedRule(GameRule):
     machine through :meth:`_machine` and first runs the initial phase owner's
     ``on_enter`` if it is still pending, whatever this rule's phase.  It then
     returns unless the machine is in this rule's phase and the event is not
-    the one dispatched when that phase was entered, and otherwise calls the
-    user handler.
+    the one dispatched when that phase was entered.  Otherwise a
+    :class:`PhaseRule` first checks the end its phase declared, on
+    ``Sensors`` only, and the user handler runs unless that end fired.
 
     Takes the scene's one :class:`PhaseSlot` for the machine it guards, through
     which it reaches the shared :class:`PhaseMachine`.
@@ -245,9 +286,11 @@ class _PhaseGuardedRule(GameRule):
         """Return this rule's :class:`PhaseMachine` via its :class:`PhaseSlot`."""
         return self._phase_slot(state)
 
-    def _end_fired(self, event: Event, machine: PhaseMachine, state: GameState) -> bool:
-        """Return ``True`` if this rule ended its phase on *event*; only a PhaseRule can."""
-        return False
+    def _handle_in_phase(self, event: Event, machine: PhaseMachine, state: GameState) -> None:
+        """Run this rule's handler for *event*, if it has one; its phase is active."""
+        handler = self._phase_handlers.get(type(event))
+        if handler is not None:
+            handler(event, state)
 
     def _phase_dispatch(self, event: Event, state: GameState) -> None:
         machine = self._machine(state)
@@ -259,11 +302,7 @@ class _PhaseGuardedRule(GameRule):
                 owner._run_pending_enter(machine, state)
         if machine.phase != self.phase or machine._entry_dispatch == state.dispatch_count:
             return
-        if self._end_fired(event, machine, state):
-            return
-        handler = self._phase_handlers.get(type(event))
-        if handler is not None:
-            handler(event, state)
+        self._handle_in_phase(event, machine, state)
 
 
 class PhaseRule(_PhaseGuardedRule):
@@ -325,12 +364,7 @@ class PhaseRule(_PhaseGuardedRule):
             RuntimeError: if called anywhere but this rule's ``on_enter``, or
                 if this phase entry already declared an end.
         """
-        machine = self._machine(state)
-        if not machine._entering or machine.phase is not self.phase:
-            raise RuntimeError(f"End of {self.phase!r} declared outside its on_enter")
-        if machine._pending_end is not None:
-            raise RuntimeError(f"End of {self.phase!r} already declared for this entry")
-        machine._pending_end = (condition, next_phase)
+        self._machine(state)._declare_end(self.phase, condition, next_phase)
 
     def end_after(self, state: GameState, seconds: float, next_phase: PhaseKey) -> None:
         """Declare that this phase ends, moving to *next_phase*, once it has run *seconds*.
@@ -358,15 +392,13 @@ class PhaseRule(_PhaseGuardedRule):
     def on_exit(self, state: GameState) -> None:
         """Run when :meth:`transition_to` leaves this phase. No-op by default."""
 
-    def _end_fired(self, event: Event, machine: PhaseMachine, state: GameState) -> bool:
-        pending_end = machine._pending_end
-        if pending_end is None or type(event) is not InputEvents.Sensors:
-            return False
-        condition, next_phase = pending_end
-        if not condition(state):
-            return False
-        self.transition_to(state, next_phase)
-        return True
+    def _handle_in_phase(self, event: Event, machine: PhaseMachine, state: GameState) -> None:
+        if type(event) is InputEvents.Sensors:
+            next_phase = machine._take_due_end(state)
+            if next_phase is not None:
+                self.transition_to(state, next_phase)
+                return
+        super()._handle_in_phase(event, machine, state)
 
     def _run_pending_enter(self, machine: PhaseMachine, state: GameState) -> None:
         if not machine.take_enter_pending():
