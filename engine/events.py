@@ -42,9 +42,6 @@ class Event:
 class EffectEvent:
     """Structured event payload for effect lifecycle and effect-triggered signals.
 
-    Constructed by ``EffectManager`` for lifecycle events (start/stop) and for
-    effect-triggered signals (via ``EffectConfig.notify_listeners``).
-
     ``clip`` is the verb's ``ResolvedClip``, or ``None`` when the effect
     declares no clip for that verb. It is payload, not identity: equality,
     hashing and ``repr`` use only ``pack``, ``name`` and ``verb``.

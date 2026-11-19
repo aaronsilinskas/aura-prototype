@@ -14,20 +14,17 @@ DynamicValue: TypeAlias = "float | Callable[[], float]"
 
 
 def lerp(a: float, b: float, t: float) -> float:
-    """Linearly interpolate between ``a`` and ``b`` by factor ``t``."""
     return a + (b - a) * t
 
 
 class ValueGenerator:
     """Factory for ``DynamicValue`` callables that produce float values on demand.
 
-    A ``DynamicValue`` is either a plain ``float`` or a zero-argument callable
-    returning a ``float``. Use ``resolve`` to evaluate either form uniformly.
+    Use ``resolve`` to evaluate either form uniformly.
     """
 
     @staticmethod
     def resolve(value: DynamicValue) -> float:
-        """Return ``value`` directly, or call it if callable."""
         if callable(value):
             return value()
         return value

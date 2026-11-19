@@ -1,8 +1,5 @@
 class Layer:
-    """Base interface for effect layers.
-
-    All concrete subclasses must implement ``update`` and ``sample``.
-    """
+    """Base interface for effect layers."""
 
     __slots__ = []
 

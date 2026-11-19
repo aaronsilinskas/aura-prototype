@@ -5,12 +5,7 @@ from effects.value import lerp
 
 
 class FlameLayer(Layer):
-    """Pure flame simulation — no rendering, no palette.
-
-    Owns the heat array and spark set directly. Call ``update(elapsed)`` each
-    frame to advance the simulation, then ``sample(position)`` per pixel to
-    read interpolated heat at any normalised position in ``[0.0, 1.0]``.
-    """
+    """Pure flame simulation — no rendering, no palette."""
 
     __slots__ = [
         "_cool_rate",
@@ -65,7 +60,6 @@ class FlameLayer(Layer):
         self._sparks_to_remove = [0] * spark_count
 
     def update(self, elapsed: float) -> None:
-        """Advance the simulation by ``elapsed`` seconds."""
         flame_buffer = self._flame_buffer
         spark_buffer = self._spark_buffer
         flame_count = self._flame_count
@@ -101,10 +95,7 @@ class FlameLayer(Layer):
             spark_buffer.add(random.randint(0, flame_count - 1))
 
     def sample(self, position: float, pixel_count: int) -> float:
-        """Return interpolated heat at ``position`` in ``[0.0, 1.0]``.
-
-        ``pixel_count`` is accepted for interface uniformity but is not used.
-        """
+        """Return interpolated heat at ``position`` in ``[0.0, 1.0]``."""
         flame_count = self._flame_count
         flame_offset = position * flame_count
         left = int(flame_offset) % flame_count

@@ -78,12 +78,10 @@ def is_capability(name: object) -> bool:
 
 
 def unknown_capabilities(names: list) -> list:
-    """The items of *names* outside the Capability vocabulary, in order."""
     return [name for name in names if not is_capability(name)]
 
 
 def describe_capabilities(names: frozenset[str]) -> str:
-    """*names* sorted and comma-joined, for a message."""
     return ", ".join(sorted(names))
 
 
@@ -111,8 +109,6 @@ class Capabilities:
 
 
 class UnknownCapabilityError(PackScanError):
-    """A ``requires`` list in *path* names *name*, which is not a Capability."""
-
     def __init__(self, path: str, name: object) -> None:
         self.path = path
         self.name = name

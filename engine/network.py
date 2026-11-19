@@ -21,20 +21,16 @@ CONE: Final = "cone"
 AREA_OF_EFFECT: Final = "area_of_effect"
 
 # The single source of IR emitter identity: every module that needs the
-# emitter key set (the parser's valid-key check, InfraredTransceiver's
-# transmitter loop) derives it from this tuple instead of re-enumerating the constants.
+# emitter key set derives it from this tuple instead of re-enumerating the constants.
 IR_EMITTERS: Final = (LINE, CONE, AREA_OF_EFFECT)
 
 
 class NetworkEvents:
-    """Namespace for network-layer event types."""
-
     GROUP: Final = EventGroup("net")
 
     class IRReceived(Event):
         """Event fired when an IR packet is received.
 
-        Carries the raw payload, normalised signal quality and error margin.
         It names no receiver: an IR multi-receiver picks
         one for reliability only, never direction.
         """

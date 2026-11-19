@@ -33,8 +33,6 @@ CLIP = "clip"
 
 
 class NoActiveSceneError(RegistryError):
-    """A name was looked up before any scene was installed."""
-
     def __init__(self, name: str, kind: str) -> None:
         self.name = name
         self.kind = kind
@@ -42,8 +40,6 @@ class NoActiveSceneError(RegistryError):
 
 
 class MissingPrefixError(RegistryError):
-    """The name has no ``scene.`` or ``<pack>.`` prefix."""
-
     def __init__(self, name: str, kind: str) -> None:
         self.name = name
         self.kind = kind
@@ -51,8 +47,6 @@ class MissingPrefixError(RegistryError):
 
 
 class UndeclaredPackError(RegistryError):
-    """The pack is installed, but the active scene does not declare it."""
-
     def __init__(self, name: str, kind: str, pack_name: str) -> None:
         self.name = name
         self.kind = kind
@@ -66,11 +60,7 @@ class UndeclaredPackError(RegistryError):
 class ActiveSceneNamespace:
     """Resolves names against the Scene view last installed.
 
-    Built once at composition from the Pack catalog's effect registry and pack
-    sounds, with no scene installed. The ``EffectManager`` resolving through
-    it calls ``install`` once per transition (boot scene, overlay, pop), as
-    part of each ``EffectAdmin`` step (ADR-0008). Nothing is cached between lookups
-    beyond what the registries cache themselves.
+    Nothing is cached between lookups beyond what the registries cache themselves.
     """
 
     __slots__ = (
@@ -91,10 +81,7 @@ class ActiveSceneNamespace:
         self._declared_packs: frozenset[str] | None = None
 
     def install(self, view: SceneView) -> None:
-        """Replace the installed Scene view with *view*.
-
-        Once installed, lookups no longer fail with ``NoActiveSceneError``.
-        """
+        """Replace the installed Scene view with *view*."""
         self._local_effects = view.local_effects
         self._local_sounds = view.local_sounds
         self._declared_packs = view.declared_packs
@@ -165,12 +152,7 @@ class ActiveSceneNamespace:
         return path
 
     def _split(self, name: str, kind: str) -> tuple[str, str, frozenset[str]]:
-        """Split *name* into ``(prefix, item, declared_packs)`` for the installed scene.
-
-        Raises ``MissingPrefixError`` for a name with no prefix, checked first
-        so it fails even before any install, then ``NoActiveSceneError`` when
-        no scene is installed.
-        """
+        """Split *name* into ``(prefix, item, declared_packs)`` for the installed scene."""
         if "." not in name:
             raise MissingPrefixError(name, kind)
         declared_packs = self._declared_packs

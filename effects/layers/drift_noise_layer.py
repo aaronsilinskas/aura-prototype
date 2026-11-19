@@ -31,15 +31,13 @@ class DriftNoiseLayer(Layer):
         self._buffer = [random.random() for _ in range(self._buffer_count)]
 
     def update(self, elapsed: float) -> None:
-        """Advance the scroll offset by ``elapsed`` seconds."""
         self._offset += self._drift_speed * elapsed * self._buffer_count
         self._offset %= self._buffer_count
 
     def sample(self, position: float, pixel_count: int) -> float:
         """Return drift-noise value at ``position`` in ``[0.0, 1.0]``.
 
-        Returns a value in ``[0.0, amplitude]``.  ``pixel_count`` is accepted for
-        interface uniformity with other buffers but is not used.
+        Returns a value in ``[0.0, amplitude]``.
         """
         buf_count = self._buffer_count
         sample_index = (position * buf_count + self._offset) % buf_count

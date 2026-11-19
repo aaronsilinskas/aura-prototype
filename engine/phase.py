@@ -1,13 +1,5 @@
 """Reusable phase-machine primitive for scene state machines.
 
-Almost every scene is a state machine: Tag has Ready → Starting → Playing →
-Game Over, Red Light Green Light cycles through eight phases, hardware_test
-cycles through six modes.  Before this module each scene reinvented the same
-four-step boilerplate by hand (do nothing if not my phase, initialise once,
-do the per-tick logic, clean up and change state).
-
-This module ships that machinery once:
-
 - :class:`PhaseKey` — an opaque, identity-typed phase token.  The engine ships
   only the *type*; scenes own the named instances.
 - :class:`PhaseMachine` — the mutable phase mechanics (current phase, a private
@@ -135,11 +127,6 @@ class PhaseMachine:
 
         *dispatch* is the :attr:`GameState.dispatch_count` of the event being
         dispatched at entry; the phase's handlers skip that event.
-
-        Drops any pending end, so every transition cancels the leaving
-        phase's declared end.  Has no other side effects: it never stops
-        effects or clears receipts, and it does not run ``on_enter`` itself —
-        :meth:`PhaseRule.transition_to` does, straight after.
         """
         self.phase = phase
         self.phase_start = now
@@ -154,15 +141,7 @@ class PhaseMachine:
     def _declare_end(
         self, phase: PhaseKey, condition: Callable[[GameState], bool], next_phase: PhaseKey
     ) -> None:
-        """Record that this entry of *phase* ends, moving to *next_phase*, once *condition* holds.
-
-        Private to this module: only :meth:`PhaseRule.end_when` calls it, so
-        only the owning rule can declare its phase's end.
-
-        Raises:
-            RuntimeError: if *phase*'s ``on_enter`` is not running, or if this
-                entry already declared an end.
-        """
+        """Record that this entry of *phase* ends once *condition* holds."""
         if not self._entering or self.phase is not phase:
             raise RuntimeError(f"End of {phase!r} declared outside its on_enter")
         if self._pending_end is not None:
@@ -173,8 +152,7 @@ class PhaseMachine:
         """Return the declared end's next phase if its condition holds on *state*, clearing it.
 
         Returns ``None``, keeping the end, while its condition does not hold
-        or when none is declared.  Private to this module: only the owning
-        :class:`PhaseRule` calls it, then transitions to the returned phase.
+        or when none is declared.
         """
         pending_end = self._pending_end
         if pending_end is None or not pending_end.condition(state):
@@ -185,8 +163,7 @@ class PhaseMachine:
     def take_enter_pending(self) -> bool:
         """Return ``True`` if the current phase's ``on_enter`` is pending, clearing the flag.
 
-        Consumed internally by :class:`PhaseRule` to drive ``on_enter``; this
-        is not a public predicate.  Combining the test and the clear into one
+        Combining the test and the clear into one
         atomic call means the entry signal can be checked exactly once and
         never left half-consumed.
         """
@@ -198,8 +175,6 @@ class PhaseMachine:
 class PhaseSlot:
     """The one accessor a scene builds per phase machine.
 
-    Owns the machine's ``GameState`` key and initial phase, wrapping a
-    :class:`~engine.state.StateSlot` internally.
     Callable ``(state) -> PhaseMachine``, get-or-create on first use so there
     is no "unestablished key" failure to guard against.
 
@@ -238,7 +213,6 @@ class PhaseSlot:
         return self._owners.get(phase)
 
     def _check_owners_listed(self, listed: set[int]) -> None:
-        """Raise ``ValueError`` if an owner's ``id`` is not in *listed*."""
         for phase, owner in self._owners.items():
             if id(owner) not in listed:
                 raise ValueError(
@@ -254,15 +228,6 @@ class PhaseSlot:
 class _PhaseGuardedRule(GameRule):
     """Shared base for phase-gated rules: the ``on`` override and phase guard.
 
-    Overrides :meth:`on` to stash the user handler in a private per-event-type
-    map and subscribe a single private dispatcher.  The dispatcher fetches the
-    machine through :meth:`_machine` and first runs the initial phase owner's
-    ``on_enter`` if it is still pending, whatever this rule's phase.  It then
-    returns unless the machine is in this rule's phase and the event is not
-    the one dispatched when that phase was entered.  Otherwise a
-    :class:`PhaseRule` first checks the end its phase declared, on
-    ``Sensors`` only, and the user handler runs unless that end fired.
-
     Takes the scene's one :class:`PhaseSlot` for the machine it guards, through
     which it reaches the shared :class:`PhaseMachine`.
     """
@@ -273,12 +238,7 @@ class _PhaseGuardedRule(GameRule):
         self._phase_handlers: dict[type, Callable[..., None]] = {}
 
     def on(self, event_type: type[T], handler: Callable[[T, GameState], None]) -> None:
-        """Register a phase-gated *handler* for *event_type*.
-
-        Stashes *handler* under *event_type* and subscribes the private phase
-        dispatcher in its place, so the inherited :meth:`handle_event` routes
-        the event through the phase guard before reaching the user handler.
-        """
+        """Register a phase-gated *handler* for *event_type*."""
         self._phase_handlers[event_type] = handler
         super().on(event_type, self._phase_dispatch)
 
@@ -292,11 +252,9 @@ class _PhaseGuardedRule(GameRule):
         return self._machine(state).elapsed(state.total)
 
     def _machine(self, state: GameState) -> PhaseMachine:
-        """Return this rule's :class:`PhaseMachine` via its :class:`PhaseSlot`."""
         return self._phase_slot(state)
 
     def _handle_in_phase(self, event: Event, machine: PhaseMachine, state: GameState) -> None:
-        """Run this rule's handler for *event*, if it has one; its phase is active."""
         handler = self._phase_handlers.get(type(event))
         if handler is not None:
             handler(event, state)
@@ -338,7 +296,6 @@ class PhaseRule(_PhaseGuardedRule):
     def transition_to(self, state: GameState, next_phase: PhaseKey) -> None:
         """Run ``on_exit``, move the machine to *next_phase*, then run its ``on_enter``.
 
-        The entering phase's owner is found through the :class:`PhaseSlot`.
         Only a handler should call this, and it should return immediately
         after.  Transitions are free-running (no one-per-tick guard).
 

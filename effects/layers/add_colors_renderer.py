@@ -17,17 +17,14 @@ class AddColorsRenderer(EffectPixels):
         self._layers = layers
 
     def update(self, elapsed: float) -> None:
-        """Advance all layers by ``elapsed`` seconds."""
         for buf, _ in self._layers:
             buf.update(elapsed)
 
     def render(self, output: PixelBuffer) -> None:
-        """Blend all layers into ``output`` using per-channel additive color mixing."""
         count = len(output)
         inv_count = 1.0 / count
         layers = self._layers
 
-        # First layer renders directly into output
         buf0, pal0 = layers[0]
         for i in range(count):
             v = buf0.sample(i * inv_count, count)
@@ -35,7 +32,6 @@ class AddColorsRenderer(EffectPixels):
                 v = 1.0
             output[i] = pal0.lookup(v)
 
-        # Subsequent layers: sample and blend additively in a single pass
         for k in range(1, len(layers)):
             buf, pal = layers[k]
             for i in range(count):

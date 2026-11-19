@@ -12,8 +12,6 @@ class ProgressLayer(Layer):
     The lit fraction of pixel ``i`` is ``clamp(progress * pixel_count - i,
     0.0, 1.0)``, where ``i = round(position * pixel_count)``. The bar maps onto
     the actual pixel count, independent of ``EffectConfig.resolution``.
-
-    ``progress`` is clamped to ``[0.0, 1.0]`` in the constructor.
     """
 
     __slots__ = ["_progress"]
@@ -34,7 +32,6 @@ class ProgressLayer(Layer):
         """No-op — the progress bar is stateless."""
 
     def sample(self, position: float, pixel_count: int) -> float:
-        """Return the lit fraction at ``position`` in ``[0.0, 1.0]``."""
         i = round(position * pixel_count)
         f = self._progress * pixel_count - i
         if f <= 0.0:

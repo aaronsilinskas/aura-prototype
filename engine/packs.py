@@ -82,12 +82,6 @@ class UnknownItemError(RegistryError):
 
 
 class MissingItemAttributeError(RegistryError):
-    """A loaded item module has no attribute named *attr*.
-
-    Raised by ``load_item``. *context* is the human-readable description of
-    the owning registry entry (see ``load_item``).
-    """
-
     def __init__(self, context: str, attr: str) -> None:
         self.context = context
         self.attr = attr
@@ -95,12 +89,6 @@ class MissingItemAttributeError(RegistryError):
 
 
 class ItemTypeError(RegistryError):
-    """A loaded item's attribute value is not an instance of *expected_class*.
-
-    Raised by ``load_item``. *context* is the human-readable description of
-    the owning registry entry (see ``load_item``).
-    """
-
     def __init__(self, context: str, attr: str, expected_class: type) -> None:
         self.context = context
         self.attr = attr
@@ -129,8 +117,7 @@ def load_item(
 
     *context* is a human-readable description of the owning registry entry used
     in error messages (e.g. ``"Pack 'rlgl' item 'fire'"`` or
-    ``"Local item 'ambush'"``).  *full_module* is the dotted
-    import path; *item_attr* is the attribute name to read from the module.
+    ``"Local item 'ambush'"``).
 
     Raises:
         MissingItemAttributeError: if the module has no attribute named *item_attr*.
@@ -147,7 +134,7 @@ def load_item(
 
 
 class _PackEntry:
-    """Metadata for a single discovered pack. Internal use only."""
+    """Metadata for a single discovered pack."""
 
     __slots__ = (
         "declarations",

@@ -86,26 +86,19 @@ class Scope:
         MAIN: Final = ScopeValue("global.main")  # primary effect area (e.g. active spell)
         BUFF: Final = ScopeValue("global.buff")  # positive status effects
         DEBUFF: Final = ScopeValue("global.debuff")  # negative status effects
-        ALL: Final = ScopeValue(
-            "global.all", [MAIN, BUFF, DEBUFF]
-        )  # entire global area, no differentiation
+        ALL: Final = ScopeValue("global.all", [MAIN, BUFF, DEBUFF])
 
-    PERSONAL: Final = ScopeValue("personal")  # only the local player's device
-    DIRECTIONAL: Final = ScopeValue("directional")  # the direction the player is pointing
-    AMBIENT: Final = ScopeValue("ambient")  # long-running background effects
-    NON_AMBIENT: Final = ScopeValue(
-        "non_ambient", [PERSONAL, DIRECTIONAL, Global.ALL]
-    )  # all non-ambient scopes
-    ALL: Final = ScopeValue(
-        "all", [PERSONAL, DIRECTIONAL, Global.ALL, AMBIENT]
-    )  # every scope, including all global zones and ambient
+    PERSONAL: Final = ScopeValue("personal")
+    DIRECTIONAL: Final = ScopeValue("directional")
+    AMBIENT: Final = ScopeValue("ambient")
+    NON_AMBIENT: Final = ScopeValue("non_ambient", [PERSONAL, DIRECTIONAL, Global.ALL])
+    ALL: Final = ScopeValue("all", [PERSONAL, DIRECTIONAL, Global.ALL, AMBIENT])
 
 
 class SceneControls:
     """Abstract interface for scene transitions called from within game rules.
 
-    All methods raise ``NotImplementedError`` by default.  ``SceneManager``
-    injects itself as the live implementation; standalone callers (e.g. rule
+    ``SceneManager`` injects itself as the live implementation; standalone callers (e.g. rule
     unit tests) pass the base ``SceneControls()`` instance, which raises on
     any call.
 
@@ -163,8 +156,7 @@ class SceneControls:
 class SceneReboot:
     """Board-free port through which ``SceneManager`` persists-and-reboots.
 
-    Mirrors how ``SceneManager`` already reaches ``EffectAdmin`` through an
-    injected seam: ``SceneManager`` validates ``reboot_into``'s *target*
+    ``SceneManager`` validates ``reboot_into``'s *target*
     against its scene registry (a typo must never persist a name the next
     boot would only skip), checks the target's Required capabilities (reading
     ``reboot_to_previous``'s target from ``previous_scene``), and otherwise
@@ -172,9 +164,7 @@ class SceneReboot:
     writing the scene switch to durable storage and physically resetting the
     device — lives on the concrete implementation, since a reboot is
     inherently a hardware operation the board-free engine cannot perform
-    itself. Every method raises ``NotImplementedError`` by default;
-    ``DeviceSceneReboot`` (``hardware.shared.device_reboot``) is the
-    live implementation, and a recording fake stands in for CPython tests.
+    itself.
     """
 
     __slots__ = ()
@@ -198,10 +188,6 @@ class SceneReboot:
 
 class NetworkControls:
     """Abstract interface for network transmit operations called from within game rules.
-
-    All methods raise ``NotImplementedError`` by default.  ``HardwareNetworkControls``
-    in ``hardware/shared/network_controls.py`` provides the live hardware-backed
-    implementation.
 
     Transmits are always broadcast — no recipient parameter; player identity is
     encoded in the payload if needed.
@@ -229,9 +215,7 @@ class EffectReceipt:
     ``[0.0, 1.0]`` (default ``1.0``) that rules set directly
     (``receipt.brightness = x``) to vary an effect's intensity without
     restarting it. Assigning a value outside that range raises
-    ``ValueError``. The pixel merge layer (``engine.effects.merge``) reads
-    ``brightness``; the voice pool (``hardware.shared.voice_pool``) reads
-    ``loudness``.
+    ``ValueError``.
     """
 
     __slots__ = ("_brightness", "_loudness", "_stopped", "id")
@@ -337,9 +321,7 @@ class EffectControls:
 class _StateSlotBase:
     """Callable accessor that owns the get-or-create-and-revalidate pattern for a GameState key.
 
-    Constructed once at module load. Calling it returns the value under
-    *key*, created by *factory* on first use, after checking it is an
-    *expected_class* instance. Use it as ``StateSlot``; the checker sees a
+    Use it as ``StateSlot``; the checker sees a
     generic subclass that types the result as *expected_class*.
     """
 
@@ -392,8 +374,6 @@ else:
 class GameState:
     """Portable game context passed to every rule handler on every tick.
 
-    ``SceneManager`` builds one for each scene on its stack and wraps it, with
-    the scene's rules, in a ``SceneRun``; rule unit tests construct it directly.
     Data stored via ``state.set()`` survives across ticks.
 
     Rules read time and control effects, scenes and the network through it,
@@ -471,12 +451,6 @@ class GameState:
 
     def get_or_none(self, key: str, expected_class: type[T]) -> T | None:
         """Return the stored value for *key*, or ``None`` if absent.
-
-        For optional/absent lookups, where ``get``'s required *default*
-        is inconvenient. Mirrors ``SceneLocalRegistry.get``'s
-        ``expected_class: type[T]`` type-hint convention: the
-        ``isinstance`` check below lets the type checker narrow the
-        return value to ``T | None`` without ``# type: ignore``.
 
         Raises:
             ValueError: if *key* is present but the stored value is not

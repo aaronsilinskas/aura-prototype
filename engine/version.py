@@ -1,11 +1,5 @@
-"""Version — a parsed MAJOR.MINOR version."""
-
-
 class Version:
-    """Parsed MAJOR.MINOR version.
-
-    Build one directly or via :meth:`parse` from a string.
-    """
+    """Parsed MAJOR.MINOR version."""
 
     __slots__ = ("major", "minor")
 

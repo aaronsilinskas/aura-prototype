@@ -4,11 +4,7 @@ from effects.effect import Effect, EffectAudio, EffectConfig, EffectHaptic
 
 
 class EffectBuilder:
-    """Factory interface for constructing ``Effect`` instances by name.
-
-    Concrete implementations return the named effect configured for the given
-    ``EffectConfig``.
-    """
+    """Factory interface for constructing ``Effect`` instances by name."""
 
     def __call__(self, name: str, config: EffectConfig) -> Effect:
         """Build an Effect for the named effect.
