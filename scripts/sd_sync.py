@@ -12,7 +12,7 @@ Usage
     uv run python -m scripts.sd_sync push HOST_PATH SD_PATH
 
 Every verb accepts ``--port`` to bypass auto-detection of the data-channel
-serial port (see ``scripts.sd_sync_transport.find_data_port``). This CLI
+serial port (see ``scripts.port_auto_detect.find_port``). This CLI
 talks to the device over serial only -- it never mounts or scans a CIRCUITPY
 volume, so it works whether or not the host has one mounted at all.
 """
@@ -22,8 +22,9 @@ import sys
 from typing import IO
 
 from hardware.shared.sd_sync_protocol import Transport
+from scripts.port_auto_detect import PortAutoDetectError, SerialChannel, find_port
 from scripts.sd_sync_client import SdSyncClient, SdSyncError
-from scripts.sd_sync_transport import SdSyncPortError, find_data_port, open_serial_transport
+from scripts.sd_sync_transport import open_serial_transport
 
 __all__ = ["build_client", "dispatch", "main", "parse_args"]
 
@@ -81,8 +82,8 @@ def main(argv: "list[str] | None" = None) -> None:
     args = parse_args(argv)
 
     try:
-        port = find_data_port(explicit_port=args.port)
-    except SdSyncPortError as exc:
+        port = find_port(SerialChannel.DATA, explicit_port=args.port)
+    except PortAutoDetectError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         sys.exit(1)
 

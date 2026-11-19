@@ -1,11 +1,9 @@
-"""Tests for scripts.sd_sync's pure arg-parsing/dispatch wiring, and data-port selection.
+"""Tests for scripts.sd_sync's pure arg-parsing/dispatch wiring.
 
 ``dispatch`` is exercised against a real ``SdSyncClient`` wired to an
 in-memory loopback ``Transport`` (mirroring ``test_sd_sync_loopback.py``'s
-harness) -- no real device or serial I/O. The live ``SerialTransport``/
-``find_data_port`` glue in ``scripts.sd_sync_transport`` is hardware-validated
-and not exercised here, except for the pure ``select_data_port`` selection
-rule.
+harness) -- no real device or serial I/O. The live ``SerialTransport`` in
+``scripts.sd_sync_transport`` is hardware-validated and not exercised here.
 """
 
 import io
@@ -20,39 +18,6 @@ from hardware.shared.sd_sync_protocol import Transport
 from hardware.shared.sd_sync_server import SdSyncServer
 from scripts.sd_sync import build_client, dispatch, parse_args
 from scripts.sd_sync_client import SdSyncNotFoundError
-from scripts.sd_sync_transport import SdSyncPortError, select_data_port
-from scripts.tests.fake_comport import fake_comport
-
-
-def test_select_data_port_auto_selects_the_single_match() -> None:
-    port = select_data_port([fake_comport("/dev/tty.usbmodem1")])
-
-    assert port == "/dev/tty.usbmodem1"
-
-
-def test_select_data_port_raises_when_no_ports_found() -> None:
-    with pytest.raises(SdSyncPortError, match="--port"):
-        select_data_port([])
-
-
-def test_select_data_port_raises_when_multiple_ports_found() -> None:
-    with pytest.raises(SdSyncPortError, match="--port"):
-        select_data_port([fake_comport("/dev/tty.usbmodem1"), fake_comport("/dev/tty.usbmodem2")])
-
-
-def test_select_data_port_explicit_port_wins_over_a_single_auto_detected_match() -> None:
-    port = select_data_port([fake_comport("/dev/tty.usbmodem1")], explicit_port="/dev/tty.explicit")
-
-    assert port == "/dev/tty.explicit"
-
-
-def test_select_data_port_explicit_port_wins_over_ambiguous_auto_detection() -> None:
-    port = select_data_port(
-        [fake_comport("/dev/tty.usbmodem1"), fake_comport("/dev/tty.usbmodem2")],
-        explicit_port="/dev/tty.explicit",
-    )
-
-    assert port == "/dev/tty.explicit"
 
 
 def test_parse_args_list_defaults_sd_subpath_to_the_card_root() -> None:
