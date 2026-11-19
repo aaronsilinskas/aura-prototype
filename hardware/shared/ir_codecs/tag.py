@@ -42,6 +42,7 @@ if TYPE_CHECKING:
     from typing import Final
 
 
+# Wire-frame timings are in µs.
 TAG_ERROR_MARGIN: Final = 500  # Maximum allowed timing deviation
 TAG_PREAMBLE_ERROR_MARGIN: Final = 1000  # Maximum timing deviation for preamble
 TAG_PREAMBLE: Final = [3000, 6000, 3000]  # Infrared tag start sequence

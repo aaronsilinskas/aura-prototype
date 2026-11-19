@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     from typing import Final
 
 
+# Wire-frame timings are in µs, each a multiple of IR_UNIT.
 IR_UNIT: Final = 500
 
 IR_HEADER_MARK: Final = IR_UNIT * 8  # 4000 µs
