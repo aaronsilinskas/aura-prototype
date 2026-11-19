@@ -18,7 +18,7 @@ Spec #925 chose this because the SD card sits on the device's SPI bus and is not
 
 ## Consequences
 
-- A failed push never replaces the file on the card. `SdSyncServer` checks the CRC while `DeviceStorage.write_chunks` is still consuming the chunks, and a mismatch aborts the write before its rename. A failed pull leaves no partial host file.
-- On pull, the server checks each ack: anything but an `ack` of the sequence number just sent raises `ValueError`, and no further chunk is sent (#1438). On push, the server echoes each chunk's sequence number in its ack, and the client waits for that ack before sending the next chunk.
+- A failed push never replaces the file on the card. `SdSyncServer` checks the CRC while `DeviceStorage.write_chunks` is still consuming the chunks, and a mismatch aborts the write before its rename. A pull whose retries all fail the CRC leaves no partial host file. A pull stopped by a transport or protocol error can, because the client writes straight to the host path, truncating any file already there.
+- On pull, the server checks each ack: anything but an `ack` of the sequence number just sent raises `ValueError`, and no further chunk is sent (#1438). On push, the server echoes each chunk's sequence number in its ack. The client waits for that ack before sending the next chunk, but doesn't decode or check it: the whole-file CRC is the only check on a push.
 - A listing is small, so it travels whole in one response frame, with no chunking and no CRC.
 - "Not found" and "no SD configured" are in-band responses, not errors on the device, because both are routine for a bench tool.

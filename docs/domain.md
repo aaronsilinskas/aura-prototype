@@ -228,8 +228,8 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `PersistedScene` | `hardware/shared/persisted_scene.py` | Board-free owner of the **Persisted scene** record on the card, the only code naming its `persisted_scene.` keys; a client of the boot's one `DeviceStateStore` (ADR-0009). Applies a Scene deploy token, reports the boot candidates and the previous scene, records a Reboot or a return, each in one write |
 | `DeviceStateStore` | `hardware/shared/device_state.py` | Board-free, general key/value store over the card's `aura-state.json`; one per boot, built by `build_scene_boot` |
 | `SdSyncServer` | `hardware/shared/sd_sync_server.py` | Board-free device side of the SD-sync protocol (ADR-0011) |
-| `SdSyncClient` | `scripts/sd_sync_client.py` | Board-free (CPython-only) host side of the SD-sync protocol |
-| `Transport` (SD sync) | `hardware/shared/sd_sync_protocol.py` | Board-free port `SdSyncClient`/`SdSyncServer` exchange base64-framed lines through; live adapters `UsbCdcTransport` (device) / `SerialTransport` (host) |
+| `SdSyncClient` | `scripts/sd_sync_client.py` | Board-free (CPython-only) host side of the SD-sync protocol (ADR-0011) |
+| `Transport` (SD sync) | `hardware/shared/sd_sync_protocol.py` | Board-free port `SdSyncClient`/`SdSyncServer` exchange base64-framed lines through (ADR-0011); live adapters `UsbCdcTransport` (device) / `SerialTransport` (host) |
 | `UsbCdcTransport` | `hardware/circuitpython/usb_cdc_transport.py` | Live `Transport` framing SD-sync lines with a newline delimiter over any `read`/`write` stream (on-device, `usb_cdc.data`); needs no `usb_cdc` import itself, so it is CPython-testable against a fake stream |
 | `SerialTransport` | `scripts/sd_sync_transport.py` | Live host-side `Transport`, framing SD-sync lines the same way as `UsbCdcTransport` but over a host serial port opened via `deploy_watch`'s `SerialHandle`/`open_serial_with_retry` |
 | `find_data_port` / `select_data_port` | `scripts/sd_sync_transport.py` | Data-channel **Port auto-detect** for `scripts/sd_sync.py`; `--port` overrides |

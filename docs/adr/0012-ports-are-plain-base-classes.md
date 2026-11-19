@@ -4,7 +4,7 @@ A port that device code implements is a plain base class whose methods raise `No
 
 ## Considered Options
 
-- **Duck typing with no base class.** Nothing at runtime to import, but mypy has no type to check an adapter against, and a missing method fails only when called.
+- **Duck typing with no base class.** Nothing at runtime to import. Rejected: mypy has no type to check an adapter against, and a missing method fails only when called.
 - **A `Protocol` declared only under `TYPE_CHECKING`,** as ADR-0007 does for generics. mypy would check adapters structurally and the device would carry no base class. Not recorded why this wasn't taken for ports. The likely reasons, to be confirmed: the pattern predates the `TYPE_CHECKING` idiom, and under a Protocol every fake would have to implement every method to type-check, where a base class lets it inherit the rest.
 
 ## Consequences

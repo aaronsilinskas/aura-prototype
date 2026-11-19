@@ -11,5 +11,5 @@ Spec #688 made this rule (built by #690). Props are built from different subsets
 
 ## Consequences
 
-- A declared, enabled component whose library is missing raises at build. It is not skipped, so the failure points at the config.
+- A declared, enabled component whose library is missing fails the build like any other declared part that can't be built (ADR-0014).
 - Checker-only imports of the same libraries live under `TYPE_CHECKING`, so annotations still name the real driver types.
