@@ -5,14 +5,11 @@ from effects.value import lerp
 
 
 class FlameLayer(Layer):
-    """Pure flame simulation — no rendering, no palette, no EffectStep overhead.
+    """Pure flame simulation — no rendering, no palette.
 
     Owns the heat array and spark set directly. Call ``update(elapsed)`` each
     frame to advance the simulation, then ``sample(position)`` per pixel to
     read interpolated heat at any normalised position in ``[0.0, 1.0]``.
-
-    The algorithm is identical to ``FlameStep``, enabling fair visual comparison
-    between the two design approaches.
     """
 
     __slots__ = [

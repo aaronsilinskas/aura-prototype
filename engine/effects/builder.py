@@ -6,16 +6,16 @@ from effects.effect import Effect, EffectAudio, EffectConfig, EffectHaptic
 class EffectBuilder:
     """Factory interface for constructing ``Effect`` instances by name.
 
-    Concrete implementations look up the named effect and return an effect
-    configured for the given ``EffectConfig``. Raise ``KeyError`` or
-    ``ValueError`` for unregistered names.
+    Concrete implementations return the named effect configured for the given
+    ``EffectConfig``.
     """
 
     def __call__(self, name: str, config: EffectConfig) -> Effect:
         """Build an Effect for the named effect.
 
         Args:
-            name: The registered effect name (e.g. ``"color.flash"``).
+            name: The bare effect name, without its pack or ``scene`` prefix
+                (e.g. ``"flash"`` for ``"color.flash"``).
             config: Runtime configuration for the render pass. ``config.get_option``
                 carries any effect-specific parameters (e.g. duration, color).
                 ``config.resolution`` describes the output hardware.

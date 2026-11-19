@@ -6,15 +6,14 @@ from effects.value import ValueGenerator as VG
 
 
 class DriftNoiseLayer(Layer):
-    """Pure drifting noise simulation — no EffectStep/EffectState overhead.
+    """Pure drifting noise simulation.
 
     A fixed-size noise buffer is initialised once with random values and slowly
     scrolled each frame at ``drift_speed``.  Each call to ``sample`` interpolates
     linearly across the buffer, so the noise flows rather than flickers.
 
     ``drift_speed`` and ``amplitude`` are resolved once at construction time (if
-    callable).  The algorithm is identical to ``DriftNoiseStep``, enabling fair
-    visual comparison between the two design approaches.
+    callable).
     """
 
     __slots__ = ["_amplitude", "_buffer", "_buffer_count", "_drift_speed", "_offset"]

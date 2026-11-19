@@ -73,7 +73,7 @@ class SdSyncClient:
         transport: The port to reach the server through (real serial, or an
             in-memory loopback for tests).
         max_attempts: Total attempts (initial try plus retries) before a
-            checksum-verified pull gives up and raises
+            checksum-verified pull or push gives up and raises
             :class:`SdSyncIntegrityError`.
     """
 

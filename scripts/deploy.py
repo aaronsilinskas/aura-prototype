@@ -13,8 +13,9 @@ Usage
 
 mpy-cross
 ---------
-Install with ``uv sync`` (pinned in ``[dependency-groups] dev`` via ``mpy-cross``).
-Matches the CircuitPython minor release in use.  Invoked as ``python -m mpy_cross``.
+Compiling needs the CircuitPython ``mpy-cross`` binary that
+``scripts/setup_mpy_cross.sh`` downloads; ``scripts/build.py`` says where it
+is looked up.
 """
 
 from __future__ import annotations

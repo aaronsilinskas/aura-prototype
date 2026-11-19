@@ -30,9 +30,10 @@ class PolledSensor(PolledPart):
     ``reading`` is the *reading* buffer passed in, the same object for the
     sensor's whole life, so a sensor event can hold it once and see every
     update. It keeps whatever values it was given until the first successful
-    read. It is typed as either buffer because ``typing.Generic`` is
-    unavailable on CircuitPython; a caller needing one narrows it once, where
-    it builds the sensor event.
+    read. It is typed as either buffer because ``PolledSensor`` is not
+    generic over its reading (ADR-0007 gives the checker-only idiom that
+    would make it so); a caller needing one narrows it once, where it builds
+    the sensor event.
 
     Failures are logged to *logger* on transitions only, labelled with
     *label*: one line carrying the error when a healthy sensor's read fails,
