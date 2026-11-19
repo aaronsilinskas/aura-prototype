@@ -170,9 +170,11 @@ class Aura:
         self._event_listeners: list[EventListener] = []
 
     def add_spell(self, spell: Spell) -> None:
+        """Requests the add as an ``AddSpellEvent``, so an active spell may cancel it."""
         self.process_event(AddSpellEvent(spell))
 
     def remove_spell(self, spell: Spell) -> None:
+        """Requests the removal as a ``RemoveSpellEvent``, so an active spell may cancel it."""
         self.process_event(RemoveSpellEvent(spell))
 
     def cast_spell(self, spell: Spell) -> None:

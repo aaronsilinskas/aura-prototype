@@ -1,6 +1,7 @@
 import pytest
 
 from magic.aura import (
+    AddSpellEvent,
     Aura,
     AuraEvent,
     DamageEvent,
@@ -139,6 +140,53 @@ def test_update_runs_each_spells_update_once_even_when_a_spell_is_spent(
     aura.update(0.1)
 
     assert counting.updates == 1
+
+
+class CancelEventsSpell(NoopSpell):
+    def __init__(self, event_type: type[AuraEvent]) -> None:
+        super().__init__(tags=[])
+        self._event_type = event_type
+
+    def modify_event(self, aura: Aura, event: AuraEvent) -> None:
+        if isinstance(event, self._event_type):
+            event.is_canceled = True
+
+
+def test_an_active_spell_can_cancel_adding_a_spell(fixture: AuraFixture) -> None:
+    aura = fixture.aura
+    canceler = CancelEventsSpell(AddSpellEvent)
+    aura.add_spell(canceler)
+
+    aura.add_spell(NoopSpell(tags=[]))
+
+    assert list(aura.spells) == [canceler]
+
+
+def test_an_active_spell_can_cancel_removing_a_spell(fixture: AuraFixture) -> None:
+    aura = fixture.aura
+    canceler = CancelEventsSpell(RemoveSpellEvent)
+    kept = NoopSpell(tags=[])
+    aura.add_spell(canceler)
+    aura.add_spell(kept)
+
+    aura.remove_spell(kept)
+
+    assert list(aura.spells) == [canceler, kept]
+
+
+def test_a_spent_spell_stays_while_an_active_spell_cancels_its_removal(
+    fixture: AuraFixture,
+) -> None:
+    aura = fixture.aura
+    canceler = CancelEventsSpell(RemoveSpellEvent)
+    spent = SpentByOneHitSpell()
+    hitter = HitEveryUpdateSpell()
+    for spell in [canceler, spent, hitter]:
+        aura.add_spell(spell)
+
+    aura.update(0.1)
+
+    assert spent in list(aura.spells)
 
 
 def test_handle_event_applies_damage_event(fixture: AuraFixture) -> None:
