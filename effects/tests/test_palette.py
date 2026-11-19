@@ -40,7 +40,6 @@ def test_lut_lookup_clamps_above_one_to_last_entry() -> None:
 
 
 def test_lut_lookup_interpolates_linearly_between_stops() -> None:
-    # black (0,0,0) → white (255,255,255): each channel should track the LUT index
     palette = PaletteLUT256(bytes([0, 0, 0, 0, 255, 255, 255, 255]))
 
     # index = int(value * 255); weight = index/255 → each channel = index
@@ -57,7 +56,6 @@ def test_lut_midpoint_stop_is_set_exactly() -> None:
 
 
 def test_lut_with_three_stops_each_segment_has_correct_endpoint_colors() -> None:
-    # black → red (at index 128) → blue: verify first and last stops
     palette = PaletteLUT256(bytes([0, 0, 0, 0, 128, 255, 0, 0, 255, 0, 0, 255]))
 
     assert palette.lookup(0.0) == Palette.pack_rgb(0, 0, 0)
@@ -78,14 +76,12 @@ def test_lut_raises_when_stops_length_is_not_a_multiple_of_four() -> None:
 
 
 def test_lut_auto_anchors_start_with_black_when_first_stop_is_not_at_index_zero() -> None:
-    # Stops begin at index 128 (red); index 0 should be auto-filled with black.
     palette = PaletteLUT256(bytes([128, 255, 0, 0, 255, 0, 255, 0]))
 
     assert palette.lookup(0.0) == Palette.pack_rgb(0, 0, 0)
 
 
 def test_lut_auto_anchors_end_with_black_when_last_stop_is_not_at_index_255() -> None:
-    # Stops end at index 128 (green); index 255 should be auto-filled with black.
     palette = PaletteLUT256(bytes([0, 255, 0, 0, 128, 0, 255, 0]))
 
     assert palette.lookup(1.0) == Palette.pack_rgb(0, 0, 0)

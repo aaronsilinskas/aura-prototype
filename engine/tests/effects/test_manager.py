@@ -298,11 +298,6 @@ def test_add_effect_on_empty_scope_delivers_one_frame(pack_tree) -> None:
 
 
 def test_add_effect_layers_split_two_effects_side_by_side_in_one_buffer(pack_tree) -> None:
-    """Split routing: layering two effects on one scope shows both, oldest-first,
-
-    each in its own contiguous slice of the composed region -- not just the
-    topmost effect.
-    """
     registry = pack_tree.scan(
         effect_packs={
             "color": {
@@ -329,7 +324,6 @@ def test_add_effect_layers_split_two_effects_side_by_side_in_one_buffer(pack_tre
 
 
 def test_render_runs_after_merge_strategy_sizes_the_buffer(pack_tree) -> None:
-    """Split's prepare_buffers partitions each buffer before an effect renders into it."""
     registry = pack_tree.scan(
         effect_packs={
             "probe": {
@@ -791,7 +785,6 @@ def test_stop_effect_by_receipt_only_notifies_outputs_still_serving_the_effect(p
     output_personal.handle_event_calls.clear()
     output_directional.handle_event_calls.clear()
 
-    # fire is now only on DIRECTIONAL — receipt.stop() should only notify DIRECTIONAL
     fire_receipt.stop()
     manager.update(_make_timer())
 
@@ -1479,7 +1472,6 @@ def test_create_buffer_not_called_for_out_of_scope_output(pack_tree) -> None:
 
 
 def test_scoped_listener_uses_live_keys_after_scope_narrowing(pack_tree) -> None:
-    """Effect-triggered events after scope narrowing must reach only remaining-scope outputs."""
     registry = pack_tree.scan(
         effect_packs={
             "evt": {
@@ -1501,8 +1493,6 @@ def test_scoped_listener_uses_live_keys_after_scope_narrowing(pack_tree) -> None
 
     manager.update(_make_timer())
 
-    # shock effect fires VerbFiringPixels.FIRED; scoped_listener reads live entry.keys
-    # → personal output must NOT receive it after narrowing
     assert not any(
         c[0] == EffectEvent("evt", "shock", VerbFiringPixels.FIRED)
         for c in output_personal.handle_event_calls
@@ -1688,7 +1678,6 @@ def test_set_effect_rejects_out_of_range_loudness_option(pack_tree) -> None:
 
 
 def test_set_merge_strategy_takes_effect_starting_next_tick(pack_tree) -> None:
-    """Switching from Split to Additive mid-run blends from the very next tick onward."""
     registry = pack_tree.scan(
         effect_packs={
             "color": {

@@ -8,7 +8,6 @@ from magic.tests.helpers import AuraFixture
 class SliceFixture(AuraFixture):
     def __init__(self) -> None:
         super().__init__()
-        # Deal one-third of max magic as damage
         self.slice_damage: float = self.aura.magic.max.value // 3
         self.slice_spell: SliceSpell = SliceSpell(damage=self.slice_damage)
 
@@ -22,17 +21,15 @@ def test_slice_instant_damage(slice_fixture: SliceFixture) -> None:
     aura = slice_fixture.aura
 
     aura.add_spell(slice_fixture.slice_spell)
-    aura.update(0.1)  # Any time passing should trigger the instant damage
+    aura.update(0.1)
 
     assert aura.magic.value == aura.magic.max.value - slice_fixture.slice_damage
-    # Spell should be removed after dealing damage
     assert slice_fixture.slice_spell not in aura.spells
 
 
 def test_slice_multiple_hits(slice_fixture: SliceFixture) -> None:
     aura = slice_fixture.aura
 
-    # Add two slice spells
     slice_spell_1 = SliceSpell(damage=slice_fixture.slice_damage)
     slice_spell_2 = SliceSpell(damage=slice_fixture.slice_damage)
 
@@ -40,9 +37,8 @@ def test_slice_multiple_hits(slice_fixture: SliceFixture) -> None:
     aura.add_spell(slice_spell_2)
     aura.update(0.1)
 
-    # Both spells should deal damage
     assert aura.magic.value == aura.magic.max.value - (slice_fixture.slice_damage * 2)
-    assert len(aura.spells) == 0  # Both spells should be removed
+    assert len(aura.spells) == 0
 
 
 def test_slice_level(slice_fixture: SliceFixture) -> None:

@@ -99,7 +99,6 @@ def _wav(tmp_path, name: str = "clip") -> str:
 
 
 def test_i2sout_constructed_with_caller_supplied_pins() -> None:
-    """audiobusio.I2SOut is constructed with the caller-supplied I2S pins."""
     _make_output()
 
     _installed_mock("audiobusio", "I2SOut").assert_called_once_with(
@@ -108,7 +107,6 @@ def test_i2sout_constructed_with_caller_supplied_pins() -> None:
 
 
 def test_mixer_constructed_with_num_voices() -> None:
-    """audiomixer.Mixer is constructed with voice_count=num_voices."""
     _make_output(num_voices=4)
 
     mixer_class = _installed_mock("audiomixer", "Mixer")
@@ -145,7 +143,6 @@ def test_a_clip_whose_file_cannot_be_opened_plays_nothing(tmp_path) -> None:
 
 
 def test_a_stops_effect_clip_whose_file_cannot_be_opened_stops_the_receipt(tmp_path) -> None:
-    """A stops_effect clip whose file fails to open must not run forever."""
     output, _mixer = _make_output()
     receipt = _make_receipt()
 
@@ -160,7 +157,6 @@ def test_a_stops_effect_clip_whose_file_cannot_be_opened_stops_the_receipt(tmp_p
 
 
 def test_the_resolved_clips_path_plays_on_an_idle_voice(tmp_path) -> None:
-    """The file at the event's resolved path is opened and played at the receipt's loudness."""
     output, mixer = _make_output(max_volume=0.4)
     path = _wav(tmp_path, "music")
 
@@ -180,7 +176,6 @@ def test_the_resolved_clips_path_plays_on_an_idle_voice(tmp_path) -> None:
 
 
 def test_a_finished_stops_effect_clip_stops_the_receipt(tmp_path) -> None:
-    """stops_effect is read from the event's resolved clip."""
     output, mixer = _make_output()
     receipt = _make_receipt()
 
@@ -194,7 +189,6 @@ def test_a_finished_stops_effect_clip_stops_the_receipt(tmp_path) -> None:
 
 
 def test_a_finished_clip_on_an_audio_only_effect_stops_the_receipt(tmp_path) -> None:
-    """With no pixels or haptic, audio is the whole effect, so its end ends the receipt."""
     output, mixer = _make_output()
     receipt = _make_receipt()
 
@@ -243,7 +237,6 @@ def test_restoring_an_effect_plays_its_held_loop_again(tmp_path) -> None:
 
 
 def test_open_source_opens_file_and_wraps_wavefile(tmp_path) -> None:
-    """open_source opens the path and bundles the file with a WaveFile, file left open."""
     wav = tmp_path / "clip.wav"
     wav.write_bytes(b"RIFF")
     output, _ = _make_output()
@@ -255,19 +248,17 @@ def test_open_source_opens_file_and_wraps_wavefile(tmp_path) -> None:
     wave_file_class = _installed_mock("audiocore", "WaveFile")
     wave_file_class.assert_called_once_with(f)
     assert wave is wave_file_class.return_value
-    assert not f.closed  # file stays open while playing
+    assert not f.closed
     f.close()
 
 
 def test_open_source_returns_none_on_oserror(tmp_path) -> None:
-    """open_source returns None when the file cannot be opened."""
     output, _ = _make_output()
 
     assert output.open_source(str(tmp_path / "nope.wav")) is None
 
 
 def test_play_stores_source_and_plays_wave_with_loop(tmp_path) -> None:
-    """play hands the WaveFile to the slot's voice with the loop flag."""
     wav = tmp_path / "clip.wav"
     wav.write_bytes(b"RIFF")
     output, mixer = _make_output()
@@ -278,11 +269,10 @@ def test_play_stores_source_and_plays_wave_with_loop(tmp_path) -> None:
     output.play(1, source, loop=True)
 
     mixer.voice[1].play.assert_called_once_with(wave, loop=True)
-    output.stop(1)  # cleanup: close the file
+    output.stop(1)
 
 
 def test_stop_stops_voice_and_closes_file(tmp_path) -> None:
-    """stop stops the slot's voice and closes the open WAV file."""
     wav = tmp_path / "clip.wav"
     wav.write_bytes(b"RIFF")
     output, mixer = _make_output()
@@ -298,7 +288,6 @@ def test_stop_stops_voice_and_closes_file(tmp_path) -> None:
 
 
 def test_stop_on_idle_slot_stops_voice_without_error(tmp_path) -> None:
-    """stop on a slot with no open source still stops the voice and does not raise."""
     output, mixer = _make_output()
 
     output.stop(0)
@@ -307,7 +296,6 @@ def test_stop_on_idle_slot_stops_voice_without_error(tmp_path) -> None:
 
 
 def test_set_loudness_applies_max_volume(tmp_path) -> None:
-    """set_loudness sets the voice level to max_volume * loudness."""
     output, mixer = _make_output(max_volume=0.4)
 
     output.set_loudness(0, 0.5)
@@ -316,7 +304,6 @@ def test_set_loudness_applies_max_volume(tmp_path) -> None:
 
 
 def test_is_playing_reads_voice_playing(tmp_path) -> None:
-    """is_playing reports the slot voice's playing flag."""
     output, mixer = _make_output()
 
     mixer.voice[0].playing = True

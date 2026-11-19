@@ -20,22 +20,18 @@ def test_aura_initialization(fixture: AuraFixture) -> None:
 def test_magic_min_limit(fixture: AuraFixture) -> None:
     aura = fixture.aura
 
-    # Try to reduce current magic below magic.min
     damage_past_min = aura.magic.value - aura.magic.min + 50.0
     aura.process_event(DamageEvent(damage_past_min))
 
-    # Current magic should not be allowed to go below magic.min
     assert aura.magic.value == aura.magic.min
 
 
 def test_magic_max_limit(fixture: AuraFixture) -> None:
     aura = fixture.aura
 
-    # Try to exceed max magic limit
     heal_past_max = aura.magic.max.value * 10
     aura.process_event(HealEvent(heal_past_max))
 
-    # Current should not exceed max magic
     assert aura.magic.value == aura.magic.max.value
 
 
@@ -44,7 +40,6 @@ def test_update_triggers_magic_value_update(fixture: AuraFixture) -> None:
     modifier = ValueModifier(1.0, duration=0.1)
     aura.magic.max.modifiers.add(modifier)
 
-    # Update the aura to trigger modifier expiry
     aura.update(1.0)
 
     assert len(aura.magic.max.modifiers) == 0
@@ -55,7 +50,6 @@ def test_update_triggers_cast_delay_update(fixture: AuraFixture) -> None:
     modifier = ValueModifier(0.5, duration=0.1)
     aura.cast_delay.modifiers.add(modifier)
 
-    # Update the aura to trigger modifier expiry
     aura.update(1.0)
 
     assert len(aura.cast_delay.modifiers) == 0
@@ -75,7 +69,7 @@ def test_handle_event_applies_heal_event(fixture: AuraFixture) -> None:
     aura = fixture.aura
     aura.magic.value = fixture.max_magic / 2
     initial_magic = aura.magic.value
-    heal_amount = fixture.max_magic / 4  # heal by 25%
+    heal_amount = fixture.max_magic / 4
 
     aura.process_event(HealEvent(heal_amount))
 
@@ -98,7 +92,7 @@ def test_handle_event_cancellation(fixture: AuraFixture) -> None:
 
     aura.process_event(DamageEvent(damage_amount))
 
-    assert aura.magic.value == initial_magic  # Magic value should remain unchanged
+    assert aura.magic.value == initial_magic
 
 
 def test_get_spells_by_name(fixture: AuraFixture) -> None:
@@ -115,7 +109,6 @@ def test_get_spells_by_name(fixture: AuraFixture) -> None:
     test_spell = InexorableDoomSpell()
     test_spell_2 = InexorableDoomSpell()
 
-    # Can have more than one of the same spell, so make sure both are returned
     aura.add_spell(test_spell)
     aura.add_spell(test_spell_2)
     aura.add_spell(AnotherSpell())
@@ -172,15 +165,12 @@ def test_get_spells_by_multiple_tags(fixture: AuraFixture) -> None:
     aura.add_spell(shield_buff_spell)
     aura.add_spell(buff_spell)
 
-    # Get spells with both SHIELD and BUFF tags
     shield_buff_spells = list(aura.spells.get_by_tag(SpellTags.SHIELD, SpellTags.BUFF))
     assert shield_buff_spells == [shield_buff_spell]
 
-    # Get spells with only SHIELD tag
     shield_spells = list(aura.spells.get_by_tag(SpellTags.SHIELD))
     assert set(shield_spells) == {shield_spell, shield_buff_spell}
 
-    # Get spells with only BUFF tag
     buff_spells = list(aura.spells.get_by_tag(SpellTags.BUFF))
     assert set(buff_spells) == {shield_buff_spell, buff_spell}
 
@@ -194,11 +184,9 @@ def test_get_spells_by_tag_empty(fixture: AuraFixture) -> None:
 
     aura.add_spell(BuffSpell())
 
-    # No tags specified should return empty list
     spells = list(aura.spells.get_by_tag())
     assert spells == []
 
-    # Non-existent tag should return empty list
     spells = list(aura.spells.get_by_tag(SpellTags.DEBUFF))
     assert spells == []
 

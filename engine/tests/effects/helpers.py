@@ -16,7 +16,7 @@ from engine.state import EffectReceipt
 
 
 class SpyEffectOutput(EffectOutput):
-    """Test spy that captures every ``update_pixels`` call for assertion."""
+    """Captures every ``update_pixels`` call."""
 
     def __init__(self, min_resolution: int, scopes: list, receives_pixels: bool = True) -> None:
         super().__init__(receives_pixels=receives_pixels)
@@ -186,7 +186,7 @@ class RenderLengthProbeEffectBuilder(EffectBuilder):
 
 
 class VerbFiringPixels(EffectPixels):
-    """Test pixels that declare one custom verb, ``FIRED``, and emit it on every update.
+    """Pixels that declare one custom verb, ``FIRED``, and emit it on every update.
 
     Built with ``fires=False`` they declare ``FIRED`` but never emit it.
     """

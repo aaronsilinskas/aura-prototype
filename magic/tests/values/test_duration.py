@@ -47,7 +47,7 @@ def test_update_beyond_expiration():
     is_expired = duration.update(15.0)
 
     assert duration.elapsed == 15.0
-    assert duration.remaining == 0.0  # Should not go negative
+    assert duration.remaining == 0.0
     assert is_expired is True
     assert duration.is_expired is True
 
@@ -70,7 +70,7 @@ def test_zero_length_duration():
     duration = Duration(length=0.0)
 
     assert duration.length == 0.0
-    assert duration.is_expired is True  # Already expired
+    assert duration.is_expired is True
 
 
 def test_zero_length_duration_after_update():
@@ -85,12 +85,10 @@ def test_zero_length_duration_after_update():
 def test_small_increments():
     duration = Duration(length=1.0)
 
-    # Update 9 times with 0.1, then once more to exceed
     for _ in range(9):
         is_expired = duration.update(0.1)
         assert is_expired is False
 
-    # Final update should push it over the edge
     is_expired = duration.update(0.2)
 
     assert duration.elapsed == pytest.approx(1.1)
@@ -124,7 +122,6 @@ def test_length_setter_changes_remaining():
     assert duration.elapsed == 5.0
     assert duration.remaining == 5.0
 
-    # Increase length
     duration.length = 15.0
     assert duration.remaining == 10.0
     assert duration.is_expired is False
@@ -135,7 +132,6 @@ def test_length_setter_can_cause_expiration():
     duration.update(5.0)
     assert duration.is_expired is False
 
-    # Decrease length below elapsed time
     duration.length = 3.0
     assert duration.remaining == 0.0
     assert duration.is_expired is True
@@ -145,7 +141,6 @@ def test_length_setter_negative_remaining():
     duration = Duration(length=10.0)
     duration.update(8.0)
 
-    # Set length to less than elapsed
     duration.length = 5.0
-    assert duration.remaining == 0.0  # Should not be negative
+    assert duration.remaining == 0.0
     assert duration.is_expired is True

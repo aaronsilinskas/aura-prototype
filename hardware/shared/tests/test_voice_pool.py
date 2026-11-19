@@ -6,11 +6,7 @@ from hardware.shared.voice_pool import VoicePool, VoiceSink, clip_stops_receipt
 
 
 class RecordingSink(VoiceSink):
-    """A VoiceSink fake that records every call and tracks per-slot playing state.
-
-    Every call is recorded so tests assert against observable behaviour rather
-    than pool internals.
-    """
+    """A VoiceSink fake that records every call and tracks per-slot playing state."""
 
     def __init__(self, num_voices: int) -> None:
         self.calls: list = []
@@ -144,7 +140,6 @@ def test_failed_load_does_not_evict_a_live_voice(pool: VoicePool, sink: Recordin
     slot = pool.claim(sink, "new.wav", loop=True, stops_receipt=True, receipt=make_receipt())
     assert slot == -1
     assert stop_slots(sink) == []  # no teardown of any existing voice
-    # All three originals still playing — a fresh one-shot claim finds no idle slot
     sink.calls.clear()
     dropped = pool.claim(sink, "shot.wav", loop=False, stops_receipt=True, receipt=make_receipt())
     assert dropped == -1
@@ -239,7 +234,6 @@ def test_sweep_frees_naturally_finished_one_shot(pool: VoicePool, sink: Recordin
     sink.calls.clear()
     pool.sweep(sink)
     assert ("stop", 0) in sink.calls
-    # Slot is free: next claim reuses slot 0
     next_slot = pool.claim(
         sink, "next.wav", loop=False, stops_receipt=False, receipt=make_receipt()
     )
@@ -271,7 +265,6 @@ def test_sweep_does_not_free_a_still_playing_one_shot(pool: VoicePool, sink: Rec
     sink.calls.clear()
     pool.sweep(sink)  # still playing
     assert stop_slots(sink) == []
-    # Slot still occupied: a new one-shot claim takes a different slot
     other = pool.claim(sink, "b.wav", loop=False, stops_receipt=True, receipt=make_receipt())
     assert other == 1
 

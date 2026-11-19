@@ -21,9 +21,8 @@ def test_shadow_spell_is_active_during_duration(fixture: ShadowFixture) -> None:
     aura = fixture.aura
 
     aura.add_spell(fixture.shadow_spell)
-    aura.update(1.0)  # Update partway through duration
+    aura.update(1.0)
 
-    # Shadow spell should still be active
     assert fixture.shadow_spell in aura.spells
 
 
@@ -32,10 +31,8 @@ def test_shadow_spell_expires_after_duration(fixture: ShadowFixture) -> None:
 
     aura.add_spell(fixture.shadow_spell)
 
-    # Simulate time passing until the spell expires
     aura.update(fixture.shadow_duration + 1.0)
 
-    # The shadow spell should be expired and removed
     assert fixture.shadow_spell not in aura.spells
 
 

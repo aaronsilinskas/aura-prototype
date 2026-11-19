@@ -1,5 +1,3 @@
-"""Tests for the hw_test rules/helpers subpackage."""
-
 from __future__ import annotations
 
 from engine.state import EffectReceipt

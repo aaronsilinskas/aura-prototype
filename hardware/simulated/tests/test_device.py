@@ -548,8 +548,6 @@ def test_a_device_without_a_logger_is_silent(capsys):
     assert capsys.readouterr().out == ""
 
 
-# -- haptics -------------------------------------------------------------------
-
 _ALL = frozenset({"all"})
 _BUZZ = Effect(
     name="buzz", haptic=EffectHaptic(patterns={EffectVerb.START: HapticPattern(sequence=[1, 2])})

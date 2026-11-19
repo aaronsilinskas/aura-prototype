@@ -313,13 +313,11 @@ def test_packets_started_counts_every_preamble_match_not_just_completions():
     encoder = TagInfraredEncoder()
     decoder = TagInfraredDecoder()
 
-    # First packet: preamble matches but mark is corrupted — never completes.
     aborted = list(encoder.encode(bytearray([0x10])))[: len(TAG_PREAMBLE) + 1]
     aborted[-1] = 4000
     for pulse in aborted:
         decoder.decode(pulse)
 
-    # Second packet: completes normally.
     completed = encoder.encode(bytearray([0x2A]))
     for pulse in completed:
         decoder.decode(pulse)

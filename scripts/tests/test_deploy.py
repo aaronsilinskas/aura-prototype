@@ -38,7 +38,7 @@ def make_source_tree(root: Path) -> None:
 
 
 def boot_py_source(root: Path) -> Path:
-    """Return the fixture path for boot.py's new home under hardware/circuitpython/."""
+    """Return the fixture path for boot.py under hardware/circuitpython/."""
     return root / "hardware" / "circuitpython" / "boot.py"
 
 
@@ -115,7 +115,6 @@ def test_example_file_is_always_deployed_even_when_up_to_date(tmp_path: Path) ->
     mount.mkdir()
     example = source / "new_demo.py"
     example.write_text("# new demo")
-    # Simulate an older example already deployed as code.py with the same mtime
     existing = mount / "code.py"
     existing.write_text("# old demo")
     os.utime(existing, (example.stat().st_mtime, example.stat().st_mtime))
@@ -291,7 +290,6 @@ def test_existing_destination_file_is_not_overwritten(tmp_path: Path) -> None:
     mount = tmp_path / "mount"
     mount.mkdir()
     (mount / "effects").mkdir()
-    # The device now carries .mpy files; a fresh .mpy should not be overwritten.
     dest = mount / "effects" / "render.mpy"
     dest.write_bytes(b"DEVICE_MPY")
 
@@ -311,12 +309,8 @@ def test_file_within_fat32_tolerance_is_skipped(tmp_path: Path) -> None:
     mount.mkdir()
     (mount / "effects").mkdir()
     # The mtime skip is compared against the staging .mpy, not the source .py.
-    # Pre-populate the device with a sentinel .mpy that looks fresh.
     dest = mount / "effects" / "render.mpy"
     dest.write_bytes(b"DEVICE_MPY")
-    # We set a known mtime on the source .py; fake_compile will produce a staging
-    # .mpy with approximately that mtime.  Then we set the dest mtime 1 s behind —
-    # within the 2-second FAT32 tolerance — so the sync should skip it.
     src = source / "effects" / "render.py"
     os.utime(src, (_BASE_TIME, _BASE_TIME))
     os.utime(dest, (_BASE_TIME - 1, _BASE_TIME - 1))  # 1 s behind — within tolerance
@@ -422,8 +416,6 @@ def test_live_mpy_file_is_not_deleted_from_mount(tmp_path: Path) -> None:
     mount = tmp_path / "mount"
     mount.mkdir()
     (mount / "effects").mkdir()
-    # The device carries .mpy files; a live .mpy that corresponds to a source .py
-    # should remain on the device (it is a valid compiled artefact).
     existing = mount / "effects" / "render.mpy"
     existing.write_bytes(b"DEVICE_MPY")
 
@@ -543,7 +535,6 @@ def test_empty_subdirectory_already_on_mount_is_removed(tmp_path: Path) -> None:
 def test_module_root_removed_when_fully_pruned(tmp_path: Path) -> None:
     source = tmp_path / "source"
     source.mkdir()
-    # Only create source dirs that don't include 'effects'
     (source / "engine").mkdir()
     (source / "engine" / "timer.py").write_text("# timer")
     (source / "magic").mkdir()
@@ -572,7 +563,6 @@ def test_non_empty_directory_is_not_removed(tmp_path: Path) -> None:
 
     deploy(None, mount, source_root=source, compile=fake_compile)
 
-    # effects/ still has live files (render.py was synced), so it must remain
     assert (mount / "effects").exists()
 
 
@@ -582,7 +572,6 @@ def test_first_time_deploy_with_no_module_dirs_on_mount(tmp_path: Path) -> None:
     make_source_tree(source)
     mount = tmp_path / "mount"
     mount.mkdir()
-    # mount has no module dirs at all
 
     result = deploy(None, mount, source_root=source, compile=fake_compile)
 
@@ -1005,7 +994,6 @@ def test_source_mode_prunes_orphaned_mpy_left_by_previous_compiled_deploy(
     make_source_tree(source)
     mount = tmp_path / "mount"
     mount.mkdir()
-    # Simulate a previously-compiled deploy: device has .mpy files
     (mount / "effects").mkdir()
     orphaned_mpy = mount / "effects" / "render.mpy"
     orphaned_mpy.write_bytes(b"OLD_MPY")
@@ -1037,7 +1025,6 @@ def test_compiled_mode_prunes_orphaned_py_left_by_previous_source_deploy(
     make_source_tree(source)
     mount = tmp_path / "mount"
     mount.mkdir()
-    # Simulate a previously-source deploy: device has .py files
     (mount / "effects").mkdir()
     orphaned_py = mount / "effects" / "render.py"
     orphaned_py.write_bytes(b"OLD_PY")

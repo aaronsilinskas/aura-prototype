@@ -28,7 +28,6 @@ _SCOPE_ROWS = {
 
 
 def _make_output(cols: int = _COLS, scope_rows: dict = _SCOPE_ROWS):
-    """Build an IS31FL3741EffectOutput with a mock matrix driver."""
     mock_matrix = MagicMock()
     return IS31FL3741EffectOutput(mock_matrix, cols=cols, scope_rows=scope_rows), mock_matrix
 
@@ -36,9 +35,8 @@ def _make_output(cols: int = _COLS, scope_rows: dict = _SCOPE_ROWS):
 class _RecordingMatrix:
     """Fake matrix with the indexed writes and ``show()`` the output uses, recording every write.
 
-    Unlike the ``MagicMock`` matrix used elsewhere, it retains each
-    ``offset -> byte`` write so a test can assert exactly which register
-    offset received which byte.
+    It retains each ``offset -> byte`` write so a test can assert exactly which
+    register offset received which byte.
     """
 
     def __init__(self) -> None:
@@ -53,7 +51,6 @@ class _RecordingMatrix:
 
 
 def test_offset_table_places_red_at_the_base_register_for_a_bank0_even_column() -> None:
-    """An even column below the x=10 bank split keeps R/G/B in base order."""
     table = build_offset_table([0], cols=13)
 
     x = 2
@@ -63,7 +60,6 @@ def test_offset_table_places_red_at_the_base_register_for_a_bank0_even_column() 
 
 
 def test_offset_table_swaps_red_and_blue_registers_for_a_bank0_odd_column() -> None:
-    """Column parity flips which register holds red vs. blue within bank 0."""
     table = build_offset_table([0], cols=13)
 
     x = 3
@@ -73,11 +69,7 @@ def test_offset_table_swaps_red_and_blue_registers_for_a_bank0_odd_column() -> N
 
 
 def test_offset_table_treats_column_12_like_an_odd_column() -> None:
-    """Column 12 always gets the swapped register order.
-
-    It does so regardless of its own even index — the chip's documented
-    last-column exception to the parity rule.
-    """
+    """The chip's documented last-column exception to the parity rule."""
     table = build_offset_table([0], cols=13)
 
     x = 12
@@ -116,9 +108,9 @@ def test_write_row_emits_one_byte_per_channel() -> None:
     cols = 3
     output, mock_matrix = _make_output(cols=cols, scope_rows={"personal": range(0, 1)})
     buf = PixelBuffer(cols)
-    buf[0] = 0xFF0000  # R=0xFF, G=0x00, B=0x00
-    buf[1] = 0x00FF00  # R=0x00, G=0xFF, B=0x00
-    buf[2] = 0x0000FF  # R=0x00, G=0x00, B=0xFF
+    buf[0] = 0xFF0000
+    buf[1] = 0x00FF00
+    buf[2] = 0x0000FF
 
     output.update_pixels("personal", buf)
 
@@ -131,7 +123,7 @@ def test_write_row_writes_each_channel_to_a_distinct_buffer_position() -> None:
     cols = 2
     output, mock_matrix = _make_output(cols=cols, scope_rows={"personal": range(0, 1)})
     buf = PixelBuffer(cols)
-    buf[0] = 0xFF0000  # R=0xFF, G=0x00, B=0x00
+    buf[0] = 0xFF0000
 
     output.update_pixels("personal", buf)
 
@@ -152,7 +144,7 @@ def test_write_row_routes_red_byte_to_the_b_off_register_and_blue_to_r_off() -> 
     matrix = _RecordingMatrix()
     output = IS31FL3741EffectOutput(matrix, cols=1, scope_rows={"personal": range(0, 1)})
     buf = PixelBuffer(1)
-    buf[0] = 0xAABBCC  # R=0xAA, G=0xBB, B=0xCC
+    buf[0] = 0xAABBCC
 
     output.update_pixels("personal", buf)
 

@@ -66,5 +66,5 @@ def test_update_triggers_max_modifier_update():
     mod = ValueModifier(multiplier=2.0, duration=1.0)
     m.max.modifiers.add(mod)
     assert m.max.value == 40.0
-    m.update(1.5)  # Update with elapsed time greater than modifier duration
+    m.update(1.5)
     assert m.max.value == 20.0

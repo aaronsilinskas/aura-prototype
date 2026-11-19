@@ -49,7 +49,6 @@ def test_add_samples_renderer_clamps_sum_to_one_before_palette_lookup() -> None:
     output = PixelBuffer(1)
     renderer.render(output)
 
-    # Should equal palette.lookup(1.0), not palette.lookup(1.6)
     assert output[0] == palette.lookup(1.0)
 
 
@@ -75,6 +74,3 @@ def test_add_samples_renderer_update_advances_all_layers() -> None:
 
     assert layer_a.update_count == 1
     assert layer_b.update_count == 1
-
-
-# (name is now on Effect, not on AddSamplesRenderer)

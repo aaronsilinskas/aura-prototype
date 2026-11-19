@@ -17,13 +17,11 @@ _G = AccelerationData.GRAVITY
 
 
 def test_linear_magnitude_is_zero_when_acceleration_matches_gravity():
-    """A device at rest (reading only the gravity vector) shows no motion."""
     accel = AccelerationData(x=0.0, y=0.0, z=_G)
     assert pytest.approx(0.0) == linear_magnitude(accel, 0.0, 0.0, _G)
 
 
 def test_linear_magnitude_returns_distance_from_the_gravity_vector():
-    """Motion is the magnitude of the sample minus the gravity estimate."""
     accel = AccelerationData(x=3.0, y=4.0, z=_G)  # deviation (3, 4, 0) → 5.0
     assert pytest.approx(5.0) == linear_magnitude(accel, 0.0, 0.0, _G)
 
@@ -42,17 +40,14 @@ def test_linear_magnitude_is_orientation_independent():
 
 
 def test_low_pass_eases_toward_the_sample_by_the_factor():
-    """One step moves the running value a `factor` fraction toward the sample."""
     assert pytest.approx(1.0) == low_pass(0.0, 10.0, 0.1)
 
 
 def test_low_pass_factor_of_one_snaps_to_the_sample():
-    """factor == 1.0 disables smoothing — the value becomes the latest sample."""
     assert pytest.approx(5.0) == low_pass(99.0, 5.0, 1.0)
 
 
 def test_low_pass_converges_to_a_held_sample():
-    """A steady input is tracked: the value climbs toward and settles at it."""
     value = 0.0
     for _ in range(100):
         value = low_pass(value, _G, 0.1)
@@ -60,7 +55,6 @@ def test_low_pass_converges_to_a_held_sample():
 
 
 def test_low_pass_decays_toward_zero_when_the_sample_stops():
-    """Once the input drops to zero the value bleeds back down to zero."""
     value = _G
     for _ in range(100):
         value = low_pass(value, 0.0, 0.1)

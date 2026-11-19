@@ -1,5 +1,3 @@
-"""Tests for engine.scene: Scene, SceneControls, and SceneManager."""
-
 from __future__ import annotations
 
 import pytest
@@ -823,7 +821,6 @@ def test_rule_pack_items_loaded_in_alphabetical_order(pack_tree) -> None:
         }
     ).rule_registry
 
-    # Verify items() returns alphabetical order
     items = rule_registry.items("rules")
     assert items == sorted(items)
 

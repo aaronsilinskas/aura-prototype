@@ -1,5 +1,3 @@
-"""Unit tests for packs.effects.basic.solid."""
-
 from __future__ import annotations
 
 from effects.effect import EffectConfig, PixelBuffer
@@ -55,7 +53,7 @@ def test_solid_ignores_brightness_option() -> None:
     buf = PixelBuffer(4)
     assert effect.pixels is not None
     effect.pixels.render(buf)
-    # brightness is ignored; raw color is stored as-is
+
     assert all(p == 0xFFFFFF for p in buf)
 
 

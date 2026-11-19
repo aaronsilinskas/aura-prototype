@@ -26,11 +26,10 @@ def regen_fixture() -> RegenFixture:
 def test_magic_regen_over_time_max(regen_fixture: RegenFixture) -> None:
     aura = regen_fixture.aura
 
-    # Duration to regen a quarter of max magic
     duration = aura.magic.max.value / 4 / regen_fixture.regen_per_second
 
     aura.add_spell(regen_fixture.regen_spell)
-    aura.update(duration)  # Simulate time passing
+    aura.update(duration)
 
     assert aura.magic.value == regen_fixture.starting_magic + (
         regen_fixture.regen_per_second * duration

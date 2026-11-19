@@ -2,7 +2,6 @@ from effects.layers.shape_layer import ShapeLayer
 
 
 def test_shape_layer_sample_returns_shape_function_value() -> None:
-    # lambda returns position directly — no gamma correction
     layer = ShapeLayer(lambda pos: pos)
 
     assert abs(layer.sample(0.0, 10) - 0.0) < 1e-9
@@ -11,7 +10,6 @@ def test_shape_layer_sample_returns_shape_function_value() -> None:
 
 
 def test_shape_layer_sample_clamps_values_above_one_to_one() -> None:
-    # shape function that returns 2.0 — should be clamped
     layer = ShapeLayer(lambda pos: 2.0)
 
     assert layer.sample(0.5, 10) == 1.0

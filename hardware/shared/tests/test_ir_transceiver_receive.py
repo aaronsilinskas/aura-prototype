@@ -157,7 +157,6 @@ def test_the_winning_readers_signal_is_reported():
 
 
 def test_a_single_reader_reports_its_signal_but_names_no_best_receiver():
-    """With one reader there is no pick to report, but the signal still is."""
     transceiver, readers = _receiving(1)
     readers[0].load(aura_pulses(b"\x42"))
 

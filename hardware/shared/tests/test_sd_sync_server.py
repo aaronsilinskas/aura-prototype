@@ -99,7 +99,7 @@ def test_list_with_no_sd_configured_returns_none_rather_than_raising():
 
 
 class _ScriptedTransport(Transport):
-    """Test double replaying pre-recorded ``recv()`` lines; records every ``send()``."""
+    """Replays pre-recorded ``recv()`` lines; records every ``send()``."""
 
     def __init__(self, recv_lines: list[bytes]) -> None:
         self._recv_lines = list(recv_lines)

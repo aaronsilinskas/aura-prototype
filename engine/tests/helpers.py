@@ -22,8 +22,6 @@ _STUB_RECEIPT_ID = 0
 
 
 class SpyNetworkControls(NetworkControls):
-    """Test spy that records send_ir and send_radio calls."""
-
     def __init__(self) -> None:
         self.send_ir_calls: list[tuple[bytes, str]] = []
         self.send_radio_calls: list[bytes] = []
@@ -36,7 +34,7 @@ class SpyNetworkControls(NetworkControls):
 
 
 class SpyEffectControls(EffectControls):
-    """Test spy that records set_effect, stop_effect, and add_effect calls.
+    """Records set_effect, stop_effect, and add_effect calls.
 
     ``add_effect`` stubs with a dummy ``EffectReceipt``. ``set_merge_strategy``
     is a defensive no-op: this spy is for rule unit tests, which may call it,
@@ -64,7 +62,7 @@ class SpyEffectControls(EffectControls):
 
 
 class SpyEffectAdmin(EffectAdmin):
-    """Test recorder for the scene-transition ``EffectAdmin`` face.
+    """Recorder for the scene-transition ``EffectAdmin`` face.
 
     ``steps`` records each step as ``(name, view)``, where *name* is
     ``"enter"``, ``"cover"`` or ``"uncover"``, so ``SceneManager`` transition
@@ -93,7 +91,7 @@ class SpyEffectAdmin(EffectAdmin):
 
 
 class RecordingSceneReboot(SceneReboot):
-    """Test recorder for the board-free ``SceneReboot`` port.
+    """Recorder for the board-free ``SceneReboot`` port.
 
     Records every ``reboot_into``/``reboot_to_previous`` call instead of
     touching storage or resetting anything, so ``SceneManager``'s

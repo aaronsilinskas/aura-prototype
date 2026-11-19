@@ -53,9 +53,7 @@ class _QueueTransport(Transport):
 class _CorruptingTransport(Transport):
     """Wraps a ``Transport``, flipping a byte in the first *corrupt_count* chunk payloads sent.
 
-    Test-only fault injection standing in for a bit-flip in transit -- the
-    means by which the CRC-mismatch-and-retry tests force a mismatch without
-    reaching into the client or server's internals.
+    Stands in for a bit-flip in transit.
     """
 
     def __init__(self, inner: Transport, corrupt_count: int) -> None:

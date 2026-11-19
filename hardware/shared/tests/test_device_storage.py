@@ -102,12 +102,7 @@ def test_write_chunks_concatenates_chunks_in_order(tmp_path):
 
 
 def test_write_chunks_writes_each_pulled_chunk_before_pulling_the_next(tmp_path, monkeypatch):
-    """Proves the streaming claim in write_chunks's docstring: each chunk is written to
-    the temp file before the next one is pulled from the generator, rather than the
-    whole generator being drained into a list/join upfront and written all at once --
-    the property that lets a caller stream chunks off a wire without buffering the
-    whole payload in memory.
-    """
+    """Lets a caller stream chunks off a wire without buffering the whole payload."""
     storage = DeviceStorage(str(tmp_path))
     events = []
 

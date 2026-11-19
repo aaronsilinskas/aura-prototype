@@ -149,7 +149,6 @@ def test_in_flight_buffer_reference_is_dropped_once_idle():
 
 
 def test_busy_query_keeps_buffer_while_still_writing():
-    """Polling is_busy() mid-write does not prematurely drop the buffer."""
     writer, sm = _make_writer()
     writer.write_pulses(array("H", [100, 200, 300]))
     assert writer.is_busy() is True
@@ -159,10 +158,8 @@ def test_busy_query_keeps_buffer_while_still_writing():
 def test_write_pulses_converts_us_durations_to_loop_counts():
     """write_pulses hands the DMA carrier-period counts, not raw µs.
 
-    The raw encoder values are microseconds; the DMA must receive carrier-period
-    counts, not the µs values fed straight through (the original defect). A
-    single (odd-length) input is padded with the gap, so the converted duration
-    is the buffer's first element.
+    A single (odd-length) input is padded with the gap, so the converted
+    duration is the buffer's first element.
     """
     writer, sm = _make_writer()
     # 500 µs, hand-computed against the source formula (independent of the
@@ -191,19 +188,16 @@ def test_write_pulses_rejects_an_even_length_frame_naming_its_length():
 
 
 def test_header_mark_round_trips_within_protocol_tolerance():
-    """A 4000 µs header mark reconstructs to ~4000 µs, well inside ±250 µs."""
     reconstructed = _loops_to_us(_duration_us_to_loops(IR_HEADER_MARK))
     assert abs(reconstructed - IR_HEADER_MARK) <= IR_UNIT // 2
 
 
 def test_base_unit_round_trips_within_protocol_tolerance():
-    """The 500 µs base unit — the shortest real duration — stays within ±250 µs."""
     reconstructed = _loops_to_us(_duration_us_to_loops(IR_UNIT))
     assert abs(reconstructed - IR_UNIT) <= IR_UNIT // 2
 
 
 def test_lead_out_round_trips_within_protocol_tolerance():
-    """The 5000 µs lead-out — the longest duration — stays within ±250 µs."""
     reconstructed = _loops_to_us(_duration_us_to_loops(IR_LEAD_OUT))
     assert abs(reconstructed - IR_LEAD_OUT) <= IR_UNIT // 2
 

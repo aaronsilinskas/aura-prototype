@@ -114,9 +114,7 @@ def _loopback_client(storage: "DeviceStorage | None"):
     """Wire a real ``SdSyncClient`` to a fresh ``SdSyncServer(storage)`` over a loopback.
 
     The server runs on a background daemon thread dispatching by request verb
-    (``serve_one``) -- the same shape ``examples/sd_sync.py`` drives on a real
-    device, just in-memory -- so ``dispatch`` is exercised end-to-end without
-    any real transport or device involved.
+    (``serve_one``).
     """
     to_server: queue.Queue[bytes] = queue.Queue()
     to_client: queue.Queue[bytes] = queue.Queue()

@@ -8,8 +8,8 @@ from magic.tests.helpers import AuraFixture
 class ChargeFixture(AuraFixture):
     def __init__(self) -> None:
         super().__init__()
-        self.aura.magic.value = self.max_magic / 4  # Start at 25% magic
-        self.healing_multiplier = 1.5  # 150% healing
+        self.aura.magic.value = self.max_magic / 4
+        self.healing_multiplier = 1.5
         self.duration = 10.0
         self.charge_spell = ChargeSpell(
             healing_multiplier=self.healing_multiplier,
@@ -25,7 +25,7 @@ def fixture() -> ChargeFixture:
 def test_charge_amplifies_healing(fixture: ChargeFixture) -> None:
     aura = fixture.aura
     initial_magic = aura.magic.value
-    original_heal_amount = fixture.max_magic / 4  # heal by 25%
+    original_heal_amount = fixture.max_magic / 4
     charged_heal_amount = original_heal_amount * fixture.healing_multiplier
 
     aura.add_spell(fixture.charge_spell)
@@ -38,7 +38,7 @@ def test_charge_amplifies_healing(fixture: ChargeFixture) -> None:
 def test_charge_does_not_amplify_damage(fixture: ChargeFixture) -> None:
     aura = fixture.aura
     initial_magic = aura.magic.value
-    damage_amount = fixture.max_magic / 10  # damage by 10%
+    damage_amount = fixture.max_magic / 10
 
     aura.add_spell(fixture.charge_spell)
 
@@ -52,10 +52,8 @@ def test_charge_expires_after_duration(fixture: ChargeFixture) -> None:
 
     aura.add_spell(fixture.charge_spell)
 
-    # Update the aura past the duration of the charge spell
     aura.update(fixture.duration + 1)
 
-    # The charge spell should be expired and removed
     assert fixture.charge_spell not in aura.spells
 
 

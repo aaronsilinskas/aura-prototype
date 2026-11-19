@@ -1,5 +1,3 @@
-"""Tests for PulseLayer.at_peak flag and raw _elapsed accumulator."""
-
 import pytest
 
 from effects.layers.pulse_layer import PulseLayer

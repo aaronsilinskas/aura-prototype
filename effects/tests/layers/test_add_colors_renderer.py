@@ -43,13 +43,11 @@ def test_add_colors_renderer_two_layers_are_brighter_than_one() -> None:
     renderer_two.render(out_two)
     renderer_one.render(out_one)
 
-    # Additive blend: each channel is brighter (or equal at max 255)
     assert out_two[0] > out_one[0], "additive result not brighter than single layer"
 
 
 def test_add_colors_renderer_blends_channels_additively_without_overflow() -> None:
-    # Palette: maps 1.0 → packed (100, 50, 25)
-    # Two layers both at 1.0 → result should be (200, 100, 50)
+    # Each layer maps to (100, 50, 25); two of them sum to (200, 100, 50).
     dim_red_palette = PaletteLUT256(bytes([0, 0, 0, 0, 255, 100, 50, 25]))
     renderer = AddColorsRenderer(
         [(_ConstantLayer(1.0), dim_red_palette), (_ConstantLayer(1.0), dim_red_palette)],

@@ -1,5 +1,3 @@
-"""Tests for ButtonData query methods, MagneticData, and InputEvents.Sensors."""
-
 from engine.input import AccelerationData, ButtonData, InputEvents, MagneticData
 
 
