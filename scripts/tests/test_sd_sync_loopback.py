@@ -33,6 +33,7 @@ from scripts.sd_sync_client import (
     SdSyncIntegrityError,
     SdSyncNoStorageError,
     SdSyncNotFoundError,
+    SdSyncProtocolError,
 )
 
 
@@ -366,6 +367,45 @@ def test_push_of_a_small_payload_sends_exactly_one_chunk(
     host_path.write_bytes(b"hello")
 
     client.push(str(host_path), "small.txt")
+
+    assert transport.sent_kind_counts["chunk"] == 1
+
+
+class _AckReplacingTransport(Transport):
+    """Wraps the server's ``Transport``, sending *reply* in place of its first chunk ack."""
+
+    def __init__(self, inner: Transport, reply: Frame) -> None:
+        self._inner = inner
+        self._reply: Frame | None = reply
+
+    def send(self, line: bytes) -> None:
+        if self._reply is not None and decode_frame(line).kind == "ack":
+            line = encode_frame(self._reply)
+            self._reply = None
+        self._inner.send(line)
+
+    def recv(self) -> bytes:
+        return self._inner.recv()
+
+
+@pytest.mark.parametrize(
+    "reply",
+    [Frame("resp", "error"), Frame("ack", "1")],
+    ids=["non-ack-frame", "ack-of-the-wrong-chunk"],
+)
+def test_push_stops_with_an_error_when_a_chunk_is_not_acked_by_its_sequence_number(
+    device_storage: DeviceStorage, tmp_path: Path, reply: Frame
+):
+    client, transport = make_loopback_client(
+        device_storage,
+        verb="push",
+        server_side_wrapper=lambda inner: _AckReplacingTransport(inner, reply),
+    )
+    host_path = tmp_path / "log.txt"
+    host_path.write_bytes(b"x" * (CHUNK_SIZE + 1))
+
+    with pytest.raises(SdSyncProtocolError, match="ack"):
+        client.push(str(host_path), "log.txt")
 
     assert transport.sent_kind_counts["chunk"] == 1
 

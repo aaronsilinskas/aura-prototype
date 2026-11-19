@@ -45,6 +45,7 @@ __all__ = [
     "SdSyncIntegrityError",
     "SdSyncNoStorageError",
     "SdSyncNotFoundError",
+    "SdSyncProtocolError",
 ]
 
 DEFAULT_MAX_ATTEMPTS: Final = 3
@@ -64,6 +65,14 @@ class SdSyncNotFoundError(SdSyncError):
 
 class SdSyncIntegrityError(SdSyncError):
     """Every retry attempt's CRC-32 mismatched; the transfer could not be verified."""
+
+
+class SdSyncProtocolError(SdSyncError, ValueError):
+    """The server broke the protocol, so the exchange cannot safely continue.
+
+    Also a ``ValueError``, the type :class:`SdSyncServer` raises when the client
+    breaks the protocol.
+    """
 
 
 class SdSyncClient:
@@ -175,6 +184,8 @@ class SdSyncClient:
         Raises:
             SdSyncNoStorageError: The device has no SD card configured.
             SdSyncIntegrityError: Every attempt's CRC-32 mismatched.
+            SdSyncProtocolError: The server replied to a chunk with anything
+                but that chunk's ack; the push stops without retrying.
         """
         for _attempt in range(self._max_attempts):
             self._transport.send(encode_frame(Frame("req", f"push {sd_path}")))
@@ -200,6 +211,10 @@ class SdSyncClient:
         is held before the server acknowledges it. The server replies to the
         closing ``done`` frame with ``"ok"`` (committed) or ``"crc_mismatch"``
         (left on disk untouched).
+
+        Raises:
+            SdSyncProtocolError: A chunk's reply was not the ack carrying its
+                sequence number.
         """
         crc = 0
         with open(host_path, "rb") as host_file:
@@ -210,12 +225,24 @@ class SdSyncClient:
                     break
                 crc = binascii.crc32(chunk, crc)
                 self._transport.send(encode_frame(Frame("chunk", str(seq), chunk)))
-                self._transport.recv()  # ack -- stop-and-wait; the seq is implied by order
+                self._expect_ack(seq)
                 seq += 1
 
         self._transport.send(encode_frame(Frame("done", str(crc))))
         response = decode_frame(self._transport.recv())
         return response.text == "ok"
+
+    def _expect_ack(self, seq: int) -> None:
+        """Consume chunk *seq*'s ack, refusing to stream past any other reply.
+
+        Raises:
+            SdSyncProtocolError: The reply was not ``ack`` carrying *seq*.
+        """
+        frame = decode_frame(self._transport.recv())
+        if frame.kind != "ack" or frame.text != str(seq):
+            raise SdSyncProtocolError(
+                f"expected SD-sync frame 'ack' {str(seq)!r}, got {frame.kind!r} {frame.text!r}"
+            )
 
 
 def _remove_if_exists(host_path: str) -> None:
