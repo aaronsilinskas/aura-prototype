@@ -169,7 +169,7 @@ class InfraredDecoder:
         self._max_error_margin = 0
 
     def _finish_packet(self) -> None:
-        """Record the completed packet's error margin, then reset to idle."""
+        """Call only when a packet completes, so no rejected frame overwrites the margin."""
         self._last_error_margin = self._max_error_margin
         self.reset()
 

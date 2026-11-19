@@ -367,8 +367,10 @@ class _InfraredReceiver:
         self.packets_surfaced: int = 0
         self.pulses_dropped_transmitting: int = 0
 
-        # The decoder object itself, not its index: apply_codec replaces the
-        # decoder list, and the last packet's signal outlives that swap.
+        # Read live, not copied: a decoder's margin changes only when it
+        # completes a packet, and every completed packet enters that tick's
+        # pick. Held as the object, not its index, because apply_codec
+        # replaces the decoder list and the last packet's signal outlives that.
         self._last_winning_decoder: InfraredDecoder | None = None
         self._last_best_receiver: PulseReader | None = None
 

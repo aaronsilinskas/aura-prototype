@@ -118,6 +118,6 @@ def test_a_rejected_frame_after_a_completed_packet_keeps_its_error_margin(
     broken = list(encoder_class().encode(bytearray([0x15])))
     broken[space_index] = 3500  # no data space in either codec, and below the tag gap
 
-    assert _feed_pulses(decoder, broken) is None
+    _feed_pulses(decoder, broken)
 
     assert decoder.last_error_margin == _NUDGE

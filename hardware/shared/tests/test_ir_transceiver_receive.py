@@ -178,8 +178,9 @@ def test_no_signal_or_best_receiver_is_reported_before_the_first_frame():
 
 
 def test_a_received_frames_signal_survives_the_drain_of_a_following_emission():
+    nudge = 100  # µs, within tolerance: a known, non-zero error margin
     noisy = aura_pulses(b"\x66")
-    noisy[3] += 100  # within tolerance: a known, non-zero error margin
+    noisy[3] += nudge
     transceiver, readers, writer = _emitting(2, holds=True)
     readers[1].load(noisy)
     transceiver.update(0.0)
@@ -190,7 +191,7 @@ def test_a_received_frames_signal_survives_the_drain_of_a_following_emission():
     writer.finish()
     transceiver.update(0.0)  # the post-emission drain
 
-    assert transceiver.last_error_margin == 100
+    assert transceiver.last_error_margin == nudge
     assert transceiver.last_signal_strength == strength
 
 
