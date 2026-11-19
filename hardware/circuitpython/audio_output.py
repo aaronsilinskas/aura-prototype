@@ -19,10 +19,6 @@ if TYPE_CHECKING:
 class AudioEffectOutput(EffectOutput, VoiceSink):
     """EffectOutput that plays WAV files via the PropMaker's built-in I2S amp.
 
-    Registered on all scopes with ``receives_pixels = False`` — receives
-    ``handle_event`` calls for every effect on every scope without incurring
-    pixel buffer allocation.
-
     All voice-slot bookkeeping (slot occupancy, the eviction policy, the
     stops-receipt release rule, loudness tracking) lives in :class:`VoicePool`.
     This class is the live :class:`VoiceSink` adapter: it owns only hardware —

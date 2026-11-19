@@ -1,12 +1,4 @@
-"""Shared base classes for IR wire-frame codecs on the Aura platform.
-
-Provides ``InfraredEncoder`` and ``InfraredDecoder`` — the abstract base
-classes every concrete codec (:mod:`hardware.shared.ir_codecs.aura`,
-:mod:`hardware.shared.ir_codecs.tag`) subclasses for its telemetry/bit/pulse
-machinery.
-
-No ``pulseio`` import — safe on CPython, CircuitPython 10.x, and MicroPython.
-"""
+"""Shared base classes for IR wire-frame codecs."""
 
 from array import array
 
@@ -16,8 +8,6 @@ class InfraredEncoder:
 
     Subclasses implement :meth:`encode` to map opaque bytes onto an
     ``array.array`` of pulse durations (µs), alternating mark/space.
-    No ``pulseio`` dependency — the array is passed to the hardware layer
-    by the caller.
     """
 
     def encode(self, data: bytes) -> array:
@@ -29,9 +19,6 @@ class InfraredEncoder:
         Returns:
             ``array.array('H', …)`` of pulse durations in microseconds,
             alternating mark/space, starting with a mark.
-
-        Raises:
-            NotImplementedError: Always — subclasses must override.
         """
         raise NotImplementedError
 
@@ -97,21 +84,12 @@ class InfraredDecoder:
 
     def __init__(self, error_threshold: int) -> None:
         self._error_threshold = error_threshold
-
-        # State machine position
         self._decoder_state: int = 0
-        # Completed-byte accumulator
         self._received_data: bytearray = bytearray()
-        # Bit-writer state (MSB-first: starts at bit 7)
         self._received_bit_index: int = 7
         self._received_byte: int = 0
-
-        # Timing-error tracking for the current packet
         self._max_error_margin: int = 0
-        # Timing-error result from the last completed packet (None = never decoded)
         self._last_error_margin: int | None = None
-
-        # Monotonic-since-boot telemetry counters
         self.packets_started: int = 0
         self.packets_completed: int = 0
         self.preamble_reject: int = 0
@@ -128,27 +106,15 @@ class InfraredDecoder:
             ``bytearray`` payload if a complete, valid packet was decoded;
             ``None`` if more pulses are needed, an error occurred, or the
             packet was rejected.
-
-        Raises:
-            NotImplementedError: Always — subclasses must override.
         """
         raise NotImplementedError
 
     @property
     def last_error_margin(self) -> int | None:
-        """Worst-case timing deviation (µs) from the last decoded packet.
-
-        Returns ``None`` before any packet has been successfully decoded.
-        """
         return self._last_error_margin
 
     @property
     def last_signal_strength(self) -> float | None:
-        """Normalised signal quality (0.0–1.0) from the last decoded packet.
-
-        An error margin of 0 or ≤ 30 % of the error threshold yields 1.0.
-        Returns ``None`` before any packet has been decoded.
-        """
         if self._last_error_margin is None:
             return None
         if self._last_error_margin == 0:

@@ -1,8 +1,4 @@
-"""Infrared tag IR wire-frame codec for the Aura platform.
-
-Provides the wire layer ``TagInfraredEncoder`` / ``TagInfraredDecoder``, which
-subclass :class:`InfraredEncoder` / :class:`InfraredDecoder` from
-:mod:`hardware.shared.ir_codecs.base`.
+"""Infrared tag IR wire-frame codec.
 
 This is a port of the external infrared tag protocol so Aura devices can send
 and receive shots that interoperate with third-party tag hardware. The wire
@@ -15,20 +11,8 @@ The game-layer *data* codec (``TagData`` / ``encode_tag_data`` /
 ``decode_tag_data``) lives in :mod:`packs.scenes.tag.tag_data` — a different
 axis (byte ↔ ``TagData``, not byte ↔ pulses) private to the tag scene.
 
-No ``pulseio`` import — safe on CPython, CircuitPython 10.x, and MicroPython.
-
-Wire-frame timing constants (all times in microseconds):
-
-- Preamble: 3000 mark, 6000 space, 3000 mark
-- Bit mark = 2000 µs for both 0 and 1
-- Bit space zero = 1000 µs, bit space one = 2000 µs
-- Data format: 2-bit team, 3-bit player, 2-bit damage (7 bits total, MSB-first,
-  preceded by a single zero padding bit)
-- Error tolerance: ±500 µs
-
-Module-level ``ENCODER`` / ``DECODER`` attributes point at this codec's class
-pair — the convention :func:`~hardware.shared.ir_codecs.codec_for` relies on to
-resolve a codec name to its module.
+Data format: 2-bit team, 3-bit player, 2-bit damage (7 bits total, MSB-first,
+preceded by a single zero padding bit).
 """
 
 from __future__ import annotations
@@ -44,21 +28,20 @@ if TYPE_CHECKING:
 
 
 # Wire-frame timings are in µs.
-TAG_ERROR_MARGIN: Final = 500  # Maximum allowed timing deviation
-TAG_PREAMBLE_ERROR_MARGIN: Final = 1000  # Maximum timing deviation for preamble
-TAG_PREAMBLE: Final = [3000, 6000, 3000]  # Infrared tag start sequence
+TAG_ERROR_MARGIN: Final = 500
+TAG_PREAMBLE_ERROR_MARGIN: Final = 1000
+TAG_PREAMBLE: Final = [3000, 6000, 3000]
 
 # Inter-frame idle gap: PulseIn reports the silence between frames as a single
 # long space pulse. Longest valid in-frame pulse is the preamble space
 # (TAG_PREAMBLE[1] == 6000 µs); anything beyond that plus the error margin
 # can only be the trailing gap, never a legitimate frame pulse.
-TAG_GAP_THRESHOLD: Final = TAG_PREAMBLE[1] + TAG_ERROR_MARGIN  # 6500 µs
+TAG_GAP_THRESHOLD: Final = TAG_PREAMBLE[1] + TAG_ERROR_MARGIN
 
-TAG_MARK: Final = 2000  # Duration of mark (ON) pulse for data bits
-TAG_SPACE_ZERO: Final = 1000  # Duration of space (OFF) pulse for bit 0
-TAG_SPACE_ONE: Final = 2000  # Duration of space (OFF) pulse for bit 1
+TAG_MARK: Final = 2000
+TAG_SPACE_ZERO: Final = 1000
+TAG_SPACE_ONE: Final = 2000
 
-# Data field bit lengths
 TAG_TEAM_BITS: Final = 2  # 2 bits = 4 teams (0-3)
 TAG_PLAYER_BITS: Final = 3  # 3 bits = 8 players (1-8)
 TAG_DAMAGE_BITS: Final = 2  # 2 bits = 4 damage levels (1-4)
@@ -107,12 +90,7 @@ class TagInfraredEncoder(InfraredEncoder):
 
 
 class TagInfraredDecoder(InfraredDecoder):
-    """Infrared tag IR decoder.
-
-    Stateful pulse-by-pulse decoder. Feed each received pulse duration (µs)
-    to :meth:`decode`; it returns a single-byte ``bytearray`` payload when a
-    complete packet has been received, or ``None`` otherwise.
-    """
+    """Infrared tag IR decoder."""
 
     __slots__ = ()
 
@@ -122,19 +100,9 @@ class TagInfraredDecoder(InfraredDecoder):
     def decode(self, pulse: int) -> bytearray | None:
         """Process one pulse and return the decoded byte when a packet completes.
 
-        States:
-        - ``0`` to ``len(TAG_PREAMBLE) - 1``: validate preamble pulses;
-          reset on mismatch.
-        - ``len(TAG_PREAMBLE)`` to ``TAG_TOTAL_PULSES - 1``: decode data
-          bits, alternating between a mark pulse and a space pulse (the
-          space determines the bit value). The space pulse that completes
-          the final data bit (the 17th pulse overall) finalises the packet
-          in this same call — no trailing pulse is consumed or awaited.
-
-        A pulse at or beyond ``TAG_GAP_THRESHOLD`` is the inter-frame idle gap
-        (``PulseIn`` reports the silence between frames as one long space),
-        not frame data — checked first, ahead of the state machine, so it
-        always wins over any in-progress decode.
+        The space pulse that completes the final data bit (the 17th pulse
+        overall) finalises the packet in this same call — no trailing pulse is
+        consumed or awaited.
 
         Args:
             pulse: Pulse duration in microseconds.

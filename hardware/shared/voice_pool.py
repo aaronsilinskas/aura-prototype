@@ -4,11 +4,7 @@
 the eviction policy, the stops-receipt release rule, and loudness tracking —
 without ever touching audio hardware.  ``clip_stops_receipt`` decides, per
 clip, whether its release stops the effect's receipt.  All hardware lives behind the
-``VoiceSink`` port, so the pool runs unchanged on CPython, CircuitPython, and
-MicroPython and is testable with a plain recording fake.
-
-Imports no CircuitPython modules (``audiobusio`` / ``audiocore`` /
-``audiomixer`` / ``board``).
+``VoiceSink`` port.
 """
 
 from __future__ import annotations
@@ -61,7 +57,6 @@ class VoiceSink:
         raise NotImplementedError
 
     def is_playing(self, slot: int) -> bool:
-        """Return whether ``slot``'s voice is still playing."""
         raise NotImplementedError
 
 

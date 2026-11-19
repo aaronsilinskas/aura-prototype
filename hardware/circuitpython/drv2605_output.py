@@ -29,15 +29,11 @@ _DRV2605L_EFFECT_MAP: Final = {
 
 _MAX_SEQUENCE_LEN: Final = 8
 
-# Sentinel used to clear remaining driver sequence slots after a shorter sequence is written.
 _EFFECT_ZERO: Final = adafruit_drv2605.Effect(0)
 
 
 class Drv2605EffectOutput(EffectOutput):
     """EffectOutput that drives the DRV2605L haptic controller in response to game events.
-
-    Registered on all scopes with ``receives_pixels = False`` — receives
-    ``handle_event`` calls for every effect without incurring pixel buffer allocation.
 
     A new event always interrupts the current haptic pattern — writing the new sequence
     and calling ``driver.play()`` is sufficient; the hardware restarts immediately.
@@ -47,9 +43,7 @@ class Drv2605EffectOutput(EffectOutput):
     is needed.
 
     Args:
-        driver: A configured ``adafruit_drv2605.DRV2605`` instance. Injected at
-            construction so setup code remains in ``circuitpython_parts.py`` and this class
-            stays testable.
+        driver: A configured ``adafruit_drv2605.DRV2605`` instance.
     """
 
     __slots__ = ("_active_receipt", "_driver")

@@ -1,4 +1,4 @@
-"""Device assembly — the one board-free turning of a ``DeviceConfig`` into ``DeviceHardware``.
+"""Device assembly: the one turning of a ``DeviceConfig`` into ``DeviceHardware``.
 
 Decides what a config builds and reaches hardware only through a
 :class:`~hardware.shared.device_parts.DeviceParts` adapter, so the physical
@@ -197,7 +197,6 @@ def _polled_sensor(
 
 
 def _append_built(polled: list[PolledPart], part: PolledPart | None) -> None:
-    """List ``part`` as a **Polled part** if it was built; an absent part is never polled."""
     if part is not None:
         polled.append(part)
 

@@ -1,11 +1,7 @@
-"""InfraredTransceiver — board-free single owner of the IR hardware subsystem.
+"""InfraredTransceiver — single owner of the IR hardware subsystem.
 
-Builds and owns the transmitters, the receiver, and the shared IR transmit
-gate that keeps a device from decoding its own self-echo, from the pulse
-readers, emitter pins and writer factory the platform provides. Pumps its own
-transmitters directly rather than through an ``engine``-side seam. Used by
-the device and the Simulated device alike, and exposed as
-``DeviceHardware.ir``.
+Pumps its own transmitters directly rather than through an ``engine``-side
+seam. Exposed as ``DeviceHardware.ir``.
 """
 
 from engine.network import IR_EMITTERS
@@ -164,8 +160,7 @@ class InfraredTransceiver(PolledPart):
 
         Applied uniformly, with no "differs from default?" branch — intended
         for a single call before the first tick, not guarded against mid-run
-        use. A no-op for transmitters when none are wired, and the decoder
-        step is skipped with no receiver.
+        use.
 
         Args:
             encoder_class: The encoder class, as
@@ -193,39 +188,19 @@ class InfraredTransceiver(PolledPart):
 
     @property
     def last_signal_strength(self) -> float | None:
-        """Normalised signal quality (0.0-1.0) forwarded from the receiver.
-
-        ``None`` with no receiver wired, or before the receiver's first
-        successful decode.
-        """
         receiver = self._receiver
         return receiver.last_signal_strength if receiver is not None else None
 
     @property
     def last_error_margin(self) -> int | None:
-        """Worst-case timing deviation (µs) forwarded from the receiver.
-
-        ``None`` with no receiver wired, or before the receiver's first
-        successful decode.
-        """
         receiver = self._receiver
         return receiver.last_error_margin if receiver is not None else None
 
     @property
     def last_best_receiver(self) -> PulseReader | None:
-        """The reader the receiver picked for the last packet, forwarded from it.
-
-        ``None`` with no receiver wired, with a single reader, or before the
-        receiver's first successful decode.
-        """
         receiver = self._receiver
         return receiver.last_best_receiver if receiver is not None else None
 
     def telemetry_line(self) -> str | None:
-        """Delegate to the receiver's change-gated telemetry summary.
-
-        Returns ``None`` with no receiver wired, or when the receiver has
-        nothing new to report.
-        """
         receiver = self._receiver
         return receiver.telemetry_line() if receiver is not None else None

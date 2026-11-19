@@ -1,8 +1,7 @@
-"""Pure IR receive-path telemetry summary — no board imports, CPython-testable.
+"""IR receive-path telemetry summary.
 
 Formats the one-line-per-second serial summary that ``run_scene`` prints,
-gated on a counter actually changing since the last poll. No ``pulseio``
-import — safe on CPython, CircuitPython 10.x, and MicroPython.
+gated on a counter actually changing since the last poll.
 """
 
 from __future__ import annotations

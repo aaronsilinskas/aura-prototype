@@ -1,6 +1,6 @@
 """The physical device's entry point: boots a board through the Device assembly.
 
-Deploy-watch only: imports board. What a config builds is decided by
+What a config builds is decided by
 :func:`~hardware.shared.device_assembly.assemble_device`; how each part is
 built on a board lives in :class:`~hardware.circuitpython.circuitpython_parts.CircuitPythonParts`.
 """

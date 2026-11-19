@@ -1,4 +1,4 @@
-"""PolledPart — the contract every part the tick refreshes shares. No board imports."""
+"""PolledPart: the contract every part the tick refreshes shares."""
 
 __all__ = ["PolledPart"]
 

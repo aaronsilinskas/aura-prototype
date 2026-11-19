@@ -1,4 +1,4 @@
-"""Config loader and parser for aura-device.json — no board imports, CPython-testable."""
+"""Config loader and parser for ``aura-device.json``."""
 
 from __future__ import annotations
 
@@ -71,10 +71,6 @@ _DEFAULT_CURRENT_LIMIT_MA: Final = 2000
 _DEFAULT_MAX_PIXEL_CURRENT_MA: Final = 60
 _DEFAULT_MIN_BRIGHTNESS: Final = 0.05
 
-# The one source of the I2C-device `DeviceConfig` slot names: `parse_device_config`,
-# `_parse_i2c_device`'s section-specific error messages, and
-# `DeviceConfig.i2c_devices` all key off this list, rather than each
-# hand-listing the set separately.
 _I2C_DEVICE_SECTIONS: Final = ("accelerometer", "magnetometer", "haptics")
 
 # `DeviceConfig.isolate` derives its isolatable set from `DeviceConfig.__slots__`
@@ -263,10 +259,7 @@ class I2CDeviceConfig:
 
     Presence alone gates that peripheral's build (see ``device_assembly``);
     ``address`` optionally overrides the driver's default I2C address, and
-    ``i2c`` names the I2C **Named bus** it joins (``"default"`` unless set). The
-    three sections carry identical fields, so one class and one parser
-    (``_parse_i2c_device``) serve all of them; only the error-message prefix
-    differs per section.
+    ``i2c`` names the I2C **Named bus** it joins (``"default"`` unless set).
     """
 
     __slots__ = ("address", "enabled", "i2c")
@@ -452,24 +445,15 @@ class DeviceConfig:
     def isolate(self, keep: str) -> DeviceConfig:
         """Return a derived config with every isolatable component but *keep* disabled.
 
-        Nothing re-parses: the returned config is built entirely from this
-        already-parsed one. *keep* is left exactly as declared, including its
-        own ``enabled`` value -- isolating a component declared
-        ``enabled: false`` yields a config that builds nothing; ``isolate``
-        is a way to narrow, never to force something on. Every other
-        isolatable component is retained, not dropped: its section stays
-        present with ``enabled`` forced to ``False``, the same shape
-        ``parse_device_config`` already produces for a declared-but-disabled
-        section. A component that is absent on this config is a no-op --
-        it stays absent. ``i2c``, ``spi``, ``buttons``, and
-        ``neopixel_current_budget`` are never touched: buses are
-        infrastructure for the kept component, not competition with it,
-        ``buttons`` has no ``enabled`` flag, and the budget is parse-time
-        policy that builds nothing.
-
-        The isolatable set is ``DeviceConfig.__slots__`` minus
-        ``_ISOLATE_EXCLUDED_COMPONENTS``, so a component section added later
-        is isolatable with no edit here.
+        *keep* is left exactly as declared, including its own ``enabled``
+        value -- isolating a component declared ``enabled: false`` yields a
+        config that builds nothing; ``isolate`` is a way to narrow, never to
+        force something on. Every other isolatable component is retained, not
+        dropped: its section stays present with ``enabled`` forced to
+        ``False``, the same shape ``parse_device_config`` produces for a
+        declared-but-disabled section. A component that is absent on this
+        config is a no-op -- it stays absent. ``i2c``, ``spi``, ``buttons``,
+        and ``neopixel_current_budget`` are never touched.
 
         Args:
             keep: The one isolatable component to leave untouched, e.g.
@@ -528,11 +512,6 @@ def validate_band_map(bands: dict[str, range], context: str) -> None:
 def _parse_brightness(mapping: dict, key: str, field: str) -> float:
     """Return the brightness value at *key* in *mapping*, defaulting to 1.0.
 
-    Args:
-        mapping: The raw config mapping to read *key* from.
-        key: The mapping key holding the brightness value (e.g. ``"brightness"``).
-        field: Label used in error messages (e.g. ``"pixels[0].brightness"``).
-
     Raises:
         ValueError: If present but non-numeric or outside the inclusive
             ``[0.0, 1.0]`` range, naming *field*.
@@ -549,12 +528,7 @@ def _parse_brightness(mapping: dict, key: str, field: str) -> float:
 
 
 def _parse_count(mapping: dict, key: str, field: str) -> int:
-    """Return the required pixel count at *key* in *mapping*.
-
-    Args:
-        mapping: The raw config mapping to read *key* from; *key* must be present.
-        key: The mapping key holding the count (e.g. ``"count"``).
-        field: Label used in error messages (e.g. ``"pixels[0].count"``).
+    """Return the required pixel count at *key* in *mapping*; *key* must be present.
 
     Raises:
         ValueError: If the value is not an ``int`` (``bool`` included) or is
@@ -581,11 +555,6 @@ def _parse_address(mapping: dict, key: str, field: str) -> int | None:
     string -- including a bare decimal string like ``"49"`` -- is rejected, as
     is a ``bool`` (a Python ``bool`` is an ``int`` subclass but never a valid
     address here).
-
-    Args:
-        mapping: The raw config mapping to read *key* from.
-        key: The mapping key holding the address value (e.g. ``"address"``).
-        field: Label used in error messages (e.g. ``"pixels[0].address"``).
 
     Raises:
         ValueError: If present but not an integer or hex-string form, or
@@ -626,10 +595,6 @@ def _parse_address(mapping: dict, key: str, field: str) -> int | None:
 def _parse_enabled(mapping: dict, field: str) -> bool:
     """Return ``mapping["enabled"]``, defaulting to ``True`` when absent.
 
-    Args:
-        mapping: The raw config mapping to read the ``enabled`` key from.
-        field: Label used in error messages (e.g. ``"accelerometer.enabled"``).
-
     Raises:
         ValueError: If present but not a ``bool``, naming *field*.
     """
@@ -643,12 +608,6 @@ def _parse_enabled(mapping: dict, field: str) -> bool:
 
 def _parse_pin(mapping: dict, key: str, field: str) -> PinRef:
     """Return the Pin reference at *key* in *mapping*, recorded under *field*.
-
-    Args:
-        mapping: The raw config mapping to read *key* from.
-        key: The mapping key holding the pin name (e.g. ``"cs"``).
-        field: The field path, used both in error messages and as the
-            returned ``PinRef.field`` (e.g. ``"radio.cs"``).
 
     Raises:
         ValueError: If *key* is absent or its value is not a string, naming *field*.
@@ -807,7 +766,7 @@ def _parse_ir(ir_raw: dict) -> IRConfig:
 
     # Every IR item is optional: a prop with no receiver omits rx, and one
     # that cannot transmit on a given emitter (line/cone/area_of_effect)
-    # omits it. Emitters are validated uniformly by the loop below.
+    # omits it.
     emitters: dict[str, PinRef] = {}
     for key in ir_raw:
         if key in ("rx", "enabled"):
@@ -851,8 +810,6 @@ def _parse_audio(audio_raw: dict) -> AudioConfig:
 
 
 def _reject_unknown_keys(raw: dict, section: str, allowed: tuple[str, ...] = ()) -> None:
-    # Minimal shape is {} plus whatever *allowed* names (e.g. "enabled") --
-    # any other key present is unknown.
     for key in raw:
         if key in allowed:
             continue
@@ -863,12 +820,9 @@ def _reject_unknown_keys(raw: dict, section: str, allowed: tuple[str, ...] = ())
 
 
 def _parse_i2c_device(raw: dict, section: str, i2c_buses: dict[str, I2CConfig]) -> I2CDeviceConfig:
-    """Parse one of the ``_I2C_DEVICE_SECTIONS`` sections (accelerometer,
-    magnetometer, haptics) into a shared ``I2CDeviceConfig``.
+    """Parse one of the ``_I2C_DEVICE_SECTIONS`` sections into a shared ``I2CDeviceConfig``.
 
-    *section* is only used to key error messages (``<section>.address``,
-    ``<section>.enabled``, ``<section>.i2c``, unknown-key naming) -- the three
-    sections carry identical fields, so one parser serves all of them.
+    *section* is only used to key error messages.
     """
     _reject_unknown_keys(raw, section, allowed=("i2c", "address", "enabled"))
     i2c = _parse_bus_reference(raw, section, "i2c", i2c_buses)
@@ -904,8 +858,7 @@ def _parse_bus(
         pins = "/".join(pin_fields)
         raise ValueError(f"{field} must be a mapping of {pins} pins")
     _reject_unknown_keys(bus_raw, field, allowed=pin_fields)
-    # A bus's pins are required-together, mirroring the audio I2S bus pins: a
-    # half-configured bus is exactly the case where some might be missing, so
+    # A bus's pins are required-together, mirroring the audio I2S bus pins:
     # every missing field is named in one error instead of stopping at the
     # first.
     missing = [pin for pin in pin_fields if pin not in bus_raw]
@@ -1108,11 +1061,6 @@ def parse_device_config(mapping: dict) -> DeviceConfig:
     if "sdcard" in mapping:
         sdcard = _parse_sdcard(mapping["sdcard"], spi)
 
-    # One parse call per `_I2C_DEVICE_SECTIONS` entry -- the same shared list
-    # `_parse_i2c_device` keys its section-specific error messages off, so the
-    # section name is never hand-typed twice. Keys match `DeviceConfig`'s
-    # `accelerometer`/`magnetometer`/`haptics` kwargs exactly, so the dict
-    # splats straight into the constructor call below.
     i2c_devices: dict[str, I2CDeviceConfig | None] = dict.fromkeys(_I2C_DEVICE_SECTIONS)
     for section in _I2C_DEVICE_SECTIONS:
         if section in mapping:
@@ -1157,9 +1105,6 @@ def read_device_config_mapping(path: str = "aura-device.json") -> dict:
 
 def load_device_config(path: str = "aura-device.json") -> DeviceConfig:
     """Read and parse *path* into a :class:`DeviceConfig`.
-
-    Board-free pair of :func:`read_device_config_mapping` and
-    :func:`parse_device_config`, so callers don't each duplicate it.
 
     Raises:
         RuntimeError: If *path* does not exist.

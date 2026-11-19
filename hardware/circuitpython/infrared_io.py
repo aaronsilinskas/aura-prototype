@@ -1,13 +1,5 @@
 """CircuitPython pulseio adapters for the Aura IR transport layer.
 
-Provides :class:`PulseInReader` and :class:`PulseOutWriter` — concrete
-implementations of the hardware-agnostic :class:`~hardware.shared.ir_transport.PulseReader`
-and :class:`~hardware.shared.ir_transport.PulseWriter` port abstractions — wired
-to ``pulseio.PulseIn`` and ``pulseio.PulseOut`` respectively.
-
-These are the hardware leaves; all codec logic lives in
-:mod:`hardware.shared.ir_codecs` and :mod:`hardware.shared.ir_transport`.
-
 Usage::
 
     import pulseio
@@ -35,10 +27,6 @@ if TYPE_CHECKING:
 class PulseInReader(PulseReader):
     """Reads IR pulses from a ``pulseio.PulseIn`` buffer one at a time.
 
-    ``pulseio.PulseIn`` behaves like a circular FIFO: ``len(pulsein)`` returns
-    the number of available durations, index 0 is the oldest, and
-    ``del pulsein[0]`` removes it.
-
     Args:
         pulsein: A ``pulseio.PulseIn`` instance already configured for the
             receive pin (idle_state=True for active-low IR receivers).
@@ -55,15 +43,7 @@ class PulseInReader(PulseReader):
         self.buffer_full_on_poll: int = 0
 
     def read_pulse(self) -> int | None:
-        """Return the oldest available pulse duration in µs, or ``None``.
-
-        Removes the returned pulse from the ``PulseIn`` buffer.  Non-blocking —
-        returns ``None`` immediately when the buffer is empty.  Increments
-        ``buffer_full_on_poll`` when the buffer is found at ``maxlen``.
-
-        Returns:
-            Pulse duration in µs, or ``None`` if no pulse is ready.
-        """
+        """Return the oldest available pulse duration in µs, or ``None``."""
         pulsein = self._pulsein
         count = len(pulsein)
         if count == 0:

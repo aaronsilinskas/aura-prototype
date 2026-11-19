@@ -5,8 +5,6 @@ Every concrete codec module in this package (:mod:`hardware.shared.ir_codecs.aur
 ``DECODER`` attributes -- the convention :func:`codec_for` resolves by name.
 Adding a codec is a single, discoverable edit: drop in a module with those two
 attributes, no hand-maintained registry to update.
-
-No ``pulseio`` import -- safe on CPython, CircuitPython 10.x, and MicroPython.
 """
 
 from __future__ import annotations
@@ -22,9 +20,6 @@ if TYPE_CHECKING:
 
 __all__ = ["UnknownCodecError", "codec_for"]
 
-# This package's dotted import path, used to build each codec's full module
-# name (``hardware.shared.ir_codecs.<name>``). ``__name__`` rather than a
-# literal so the constant tracks a future package rename for free.
 _PACKAGE_NAME: Final = __name__
 
 # Modules under this package that are not themselves codecs: the shared base
@@ -35,12 +30,11 @@ _NON_CODEC_MODULES: Final = frozenset({"__init__", "base"})
 class UnknownCodecError(ValueError):
     """*name* has no matching module under ``hardware.shared.ir_codecs``.
 
-    Raised by :func:`codec_for`.  A bespoke ``ValueError`` subclass rather
-    than the engine's ``UnknownItemError``: ``hardware`` may not import
-    ``engine.packs``, where that class lives (the engine <-> hardware
-    layering contract is one-way).  Callers classify the failure by
-    exception *type*; the message is a free display detail that happens to
-    name the known codecs.
+    A bespoke ``ValueError`` subclass rather than the engine's
+    ``UnknownItemError``: ``hardware`` may not import ``engine.packs``, where
+    that class lives (the engine <-> hardware layering contract is one-way).
+    Callers classify the failure by exception *type*; the message is a free
+    display detail that happens to name the known codecs.
     """
 
     def __init__(self, name: str, available: list[str]) -> None:

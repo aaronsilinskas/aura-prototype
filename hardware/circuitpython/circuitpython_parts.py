@@ -1,8 +1,7 @@
 """CircuitPythonParts — the Device assembly's ``DeviceParts`` adapter on a CircuitPython board.
 
-Deploy-watch only: imports board, busio, digitalio and microcontroller. Every
-per-part driver library is imported inside the part that builds it, so a config
-that doesn't need a part never requires its library to be installed.
+Every per-part driver library is imported inside the part that builds it, so a
+config that doesn't need a part never requires its library to be installed.
 """
 
 from __future__ import annotations
@@ -78,13 +77,11 @@ def _setup_matrix_is31fl3741(
     """Return a configured IS31FL3741 driver on *i2c*.
 
     Retries construction for up to :data:`_MATRIX_STARTUP_TIMEOUT_S` seconds
-    (useful if the I2C bus is still settling at boot), sleeping ~1s between
-    attempts.
+    (useful if the I2C bus is still settling at boot).
 
-    *address* is the configured I2C address override (``MatrixPixelsConfig.address``).
-    ``None`` means no override -- the ``address=`` keyword is omitted entirely
-    so the driver's own default (``0x30``) applies, rather than passing
-    ``address=None``.
+    *address* is the configured I2C address override. ``None`` means no
+    override -- the ``address=`` keyword is omitted entirely so the driver's
+    own default (``0x30``) applies.
 
     Raises:
         RuntimeError: If the matrix has not responded within the timeout.
@@ -129,7 +126,6 @@ def _construct_with_optional_address(
 
 
 def _setup_accelerometer(i2c: busio.I2C, address: int | None = None) -> LIS3DH_I2C:
-    """Return a LIS3DH on *i2c*."""
     import adafruit_lis3dh
 
     return _construct_with_optional_address(adafruit_lis3dh.LIS3DH_I2C, i2c, address)
@@ -191,7 +187,6 @@ def _setup_magnetometer(i2c: busio.I2C, address: int | None = None) -> MMC5603:
 
 
 def _setup_drv2605(i2c: busio.I2C, address: int | None = None) -> DRV2605:
-    """Return a DRV2605 haptic driver on *i2c*."""
     import adafruit_drv2605
 
     return _construct_with_optional_address(adafruit_drv2605.DRV2605, i2c, address)
@@ -316,7 +311,6 @@ class CircuitPythonParts(DeviceParts):
 
     def haptic_output(self, haptics: I2CDeviceConfig, i2c: busio.I2C) -> Drv2605EffectOutput:
         driver = _setup_drv2605(i2c, haptics.address)
-        # Imported after _setup_drv2605: this module imports adafruit_drv2605 at load time.
         from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
 
         return Drv2605EffectOutput(driver)
@@ -328,7 +322,6 @@ class CircuitPythonParts(DeviceParts):
         word_select: PinRef,
         data: PinRef,
     ) -> AudioEffectOutput:
-        # Its module imports the audio stack (audiobusio/audiocore/audiomixer) at load time.
         from hardware.circuitpython.audio_output import AudioEffectOutput
 
         return AudioEffectOutput(
@@ -350,7 +343,6 @@ class CircuitPythonParts(DeviceParts):
     def radio_transport(
         self, radio: RadioConfig, spi: busio.SPI, cs: PinRef, reset: PinRef
     ) -> Rfm69RadioTransport:
-        # The only importer of adafruit_rfm69, which it imports at load time.
         from hardware.circuitpython.rfm69_radio_transport import Rfm69RadioTransport
 
         return Rfm69RadioTransport(
@@ -367,7 +359,6 @@ class CircuitPythonParts(DeviceParts):
         Raises:
             SdCardMountError: When the card is absent or unmountable.
         """
-        # The only importer of sdcardio and storage, which it imports at load time.
         from hardware.circuitpython.sdcard_storage import SdCardStorage
 
         try:

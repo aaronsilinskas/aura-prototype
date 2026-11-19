@@ -1,15 +1,8 @@
 """Aura IR wire-frame codec.
 
-Concrete ``AuraInfraredEncoder`` / ``AuraInfraredDecoder`` implementations of
-the shared base classes in :mod:`hardware.shared.ir_codecs.base`. The frame
-carries a variable-length opaque payload plus a trailing CRC-8; the timing
-constants below are the source of truth, and :class:`AuraInfraredEncoder`
-documents the frame layout.
-
-No ``pulseio`` import — safe on CPython, CircuitPython 10.x, and MicroPython.
-
-The module-level ``ENCODER`` / ``DECODER`` names let a codec be resolved by
-module (name → class pair), the convention shared across IR codec modules.
+The frame carries a variable-length opaque payload plus a trailing CRC-8; the
+timing constants below are the source of truth, and
+:class:`AuraInfraredEncoder` documents the frame layout.
 """
 
 from __future__ import annotations
@@ -27,18 +20,18 @@ if TYPE_CHECKING:
 # Wire-frame timings are in µs, each a multiple of IR_UNIT.
 IR_UNIT: Final = 500
 
-IR_HEADER_MARK: Final = IR_UNIT * 8  # 4000 µs
-IR_HEADER_SPACE: Final = IR_UNIT * 6  # 3000 µs
+IR_HEADER_MARK: Final = IR_UNIT * 8
+IR_HEADER_SPACE: Final = IR_UNIT * 6
 
-IR_MARK_ZERO: Final = IR_UNIT  # 500 µs mark for a zero bit
-IR_SPACE_ZERO: Final = IR_UNIT  # 500 µs space for a zero bit
+IR_MARK_ZERO: Final = IR_UNIT
+IR_SPACE_ZERO: Final = IR_UNIT
 
-IR_MARK_ONE: Final = IR_UNIT  # 500 µs mark for a one bit
-IR_SPACE_ONE: Final = IR_UNIT * 3  # 1500 µs space for a one bit
+IR_MARK_ONE: Final = IR_UNIT
+IR_SPACE_ONE: Final = IR_UNIT * 3
 
-IR_LEAD_OUT: Final = IR_UNIT * 10  # 5000 µs terminator
+IR_LEAD_OUT: Final = IR_UNIT * 10
 
-_IR_ERROR_MARGIN: Final = IR_UNIT // 2  # 250 µs — internal tolerance threshold
+_IR_ERROR_MARGIN: Final = IR_UNIT // 2
 _CRC_GENERATOR: Final = 0x1D
 
 
@@ -58,7 +51,6 @@ def _calculate_crc(data: bytes | bytearray, length: int = -1) -> int:
     return crc
 
 
-# Decoder state constants
 _STATE_IDLE: Final = 0
 _STATE_HEADER_SPACE: Final = 1
 _STATE_DATA: Final = 2
@@ -85,7 +77,7 @@ class AuraInfraredEncoder(InfraredEncoder):
             ``array.array('H', …)`` ready to pass to a pulse-output driver.
         """
         # Layout: 2 (header) + (len(data)+1)*8*2 (payload+CRC bits) + 1 (lead-out)
-        n_bit_slots = (len(data) + 1) * 8 * 2  # mark+space pairs for payload and CRC
+        n_bit_slots = (len(data) + 1) * 8 * 2
         n_slots = 2 + n_bit_slots + 1
         pulses = array("H", bytearray(n_slots * 2))  # zero-init via bytearray — no temp list
 
@@ -123,10 +115,6 @@ class AuraInfraredEncoder(InfraredEncoder):
 class AuraInfraredDecoder(InfraredDecoder):
     """Aura wire-frame IR decoder.
 
-    Stateful pulse-by-pulse decoder.  Feed each received pulse duration (µs)
-    to :meth:`decode`; it returns a ``bytearray`` payload when a complete,
-    CRC-verified packet has been received, or ``None`` otherwise.
-
     The decoder silently discards unrecognised pulses while idle (searching
     for the header mark) and resets on any protocol violation during reception.
     """
@@ -135,7 +123,6 @@ class AuraInfraredDecoder(InfraredDecoder):
 
     def __init__(self) -> None:
         super().__init__(_IR_ERROR_MARGIN)
-        # True while waiting for the space half of the current bit
         self._awaiting_space: bool = False
 
     def decode(self, pulse: int) -> bytearray | None:
@@ -196,11 +183,10 @@ class AuraInfraredDecoder(InfraredDecoder):
         calculated_crc = _calculate_crc(data, payload_len)
 
         if received_crc == calculated_crc:
-            payload = data[:payload_len]  # bytearray slice returns bytearray — no extra wrap
+            payload = data[:payload_len]
             self._finish_packet()
             return payload
 
-        # CRC mismatch — reject silently
         self.reset()
         return None
 

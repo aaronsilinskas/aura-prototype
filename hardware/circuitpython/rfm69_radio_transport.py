@@ -1,10 +1,4 @@
-"""CircuitPython adapter wrapping adafruit_rfm69.RFM69 as the live RadioTransport.
-
-The only module that imports ``adafruit_rfm69`` — ``hardware.shared.radio_transport``
-and ``hardware.shared.radio_transceiver`` stay chip-agnostic, and ``CircuitPythonParts``
-reaches this module only through a deferred import inside its radio transport part,
-so a config with no ``radio`` section never requires ``adafruit_rfm69`` to be installed.
-"""
+"""CircuitPython adapter wrapping adafruit_rfm69.RFM69 as the live RadioTransport."""
 
 import adafruit_rfm69
 
@@ -21,10 +15,6 @@ __all__ = ["Rfm69RadioTransport"]
 
 class Rfm69RadioTransport(RadioTransport):
     """Live ``RadioTransport`` backed by an ``adafruit_rfm69.RFM69`` chip.
-
-    Constructs and owns the RFM69 driver instance itself from already-resolved
-    hardware handles — an SPI bus and two ``digitalio.DigitalInOut`` pins — so
-    ``CircuitPythonParts`` never needs to import ``adafruit_rfm69`` to build a radio.
 
     Args:
         spi: The shared SPI bus (see ``CircuitPythonParts.spi_bus``).

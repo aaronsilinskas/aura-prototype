@@ -1,10 +1,4 @@
-"""DeviceSceneReboot — the live SceneReboot: persist the target, then reset.
-
-Board-free: the reset is injected rather than imported, so the adapter runs
-under CPython. ``app.scene_composition.build_scene_boot`` builds it with the
-reset it is handed (on a board, ``run_scene`` passes ``microcontroller.reset``)
-and wires it into the booted scene as its ``SceneReboot`` port.
-"""
+"""DeviceSceneReboot — the live SceneReboot: persist the target, then reset."""
 
 from __future__ import annotations
 
@@ -57,11 +51,7 @@ class DeviceSceneReboot(SceneReboot):
         self._logger = logger if logger is not None else Logger.SILENT
 
     def reboot_into(self, target: str) -> None:
-        """Record a Reboot into *target*, leaving the booted scene, then reset.
-
-        A card-less device logs and returns instead of rebooting — see the
-        class docstring.
-        """
+        """Record a Reboot into *target*, leaving the booted scene, then reset."""
         if self._persisted_scene is None:
             self._logger.log(f"no SD card mounted; not rebooting into scene {target!r}")
             return
@@ -72,7 +62,7 @@ class DeviceSceneReboot(SceneReboot):
         """Record a return to the recorded ``return_to``, then reset.
 
         A no-op (logged) when no ``return_to`` was recorded, or on a
-        card-less device — see the class docstring for the latter.
+        card-less device.
         """
         if self._persisted_scene is None:
             self._logger.log("no SD card mounted; not rebooting to the previous scene")

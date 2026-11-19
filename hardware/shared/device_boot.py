@@ -1,4 +1,4 @@
-"""Loader for aura-boot.json — no board imports, CPython-testable."""
+"""Loader for ``aura-boot.json``."""
 
 from __future__ import annotations
 

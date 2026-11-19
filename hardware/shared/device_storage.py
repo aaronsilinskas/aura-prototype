@@ -1,24 +1,16 @@
-"""DeviceStorage — the board-free device-state storage port.
+"""DeviceStorage: the device-state storage port.
 
 Reads and writes small device-state files under a mount root (e.g. an SD
 card) and resolves real filesystem paths for streamed/scanned consumers
 (audio ``open()``+``WaveFile``, scene ``os.listdir``). Every *name*/*subpath*
 passed in routes through :meth:`DeviceStorage._resolve`, the one place that
-joins it onto the mount root and rejects any attempt to escape it; the
-``mount_root`` accessor is the one exception, since it reads the
-already-owned root rather than resolving a caller-supplied path.
+joins it onto the mount root and rejects any attempt to escape it.
 
-No ``board``/``busio``/CircuitPython-only import — safe on CPython,
-CircuitPython 10.x, and MicroPython. Mounting the card is someone else's
-job: the live adapter is ``hardware.circuitpython.sdcard_storage.SdCardStorage``,
-which mounts at construction time and then defers every read/write to this
-base class, since once mounted, plain ``os`` calls work identically across
-runtimes. Tests and the Simulated device's card run this same class over a
-real directory.
-
-``read_json``/``write_json`` are a thin JSON convenience built on the bytes
-primitives, so they inherit ``read_bytes``/``write_bytes``'s escape-rejection
-and durable atomic-as-FAT-allows write guarantees for free.
+Mounting the card is someone else's job: the live adapter is
+``hardware.circuitpython.sdcard_storage.SdCardStorage``, which mounts at
+construction time and then defers every read/write to this base class, since
+once mounted, plain ``os`` calls work identically across runtimes. Tests and
+the Simulated device's card run this same class over a real directory.
 """
 
 from __future__ import annotations
@@ -95,19 +87,18 @@ class DeviceStorage:
                 return f.read()
         except OSError as e:
             if e.errno != errno.ENOENT:
-                raise  # Anything but "not written yet" is a real failure.
+                raise
             return None
 
     def read_chunks(self, name: str, chunk_size: int) -> Iterator[bytes] | None:
         """Yield *name*'s contents in *chunk_size*-byte pieces, or ``None`` if never written.
 
         Opens the file once and reads it *chunk_size* bytes at a time, so a
-        streaming caller (e.g. :meth:`hardware.shared.sd_sync_server.SdSyncServer.read`)
-        never holds more than one chunk of the file in memory at once -- unlike
-        :meth:`read_bytes`, which buffers the whole file. The handle stays open
-        for the lifetime of the generator and is closed once it is exhausted or
-        the caller stops iterating early (via ``GeneratorExit`` on ``close()`` or
-        garbage collection).
+        streaming caller never holds more than one chunk of the file in memory
+        at once -- unlike :meth:`read_bytes`. The handle stays open for the lifetime of
+        the generator and is closed once it is exhausted or the caller stops
+        iterating early (via ``GeneratorExit`` on ``close()`` or garbage
+        collection).
 
         Args:
             name: File name or subpath under the mount root.
@@ -122,7 +113,7 @@ class DeviceStorage:
             f = open(resolved, "rb")  # noqa: SIM115 -- handle outlives this method; see below
         except OSError as e:
             if e.errno != errno.ENOENT:
-                raise  # Anything but "not written yet" is a real failure.
+                raise
             return None
         return self._read_open_file_in_chunks(f, chunk_size)
 
@@ -195,7 +186,7 @@ class DeviceStorage:
             os.remove(resolved)
         except OSError as e:
             if e.errno != errno.ENOENT:
-                raise  # Anything but "nothing to replace" is a real failure.
+                raise
 
         os.rename(temp_path, resolved)
         os.sync()
@@ -203,10 +194,8 @@ class DeviceStorage:
     def read_json(self, name: str) -> dict | None:
         """Return *name*'s contents parsed as JSON, or ``None`` if never written.
 
-        A thin decode wrapped around :meth:`read_bytes`; stays a faithful
-        primitive rather than a fail-soft convenience, so malformed content
-        raises rather than silently returning ``None`` — that policy call
-        belongs to callers, not this port.
+        Malformed content raises rather than silently returning ``None`` — that
+        policy call belongs to callers, not this port.
 
         Args:
             name: File name or subpath under the mount root.
@@ -277,7 +266,7 @@ class DeviceStorage:
             os.stat(root)
         except OSError as e:
             if e.errno != errno.ENOENT:
-                raise  # Anything but "no such subtree" is a real failure.
+                raise
             return []
         entries: list[tuple[str, int]] = []
         self._walk_into(root, subpath.rstrip("/"), entries)
@@ -317,9 +306,7 @@ class DeviceStorage:
     def _ensure_parent_dirs(self, relative_path: str) -> None:
         """Create every missing directory segment above *relative_path*'s file.
 
-        Walks from the mount root down, ``os.mkdir``-ing one segment at a
-        time and tolerating a segment that already exists — there is no
-        ``os.makedirs`` on CircuitPython.
+        There is no ``os.makedirs`` on CircuitPython.
         """
         segments = relative_path.split("/")[:-1]
         current = self._mount_root
@@ -329,4 +316,4 @@ class DeviceStorage:
                 os.mkdir(current)
             except OSError as e:
                 if e.errno != errno.EEXIST:
-                    raise  # Anything but "already present" is a real failure.
+                    raise

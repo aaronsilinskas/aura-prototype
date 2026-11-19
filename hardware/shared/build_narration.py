@@ -1,13 +1,10 @@
-"""Board-free "open a line, run the build, close it" narration primitive.
+"""Open a line, run the build, close it: narration primitive.
 
 A component builder narrating its own construction to a :class:`~engine.log.Logger`
 otherwise hand-threads the same three calls every time: ``begin`` a line describing
 what it is about to build, run the build, then ``end`` the line with a success detail
 or ``fail`` it on an exception. :func:`narrate_step` and :func:`narrate_skip` own that
 sequence once so a component block reduces to a single call.
-
-No``board``/``busio`` imports, so this module is CPython-testable in isolation,
-like the rest of ``hardware/shared``.
 """
 
 from __future__ import annotations

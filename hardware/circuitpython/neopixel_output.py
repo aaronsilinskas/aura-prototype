@@ -1,8 +1,4 @@
-"""NeoPixel effect output — one strip, multiple scope segments.
-
-The runtime ``neopixel`` import lives only in ``circuitpython_parts`` (which supplies
-already-initialised strip objects), keeping this module testable under CPython.
-"""
+"""NeoPixel effect output — one strip, multiple scope segments."""
 
 from __future__ import annotations
 

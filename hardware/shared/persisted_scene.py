@@ -4,8 +4,7 @@ The record is the Persisted scene, its ``return_to`` companion and the
 recorded Scene deploy token, kept in ``aura-state.json`` under the reserved
 ``persisted_scene.`` prefix so game data in the same file never collides with
 it (ADR-0009). An older card's unprefixed ``scene`` / ``return_to`` keys are
-ignored. Board-free: it reaches the card only through the ``DeviceStateStore``
-it is given.
+ignored.
 """
 
 from __future__ import annotations

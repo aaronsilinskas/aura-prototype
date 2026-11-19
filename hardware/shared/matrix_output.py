@@ -7,9 +7,7 @@ from engine.effects.output import EffectOutput
 class MatrixEffectOutput(EffectOutput):
     """Hardware-agnostic base class for matrix LED outputs with scope-to-row-band routing.
 
-    Subclasses must implement ``_write_row(row, pixels)`` to perform the actual
-    hardware write.  All routing logic lives here; subclasses contain only the
-    last-mile hardware calls.
+    Subclasses implement ``_write_row(row, pixels)`` to perform the hardware write.
     """
 
     __slots__ = ("_cols", "_scope_rows", "_zero_buffer")
@@ -31,11 +29,10 @@ class MatrixEffectOutput(EffectOutput):
             self._write_row(row, buffer)
 
     def clear_pixels(self, scope_key: str) -> None:
-        """Zero all rows in the scope's row band."""
         row_band = self._scope_rows[scope_key]
         for row in row_band:
             self._write_row(row, self._zero_buffer)
 
     def _write_row(self, row: int, pixels: PixelBuffer) -> None:
-        """Write ``pixels`` to hardware row ``row``.  Must be overridden by subclasses."""
+        """Write ``pixels`` to hardware row ``row``."""
         raise NotImplementedError
