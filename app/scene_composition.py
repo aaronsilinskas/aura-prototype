@@ -1,9 +1,9 @@
 """The Scene boot: ``build_scene_boot`` turns a device's hardware into a booted scene and its tick.
 
 Its interface is ``build_scene_boot`` and the ``SceneBoot`` it returns; every
-boot step below is private. It imports only ``engine`` and the board-free
-modules under ``hardware.shared``, so it runs under CPython as well as on the
-device.
+boot step below is private. It runs under CPython as well as on the device; an
+import-linter contract in ``pyproject.toml`` keeps ``hardware.circuitpython``
+out.
 """
 
 from __future__ import annotations
