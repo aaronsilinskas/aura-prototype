@@ -1,8 +1,8 @@
 """SD-sync wire protocol — frame representation shared by client and server.
 
-Every request, response, and streamed file chunk is one **frame**: a ``kind``
-plus free-form ``text`` header and optional payload bytes, base64-encoded as a
-single line. ``CHUNK_SIZE`` bounds how much of a file one frame carries. See
+Every request, response, and streamed file chunk is one **frame**: a header of
+``kind`` and free-form ``text``, plus optional payload bytes, base64-encoded as
+a single line. ``CHUNK_SIZE`` bounds how much of a file one frame carries. See
 ADR-0011.
 """
 

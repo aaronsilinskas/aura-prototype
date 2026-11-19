@@ -29,7 +29,7 @@ __all__ = ["SdSyncServer"]
 class _CrcMismatchError(Exception):
     """Internal signal: a push's declared whole-file CRC didn't match the received bytes.
 
-    Raised inside the iteration that
+    Raised by :meth:`SdSyncServer._receive_pushed_chunks` inside the iteration
     :meth:`~hardware.shared.device_storage.DeviceStorage.write_chunks` drives,
     aborting that write before its rename (ADR-0011). Caught by
     :meth:`SdSyncServer.serve_push`, never escapes this module.
@@ -199,9 +199,8 @@ class SdSyncServer:
     def _receive_pushed_chunks(self, transport: Transport) -> Iterator[bytes]:
         """Yield each pushed chunk, acking stop-and-wait, until the closing ``done`` frame.
 
-        A CRC-32 that doesn't match the one on ``done`` raises
-        :class:`_CrcMismatchError` from *inside* the iteration :meth:`write`
-        drives, aborting that write before its rename.
+        Returns, letting the write commit, when the received chunks' CRC-32
+        matches the one on ``done``; otherwise raises :class:`_CrcMismatchError`.
         """
         crc = 0
         while True:

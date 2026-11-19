@@ -201,9 +201,8 @@ class SdSyncClient:
         """Stream *host_path* to the server (stop-and-wait); return whether it committed.
 
         Runs after the server has already confirmed ``"ok"`` for the request.
-        The server replies to the
-        closing ``done`` frame with ``"ok"`` (committed) or ``"crc_mismatch"``
-        (left on disk untouched).
+        The server replies to the closing ``done`` frame with ``"ok"``
+        (committed) or ``"crc_mismatch"`` (left on disk untouched).
 
         Raises:
             SdSyncProtocolError: A chunk's reply was not the ack carrying its

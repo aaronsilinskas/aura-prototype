@@ -256,8 +256,8 @@ class EffectReceipt:
 class MergeStrategy:
     """Per-scope policy compositing a scope's layered effect buffers into one region buffer.
 
-    A port (ADR-0012). Subclasses hold no per-instance state,
-    so each ships as a module-level singleton (``SPLIT``, ``ADDITIVE`` in
+    A plain base class (ADR-0012). Subclasses hold no per-instance state, so
+    each ships as a module-level singleton (``SPLIT``, ``ADDITIVE`` in
     ``engine.effects.merge``). Lives here rather than in ``engine.effects.merge``
     because that module imports ``EffectReceipt`` from this one; defining the
     base class in ``engine.effects.merge`` would make ``EffectControls.set_merge_strategy``

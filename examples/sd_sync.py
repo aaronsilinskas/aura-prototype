@@ -20,7 +20,7 @@ An ``aura-device.json`` with an ``sdcard`` section promises a card is present,
 so if it fails to mount ``build_hardware`` raises and this app reports it over
 the console and idles rather than crashing into the REPL. This differs from a
 device with *no* ``sdcard`` section, which boots normally and replies
-``"no_storage"`` to every request (handled by ``SdSyncServer`` itself).
+``"no_storage"`` to every request (handled by ``SdSyncServer``; ADR-0011).
 
 Installation
 ------------
