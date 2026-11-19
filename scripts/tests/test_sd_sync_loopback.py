@@ -72,6 +72,29 @@ class _CorruptingTransport(Transport):
         return self._inner.recv()
 
 
+class _DroppingTransport(Transport):
+    """Wraps a ``Transport``, raising *error* on the first ``recv`` after a chunk has arrived.
+
+    Stands in for a link that dies mid-transfer, once part of the file has
+    been written: the serial cable pulled, or the user pressing Ctrl-C.
+    """
+
+    def __init__(self, inner: Transport, error: BaseException) -> None:
+        self._inner = inner
+        self._error = error
+        self._chunk_received = False
+
+    def send(self, line: bytes) -> None:
+        self._inner.send(line)
+
+    def recv(self) -> bytes:
+        if self._chunk_received:
+            raise self._error
+        line = self._inner.recv()
+        self._chunk_received = decode_frame(line).kind == "chunk"
+        return line
+
+
 class _CountingTransport(Transport):
     """Wraps a ``Transport``, counting sent frames by ``kind`` for behaviour-level assertions."""
 
@@ -236,7 +259,25 @@ def test_pull_raises_integrity_error_after_exhausting_retries(
         client.pull("corrupt.json", str(host_path))
 
 
-def test_pull_leaves_no_host_file_after_exhausting_retries(
+def test_pull_leaves_no_file_behind_after_exhausting_retries(
+    device_storage: DeviceStorage, tmp_path: Path
+):
+    device_storage.write_bytes("corrupt.json", b'{"scene": "tag"}')
+    client, _ = make_loopback_client(
+        device_storage,
+        server_side_wrapper=lambda inner: _CorruptingTransport(inner, corrupt_count=10),
+        max_attempts=3,
+    )
+    host_dir = tmp_path / "host"
+    host_dir.mkdir()
+
+    with pytest.raises(SdSyncIntegrityError):
+        client.pull("corrupt.json", str(host_dir / "corrupt.json"))
+
+    assert list(host_dir.iterdir()) == []
+
+
+def test_pull_after_exhausting_retries_leaves_an_existing_host_file_unchanged(
     device_storage: DeviceStorage, tmp_path: Path
 ):
     device_storage.write_bytes("corrupt.json", b'{"scene": "tag"}')
@@ -246,11 +287,48 @@ def test_pull_leaves_no_host_file_after_exhausting_retries(
         max_attempts=3,
     )
     host_path = tmp_path / "corrupt.json"
+    host_path.write_bytes(b'{"scene": "original"}')
 
     with pytest.raises(SdSyncIntegrityError):
         client.pull("corrupt.json", str(host_path))
 
-    assert not host_path.exists()
+    assert host_path.read_bytes() == b'{"scene": "original"}'
+
+
+def _client_dropping_after_first_chunk(
+    storage: DeviceStorage, error: BaseException
+) -> SdSyncClient:
+    storage.write_bytes("log.txt", b"new" * CHUNK_SIZE)
+    client, _ = make_loopback_client(
+        storage, client_side_wrapper=lambda inner: _DroppingTransport(inner, error)
+    )
+    return client
+
+
+@pytest.mark.parametrize("error", [OSError("serial link lost"), KeyboardInterrupt("ctrl-c")])
+def test_pull_interrupted_mid_transfer_leaves_an_existing_host_file_unchanged(
+    device_storage: DeviceStorage, tmp_path: Path, error: BaseException
+):
+    client = _client_dropping_after_first_chunk(device_storage, error)
+    host_path = tmp_path / "log.txt"
+    host_path.write_bytes(b"original")
+
+    with pytest.raises(type(error), match=str(error)):
+        client.pull("log.txt", str(host_path))
+
+    assert host_path.read_bytes() == b"original"
+
+
+def test_pull_interrupted_mid_transfer_leaves_no_file_behind(
+    device_storage: DeviceStorage, tmp_path: Path
+):
+    client = _client_dropping_after_first_chunk(device_storage, OSError("serial link lost"))
+    host_dir = tmp_path / "host"
+
+    with pytest.raises(OSError, match="serial link lost"):
+        client.pull("log.txt", str(host_dir / "log.txt"))
+
+    assert list(host_dir.iterdir()) == []
 
 
 def test_pull_of_a_nonexistent_sd_path_raises_not_found(
