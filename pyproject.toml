@@ -106,6 +106,13 @@ protected_modules = ["app.simulation", "hardware.simulated"]
 allowed_importers = ["**.tests", "app.simulation"]
 
 [[tool.importlinter.contracts]]
+name = "the Scene boot must not import board-only hardware"
+type = "forbidden"
+# build_scene_boot also boots the Simulated device under CPython.
+source_modules = ["app.scene_composition"]
+forbidden_modules = ["hardware.circuitpython"]
+
+[[tool.importlinter.contracts]]
 name = "device packages must not import host scripts"
 type = "forbidden"
 # scripts/ (the Ship list, build, deploy) is CPython-only and never ships.
