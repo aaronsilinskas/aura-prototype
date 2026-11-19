@@ -6,7 +6,8 @@ loopback tests in ``scripts/tests/test_sd_sync_loopback.py``, which drive
 protocol as a whole. These tests cover ``read``, ``write`` and ``list``
 directly, the pieces of server behaviour meaningful in isolation from the wire,
 plus ``serve_one``'s request-verb dispatch -- the piece a device-side
-loop needs to service a mix of verbs over one connection.
+loop needs to service a mix of verbs over one connection -- and a pull's
+refusal to stream past a bad ack.
 """
 
 import pytest
@@ -146,3 +147,24 @@ def test_serve_one_raises_for_an_unrecognized_verb():
 
     with pytest.raises(ValueError, match="frobnicate"):
         server.serve_one(transport)
+
+
+@pytest.mark.parametrize(
+    "reply",
+    [Frame("resp", "error"), Frame("ack", "1")],
+    ids=["non-ack-frame", "ack-of-the-wrong-chunk"],
+)
+def test_pull_stops_with_an_error_when_a_chunk_is_not_acked_by_its_sequence_number(
+    device_storage, reply
+):
+    device_storage.write_bytes("log.txt", b"x" * (CHUNK_SIZE + 1))
+    server = SdSyncServer(device_storage)
+    transport = _ScriptedTransport(
+        [encode_frame(Frame("req", "pull log.txt")), encode_frame(reply)]
+    )
+
+    with pytest.raises(ValueError, match="ack"):
+        server.serve_one(transport)
+
+    chunks_sent = [line for line in transport.sent if decode_frame(line).kind == "chunk"]
+    assert len(chunks_sent) == 1
