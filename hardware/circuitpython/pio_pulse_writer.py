@@ -31,8 +31,8 @@ raw loop counts.
 
 .. note::
    The PIO program's on-wire timing is **not** exercised by CPython tests (the
-   stubbed ``rp2pio`` runs no PIO), so it is pending on-hardware validation
-   under the transmit spike (#551). The µs→loops conversion *is* unit-tested.
+   stubbed ``rp2pio`` runs no PIO), so it is validated on
+   RP2040 and RP2350 hardware instead. The µs→loops conversion *is* unit-tested.
 """
 
 from __future__ import annotations

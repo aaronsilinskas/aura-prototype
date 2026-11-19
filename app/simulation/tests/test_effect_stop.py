@@ -1,4 +1,4 @@
-"""A looping sound ends with its effect when a rule stops or replaces it (#1198)."""
+"""A looping sound ends with its effect when a rule stops or replaces it."""
 
 from __future__ import annotations
 

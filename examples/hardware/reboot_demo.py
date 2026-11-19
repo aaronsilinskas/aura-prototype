@@ -1,4 +1,4 @@
-"""On-device round-trip check for the reboot seam (#913).
+"""On-device round-trip check for the reboot seam.
 
 Exercises the hardware-boundary behaviour the CPython suite cannot: that a
 scene selection written to ``aura-state.json`` actually survives

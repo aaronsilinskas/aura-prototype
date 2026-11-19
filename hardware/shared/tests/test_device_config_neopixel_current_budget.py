@@ -1,4 +1,4 @@
-"""Behaviour-driven tests for the opt-in ``neopixel_current_budget`` section (#948).
+"""Behaviour-driven tests for the opt-in ``neopixel_current_budget`` section.
 
 Every test goes through ``parse_device_config`` and asserts only on its public
 result: the tuned strip/scope brightness and the parsed budget's fields.
@@ -171,7 +171,7 @@ def test_isolate_keeps_budgeted_strips_at_their_parse_time_tuned_brightness(keep
 
 
 def test_strip_that_would_scale_below_the_floor_is_held_there_and_the_rest_absorb_the_cut():
-    # #857's worked example: uniform scaling would put C at 0.056 < 0.1, so C is
+    # Worked example: uniform scaling would put C at 0.056 < 0.1, so C is
     # held at 0.1 (600 mA) and A gets the remaining 1400 mA: 1400 / 6000.
     result = parse_device_config(
         {
@@ -268,7 +268,7 @@ def test_tuned_total_never_exceeds_the_limit_under_float_rounding():
 
 
 def test_budget_records_the_shared_scale_applied_to_strips_not_held_at_the_floor():
-    # #857's worked example: C is held at the floor, A is scaled by 1400 / 6000.
+    # Worked example: C is held at the floor, A is scaled by 1400 / 6000.
     result = parse_device_config(
         {
             "pixels": [_strip("D5", 100, 1.0), _strip("D6", 100, 0.2)],

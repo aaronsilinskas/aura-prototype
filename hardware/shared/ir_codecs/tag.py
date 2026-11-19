@@ -27,7 +27,8 @@ Wire-frame timing constants (all times in microseconds):
 - Error tolerance: ±500 µs
 
 Module-level ``ENCODER`` / ``DECODER`` attributes point at this codec's class
-pair — the resolution convention a later ticket relies on (name → module).
+pair — the convention :func:`~hardware.shared.ir_codecs.codec_for` relies on to
+resolve a codec name to its module.
 """
 
 from __future__ import annotations

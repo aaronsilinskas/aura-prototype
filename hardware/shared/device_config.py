@@ -372,7 +372,7 @@ class NeoPixelCurrentBudgetConfig:
 def _disabled_copy(section: SlottedSection) -> SlottedSection:
     """Return a copy of *section* with ``enabled`` forced to ``False``.
 
-    Private to ``isolate`` (#715, #1071). It can only disable, never force a
+    Private to ``isolate``. It can only disable, never force a
     section on: disabling only narrows, so the copy stays within the NeoPixel
     current budget tuned at parse time, whereas enabling would skip
     validation and the budget. To force a section on, set ``enabled`` in the

@@ -50,3 +50,13 @@ repos:
         entry: '^\s*# ?[-=]{10,}\s*$|^\s*# -{2,3} .+ -{2,3}\s*$'
         language: pygrep
         types: [python]
+      - id: work-tracking-refs
+        name: no work-tracking references
+        description: >-
+          Reject work-tracking references in Python, which go stale once the work lands:
+          "later ticket", "slice N", an issue number such as #1234, or "issue N".
+          An issues/1234 URL passes.
+        entry: 'later ticket|\bslice \d+\b|(?<![\w/])#\d{3,}\b|\bissue #?\d+'
+        args: [--ignore-case]
+        language: pygrep
+        types: [python]
