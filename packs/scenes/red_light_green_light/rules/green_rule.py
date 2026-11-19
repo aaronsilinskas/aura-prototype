@@ -36,7 +36,6 @@ class RlglGreenRule(PhaseRule):
         rlgl_phase_state(state).stop_music()
 
     def _handle(self, event: InputEvents.Sensors, state: GameState) -> None:
-        # Timer expiry is always checked before motion
         config = rlgl_config(state)
         level = rlgl_phase_state(state).level
         elapsed = self.phase_elapsed(state)

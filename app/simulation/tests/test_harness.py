@@ -321,6 +321,16 @@ def test_magnetizing_again_changes_the_field(simulation):
     assert device.strip(Scope.PERSONAL).dark
 
 
+def test_forget_leaves_a_lit_strip_showing_its_current_frame(simulation):
+    device = simulation.add_device("red", scene="example_lobby")
+    simulation.advance(TICK)
+    before = list(device.strip(Scope.AMBIENT).pixels)
+
+    device.forget()
+
+    assert device.strip(Scope.AMBIENT).pixels == before
+
+
 def test_a_simulation_owns_a_temporary_directory_until_it_is_closed(tmp_path, monkeypatch):
     monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))
     simulation = Simulation()

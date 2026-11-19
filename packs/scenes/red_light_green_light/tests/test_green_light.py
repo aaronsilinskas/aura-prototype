@@ -193,3 +193,17 @@ def test_green_light_shortens_to_its_minimum_at_the_top_level(simulation):
     wait_for(simulation, player, WIN_STING)
 
     assert simulation.now - last_played_at(player, GREEN_MUSIC) == pytest.approx(1.0, abs=SLACK)
+
+
+def test_a_still_timeout_ending_on_the_tick_green_light_runs_out_levels_up_not_game_over(
+    simulation,
+):
+    still_as_long_as_green = {**GREEN_LIGHT, "green_still_timeout": 3.0}
+    player = simulation.add_device(
+        "p1", scene="red_light_green_light", setting_overrides=overrides(still_as_long_as_green)
+    )
+    reach_green_light(simulation, player)
+
+    wait_for(simulation, player, LEVEL_UP_SOUND)
+
+    assert not player.has_played(GAME_OVER_STING)

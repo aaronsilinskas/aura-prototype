@@ -276,8 +276,7 @@ def _build_scene_tick(hw: DeviceHardware, runtime: SceneRuntime) -> Callable[[],
         runtime.advance_clock()
         elapsed = runtime.elapsed
         # Polled whether or not a scene is active, so a send in flight across
-        # a scene transition still completes and a packet received with no
-        # scene active is drained and dropped; only building events waits on
+        # a scene transition still completes; only building events waits on
         # a scene.
         for part in polled:
             part.update(elapsed)

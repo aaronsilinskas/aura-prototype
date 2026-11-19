@@ -150,6 +150,19 @@ def test_radio_sent_records_when_each_packet_went_out_and_what_it_carried(simula
     assert red.radio_sent == [RadioSent(simulation.now, HW_TEST_PAYLOAD)]
 
 
+def test_a_device_added_after_the_simulation_advanced_records_on_the_shared_timeline(
+    simulation,
+):
+    simulation.advance(5.0)
+    red, _blue = add_in_radio_mode(simulation, "red", "blue")
+    red.forget()
+
+    red.schedule_hold("A")
+    simulation.run_until(lambda: bool(red.radio_sent))
+
+    assert red.radio_sent == [RadioSent(simulation.now, HW_TEST_PAYLOAD)]
+
+
 def test_forget_clears_radio_sent(simulation):
     red, _blue = add_in_radio_mode(simulation, "red", "blue")
     red.tap("A")

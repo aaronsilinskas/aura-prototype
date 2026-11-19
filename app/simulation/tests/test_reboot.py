@@ -162,6 +162,24 @@ def test_a_button_held_through_a_reboot_gives_no_new_press(simulation):
     assert device.scene == LOBBY_ENTRIES[0]  # the lobby's A never stepped the selection
 
 
+def test_a_release_landing_as_the_device_reboots_leaves_the_button_up_in_the_new_scene(
+    simulation,
+):
+    device = simulation.add_device("red", scene="example_lobby")
+    launch(device, "element_browser")
+    device.hold("A", "B")
+    simulation.advance(
+        settings_for(device.scene).get_float("return_to_lobby", "hold_seconds") - TICK
+    )
+    assert device.scene == "element_browser"
+
+    device.release("A", "B")
+    device.tap("A")
+    device.tap("B")
+
+    assert device.scene == LOBBY_ENTRIES[1]  # the lobby's A stepped the selection
+
+
 def test_a_rule_failure_inside_a_tick_still_fails(simulation):
     simulation.add_device(
         "red",
