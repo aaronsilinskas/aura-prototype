@@ -42,7 +42,7 @@ def test_scope_is_a_leaf_with_one_routing_key() -> None:
     assert len(output.scopes[0].keys) == 1
 
 
-def test_an_empty_scope_pixels_mapping_is_rejected_by_name() -> None:
+def test_an_empty_scope_pixels_mapping_is_rejected_with_an_error_naming_it() -> None:
     from hardware.circuitpython.neopixel_output import NeoPixelEffectOutput
 
     with pytest.raises(ValueError, match="scope_pixels"):

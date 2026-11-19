@@ -49,6 +49,7 @@ if TYPE_CHECKING:
     from typing import Protocol, TypeVar
 
     from hardware.shared.device_parts import Bus
+    from hardware.shared.polled_sensor import Reading
 
     class _Gated(Protocol):
         """A config section ``_gated_step`` can skip: one with an ``enabled`` flag."""
@@ -58,7 +59,6 @@ if TYPE_CHECKING:
 
     GatedSection = TypeVar("GatedSection", bound="_Gated")
     T = TypeVar("T")
-    Reading = TypeVar("Reading", AccelerationData, MagneticData)
 
 
 __all__ = ["assemble_device", "button_label", "open_i2c"]

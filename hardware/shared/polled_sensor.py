@@ -32,8 +32,7 @@ class _PolledSensorBase(PolledPart):
     ``reading`` is the *reading* buffer passed in, the same object for the
     sensor's whole life, so a sensor event can hold it once and see every
     update. It keeps whatever values it was given until the first successful
-    read. Use it as ``PolledSensor``; the checker sees a generic subclass that
-    types ``reading`` as the buffer passed in.
+    read.
 
     Failures are logged to *logger* on transitions only, labelled with
     *label*: one line carrying the error when a healthy sensor's read fails,
@@ -93,6 +92,8 @@ class _PolledSensorBase(PolledPart):
 if TYPE_CHECKING:
     from typing import Generic
 
+    # Checker-only: types ``reading`` as the buffer passed in. CircuitPython
+    # can't run generics (ADR-0007), so at runtime PolledSensor is the base itself.
     class PolledSensor(_PolledSensorBase, Generic[Reading]):
         reading: Reading
 

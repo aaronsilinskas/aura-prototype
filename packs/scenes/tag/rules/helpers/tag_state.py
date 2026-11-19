@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 _STATE_KEY: Final = "tag_state"
 
 
-class Reload:
+class ReloadHold:
     """A hold-to-reload in progress: when it began and its ``scene.reload`` effect.
 
     *started_at* is the ``state.total`` timestamp the hold began; *receipt*
@@ -36,7 +36,7 @@ class ShotState:
     def __init__(self) -> None:
         self.ammo = 0
         self.last_shot_at = float("-inf")
-        self.reload: Reload | None = None
+        self.reload: ReloadHold | None = None
 
 
 class TagState:

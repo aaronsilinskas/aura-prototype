@@ -6,7 +6,7 @@ from engine.phase import InPhaseRule
 from engine.state import GameState, Scope
 from packs.scenes.tag.rules.helpers.phases import PHASE_PLAYING, tag_phase
 from packs.scenes.tag.rules.helpers.tag_config import TagConfig, tag_config
-from packs.scenes.tag.rules.helpers.tag_state import Reload, TagState, tag_state
+from packs.scenes.tag.rules.helpers.tag_state import ReloadHold, TagState, tag_state
 from packs.scenes.tag.rules.playing_rule import AMMO_COLOR
 from packs.scenes.tag.tag_data import TagData, encode_tag_data
 
@@ -35,7 +35,7 @@ class TagShootingRule(InPhaseRule):
         if event.buttons.is_pressed("A"):
             if tag.shot.ammo == 0:
                 state.effect_controls.add_effect(Scope.DIRECTIONAL, "scene.dry_fire", {})
-                tag.shot.reload = Reload(
+                tag.shot.reload = ReloadHold(
                     state.total,
                     state.effect_controls.set_effect(
                         Scope.Global.BUFF, "scene.reload", {"duration": config.reload_duration}
@@ -50,7 +50,7 @@ class TagShootingRule(InPhaseRule):
         state: GameState,
         tag: TagState,
         config: TagConfig,
-        reload: Reload,
+        reload: ReloadHold,
     ) -> None:
         reload_complete = state.total - reload.started_at >= config.reload_duration
         if reload_complete:
@@ -61,7 +61,7 @@ class TagShootingRule(InPhaseRule):
             self._cancel_reload(state, tag, reload)
 
     def _complete_reload(
-        self, state: GameState, tag: TagState, config: TagConfig, reload: Reload
+        self, state: GameState, tag: TagState, config: TagConfig, reload: ReloadHold
     ) -> None:
         tag.shot.ammo = config.max_ammo
         state.effect_controls.set_effect(
@@ -70,11 +70,11 @@ class TagShootingRule(InPhaseRule):
         state.effect_controls.add_effect(Scope.Global.BUFF, "scene.reload_complete", {})
         self._end_reload(tag, reload)
 
-    def _cancel_reload(self, state: GameState, tag: TagState, reload: Reload) -> None:
+    def _cancel_reload(self, state: GameState, tag: TagState, reload: ReloadHold) -> None:
         state.effect_controls.set_effect(Scope.Global.BUFF, "scene.ammo_empty", {})
         self._end_reload(tag, reload)
 
-    def _end_reload(self, tag: TagState, reload: Reload) -> None:
+    def _end_reload(self, tag: TagState, reload: ReloadHold) -> None:
         reload.receipt.stop()
         tag.shot.reload = None
 
