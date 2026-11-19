@@ -58,12 +58,10 @@ _SM_HZ: Final = 1_000_000
 # period. Every duration is quantised to a whole number of these periods.
 _CARRIER_PERIOD_US: Final = 26
 
-# Trailing silence appended to every frame. Serves two purposes: (1) it pads the
-# frame to an even number of durations, which keeps the PIO program's strict
-# pull-mark / pull-space phase aligned across back-to-back frames (an odd-length
-# frame would clock the *next* frame's header mark out as a space, inverting it —
-# see write_pulses); (2) it is real inter-frame silence for the receiver to
-# delimit on. Tunable: larger is safer for delimiting, smaller costs less rate.
+# Trailing silence appended to every frame. Frames end on a mark, so this space
+# also leaves the PIO program's strict pull-mark / pull-space phase ready for the
+# next frame's header mark (see write_pulses). Tunable: larger is safer for the
+# receiver's delimiting, smaller costs less rate.
 _INTERFRAME_GAP_US: Final = 5000
 
 # One 38.46 kHz carrier period, expressed as PIO instruction delays. A mark
@@ -167,32 +165,34 @@ class PioPulseWriter(PulseWriter):
         """Start a non-blocking DMA write of *durations* and return immediately.
 
         Builds the DMA buffer by converting each µs duration to a carrier-period
-        loop count (see :func:`_duration_us_to_loops`) and appending a trailing
-        gap so the buffer holds an **even** number of durations. The even count
-        is required for correctness, not just spacing: the PIO program pulls
-        strictly mark, space, mark, space, … and keeps that phase across the
-        wrap between frames, so an odd-length frame would clock the next frame's
-        header mark out as a space — inverting every following frame. The
-        appended :data:`_INTERFRAME_GAP_US` space both restores even parity and
-        gives the receiver silence to delimit on.
+        loop count (see :func:`_duration_us_to_loops`) and appending the
+        :data:`_INTERFRAME_GAP_US` space. The PIO program pulls strictly mark,
+        space, mark, space, … and keeps that phase across the wrap between
+        frames, so the buffer must hold an even number of durations or the next
+        frame's header mark would clock out as a space, inverting every
+        following frame. That is why *durations* must be odd-length.
 
         The built buffer is kept referenced until the transfer completes —
         freeing it mid-DMA would corrupt the transfer.
 
         Args:
             durations: An ``array('H', …)`` of mark/space durations (µs),
-                alternating mark/space, starting with a mark. Odd-length (the
-                Aura encoder ends on a lead-out mark). The PIO program adds the
-                38 kHz carrier.
+                alternating mark/space, starting and ending with a mark, so
+                odd-length. The PIO program adds the 38 kHz carrier.
+
+        Raises:
+            ValueError: If *durations* has an even length.
         """
         n = len(durations)
-        # The Aura encoder always emits an odd count, so this pads exactly once.
-        pad = n % 2
-        buffer = array("H", bytearray((n + pad) * 2))
+        if n % 2 == 0:
+            raise ValueError(
+                f"IR frame has {n} durations; it must be odd-length, "
+                + "starting and ending with a mark"
+            )
+        buffer = array("H", bytearray((n + 1) * 2))
         for i in range(n):
             buffer[i] = _duration_us_to_loops(durations[i])
-        if pad:
-            buffer[n] = _duration_us_to_loops(_INTERFRAME_GAP_US)
+        buffer[n] = _duration_us_to_loops(_INTERFRAME_GAP_US)
         self._inflight = buffer
         self._sm.background_write(buffer)
 
