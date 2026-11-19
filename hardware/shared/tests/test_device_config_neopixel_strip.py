@@ -1,6 +1,6 @@
 """Behaviour-driven tests for NeoPixelStripConfig parsing in device_config.py.
 
-Covers the new scope_pixels segmented-strip shape introduced in issue #482.
+Covers the scope_pixels segmented-strip shape.
 """
 
 import pytest

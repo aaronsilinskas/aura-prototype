@@ -148,7 +148,7 @@ def deploy(
     The list's ``boot.py`` entry, if any, is copied to the mount alongside
     ``code.py`` whenever *example_file* is given -- the
     same force-always, never-pruned handling ``code.py`` gets, since a mount's
-    existing ``boot.py`` is otherwise indistinguishable from a stale one (#930).
+    existing ``boot.py`` is otherwise indistinguishable from a stale one.
     It is not deployed when *example_file* is ``None`` (module-only sync).
     """
     if source_root is None:

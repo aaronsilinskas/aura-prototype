@@ -119,7 +119,7 @@ def make_loopback_client(
     thread drives -- ``"pull"`` (default), ``"push"``, or ``"list"`` (a test
     only ever exercises one verb per client, so there is no need for the server
     to dispatch by request text itself); pass ``None`` to instead dispatch each
-    request by its own verb via ``SdSyncServer.serve_one`` (#930), the shape a
+    request by its own verb via ``SdSyncServer.serve_one``, the shape a
     real device-side loop needs to service a mix of pull/push/list requests
     over one connection. Returns the client and a counting wrapper around its
     send side, for tests that assert on how many frames of each kind were

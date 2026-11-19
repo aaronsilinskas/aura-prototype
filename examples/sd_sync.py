@@ -12,9 +12,8 @@ puts a device into sync-server mode; the file deployed as ``code.py`` is the
 only thing that decides a device's mode.
 
 The byte-frame loop and USB-CDC wiring here are validated on the bench, not in
-the CPython suite (the on-device loop is exercised in #931); the pieces it
-composes (``SdSyncServer``, ``SdCardStorage``, ``UsbCdcTransport``) each carry
-their own board-free or CPython-testable coverage.
+the CPython suite; the pieces it composes (``SdSyncServer``, ``SdCardStorage``,
+``UsbCdcTransport``) each carry their own board-free or CPython-testable coverage.
 
 No card fitted
 --------------

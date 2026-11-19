@@ -10,10 +10,11 @@ versus "text" content.
 
 ``Transport`` is the port both :class:`hardware.shared.sd_sync_server.SdSyncServer`
 and ``scripts.sd_sync_client.SdSyncClient`` reach each other through --
-``send``/``recv`` of one already-encoded frame line at a time. The real serial
-adapter (a later ticket) and the in-memory loopback used by tests are both thin
-implementations of this port; neither this module nor its callers know or care
-which one is underneath.
+``send``/``recv`` of one already-encoded frame line at a time. The serial adapters
+(:class:`~hardware.circuitpython.usb_cdc_transport.UsbCdcTransport` on the device,
+:class:`~scripts.sd_sync_transport.SerialTransport` on the host) and the
+in-memory loopback used by tests are all thin implementations of this port;
+neither this module nor its callers know or care which one is underneath.
 
 ``CHUNK_SIZE`` bounds how much of a file is ever in flight as a single frame:
 :func:`iter_chunks` slices a bytes object into pieces of at most this size, so a

@@ -1230,7 +1230,7 @@ def test_parse_audio_non_integer_voices_raises_value_error(matrix_config):
 def test_parse_audio_section_with_no_clips_key_succeeds_and_carries_no_clips_attribute(
     matrix_config,
 ):
-    """AudioConfig no longer carries a clips map (#804) -- clip names resolve
+    """AudioConfig carries no clips map -- clip names resolve
     through the Active scene namespace -- so a clips-free audio section parses with
     voices/max_volume/I2S validation unaffected."""
     result = parse_device_config(matrix_config)
@@ -1348,7 +1348,7 @@ def test_committed_sample_device_config_matrix_and_magnetometer_no_longer_collid
     """The Pico 2 board wires both the matrix and the MMC5603 magnetometer on
     the same I2C bus. The magnetometer has no configurable address and lives
     at its driver default (0x30), so the matrix must declare a distinct
-    override (#834) rather than also defaulting to 0x30."""
+    override rather than also defaulting to 0x30."""
     mapping = read_device_config_mapping(str(_SAMPLE_CONFIG_PATH))
 
     result = parse_device_config(mapping)
@@ -1362,7 +1362,7 @@ def test_committed_sample_device_config_matrix_and_magnetometer_no_longer_collid
 
 def test_committed_sample_device_config_carries_no_clips_map():
     """hardware_test's sfx_test clip resolves to its scene-local
-    hardware_test/sounds/sfx_test_start.wav (#804), not a device-config
+    hardware_test/sounds/sfx_test_start.wav, not a device-config
     clips map."""
     mapping = read_device_config_mapping(str(_SAMPLE_CONFIG_PATH))
 

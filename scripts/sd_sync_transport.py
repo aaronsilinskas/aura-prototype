@@ -1,6 +1,6 @@
 """Host-side wiring for the SD-sync data channel: port auto-detect and byte transport.
 
-Enabling the on-device SD-sync app (#930) makes a CircuitPython board expose
+Enabling the on-device SD-sync app makes a CircuitPython board expose
 *two* serial ports -- the console channel and the data channel that carries
 the SD-sync protocol -- and their device names alone can't tell them apart.
 :func:`find_data_port` asks

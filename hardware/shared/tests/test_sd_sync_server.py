@@ -5,7 +5,7 @@ loopback tests in ``scripts/tests/test_sd_sync_loopback.py``, which drive
 ``SdSyncServer`` through ``SdSyncClient`` -- the seam that matters for the
 protocol as a whole. These tests cover ``read``, ``write`` and ``list``
 directly, the pieces of server behaviour meaningful in isolation from the wire,
-plus ``serve_one``'s request-verb dispatch (#930) -- the piece a device-side
+plus ``serve_one``'s request-verb dispatch -- the piece a device-side
 loop needs to service a mix of verbs over one connection.
 """
 
