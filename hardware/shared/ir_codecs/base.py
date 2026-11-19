@@ -156,17 +156,22 @@ class InfraredDecoder:
         error_ratio = self._last_error_margin / self._error_threshold
         return min(1.0, 1.3 - error_ratio)
 
-    def reset(self, error_margin: int | None = None) -> None:
+    def reset(self) -> None:
         """Return the decoder to idle, discarding any in-progress decode.
 
-        Decode state only — telemetry counters are untouched.
+        Decode state only: the telemetry counters and the last completed
+        packet's error margin (and so its signal strength) are untouched.
         """
         self._decoder_state = 0
         self._received_data = bytearray()  # MicroPython does not support clear() on bytearray
         self._received_bit_index = 7
         self._received_byte = 0
         self._max_error_margin = 0
-        self._last_error_margin = error_margin
+
+    def _finish_packet(self) -> None:
+        """Call only when a packet completes, so no rejected frame overwrites the margin."""
+        self._last_error_margin = self._max_error_margin
+        self.reset()
 
     def _check_pulse(
         self, received: int, expected: int, error_threshold: int | None = None

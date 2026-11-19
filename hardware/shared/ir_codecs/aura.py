@@ -156,7 +156,7 @@ class AuraInfraredDecoder(InfraredDecoder):
                 self._decoder_state = _STATE_DATA
                 self._awaiting_space = False
             else:
-                self.reset(self._error_threshold)
+                self.reset()
 
         elif self._decoder_state == _STATE_DATA:
             if not self._awaiting_space:
@@ -166,7 +166,7 @@ class AuraInfraredDecoder(InfraredDecoder):
                 elif self._check_pulse(pulse, IR_LEAD_OUT):
                     return self._finalise()
                 else:
-                    self.reset(self._error_threshold)
+                    self.reset()
             else:
                 # Space encodes the bit value. The two space durations are
                 # >=1000 µs apart, well outside the 250 µs error window, so
@@ -178,7 +178,7 @@ class AuraInfraredDecoder(InfraredDecoder):
                     self._write_bit(0)
                     self._awaiting_space = False
                 else:
-                    self.reset(self._error_threshold)
+                    self.reset()
 
         return None
 
@@ -188,21 +188,20 @@ class AuraInfraredDecoder(InfraredDecoder):
         n = len(data)
         if n < 2:
             # Need at least 1 payload byte + 1 CRC byte
-            self.reset(self._error_threshold)
+            self.reset()
             return None
 
         payload_len = n - 1
         received_crc = data[payload_len]
         calculated_crc = _calculate_crc(data, payload_len)
 
-        saved_margin = self._max_error_margin
         if received_crc == calculated_crc:
             payload = data[:payload_len]  # bytearray slice returns bytearray — no extra wrap
-            self.reset(saved_margin)
+            self._finish_packet()
             return payload
 
         # CRC mismatch — reject silently
-        self.reset(self._error_threshold)
+        self.reset()
         return None
 
 

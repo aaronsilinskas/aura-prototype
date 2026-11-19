@@ -177,6 +177,36 @@ def test_no_signal_or_best_receiver_is_reported_before_the_first_frame():
     assert transceiver.last_best_receiver is None
 
 
+def test_a_received_frames_signal_survives_the_drain_of_a_following_emission():
+    nudge = 100  # µs, within tolerance: a known, non-zero error margin
+    noisy = aura_pulses(b"\x66")
+    noisy[3] += nudge
+    transceiver, readers, writer = _emitting(2, holds=True)
+    readers[1].load(noisy)
+    transceiver.update(0.0)
+    strength = transceiver.last_signal_strength
+
+    transceiver.send(b"\x01", LINE)
+    transceiver.update(0.0)  # drain-but-discard resets every decoder
+    writer.finish()
+    transceiver.update(0.0)  # the post-emission drain
+
+    assert transceiver.last_error_margin == nudge
+    assert transceiver.last_signal_strength == strength
+
+
+def test_the_last_frames_signal_is_still_reported_after_apply_codec():
+    transceiver, readers = _receiving(2)
+    readers[0].load(aura_pulses(b"\x77"))
+    transceiver.update(0.0)
+
+    transceiver.apply_codec(TagInfraredEncoder, TagInfraredDecoder)
+    transceiver.update(0.0)
+
+    assert transceiver.last_error_margin == 0
+    assert transceiver.last_signal_strength == 1.0
+
+
 def test_frames_read_on_any_reader_while_emitting_are_never_received():
     transceiver, readers, _ = _emitting(3, holds=True)
     transceiver.send(b"\x33", LINE)  # the writer stays busy: still emitting
