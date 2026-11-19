@@ -402,8 +402,7 @@ class SceneManager(SceneControls):
         self._stack: list[_SceneStackEntry] = []
         self._pending: tuple[Literal["overlay"], Scene] | tuple[Literal["pop"]] | None = None
 
-    # activate_boot_scene is not on SceneControls, so rules can't reach it.
-
+    # Not on SceneControls, so rules can't reach it.
     def activate_boot_scene(self, name: str) -> None:
         """Make *name* the active scene, at once, on Split for every scope.
 

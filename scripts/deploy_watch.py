@@ -211,9 +211,8 @@ def find_console_port(*, explicit_port: "str | None" = None) -> str:
     return select_console_port(list(circuitpython_serial.repl_comports()))
 
 
-# Thin glue over the serial port; not unit tested.
-
-
+# open_serial_with_retry, SerialHandle and iter_serial_lines are thin glue over
+# the serial port, not unit tested.
 def open_serial_with_retry(
     port: str,
     baud: int,

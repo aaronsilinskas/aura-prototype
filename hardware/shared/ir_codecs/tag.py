@@ -192,7 +192,5 @@ class TagInfraredDecoder(InfraredDecoder):
         return None
 
 
-# ir_codecs resolves a codec by its module-level ENCODER and DECODER.
-
 ENCODER = TagInfraredEncoder
 DECODER = TagInfraredDecoder

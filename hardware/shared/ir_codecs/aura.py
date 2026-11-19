@@ -42,6 +42,7 @@ _IR_ERROR_MARGIN: Final = IR_UNIT // 2  # 250 µs — internal tolerance thresho
 _CRC_GENERATOR: Final = 0x1D
 
 
+# Pure integer arithmetic: it allocates nothing.
 def _calculate_crc(data: bytes | bytearray, length: int = -1) -> int:
     """Return the CRC-8 (generator ``0x1D``) of the first *length* bytes of *data*.
 
@@ -204,8 +205,6 @@ class AuraInfraredDecoder(InfraredDecoder):
         self.reset(self._error_threshold)
         return None
 
-
-# ir_codecs resolves a codec by its module-level ENCODER and DECODER.
 
 ENCODER = AuraInfraredEncoder
 DECODER = AuraInfraredDecoder
