@@ -25,10 +25,10 @@ __all__ = [
     "Transport",
     "decode_frame",
     "decode_listing",
+    "delimit_line",
     "encode_frame",
     "encode_listing",
     "expect_ack",
-    "frame_line",
     "iter_chunks",
 ]
 
@@ -90,7 +90,7 @@ def decode_frame(line: bytes) -> Frame:
     return Frame(kind, text, payload)
 
 
-def frame_line(line: bytes) -> bytes:
+def delimit_line(line: bytes) -> bytes:
     """Return *line* terminated with ``FRAME_DELIMITER``, ready to write to a byte stream."""
     return line + FRAME_DELIMITER
 
@@ -100,19 +100,23 @@ class LineFramer:
 
     Bytes read past a delimiter are kept for the next :meth:`read_line`, so
     two lines arriving in one read are returned one per call.
+
+    Args:
+        read: The stream's read: takes a maximum byte count and returns
+            whatever is available, possibly nothing.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, read: Callable[[int], bytes | None]) -> None:
+        self._read = read
         self._buffered = b""
 
-    def read_line(self, read: Callable[[int], bytes | None]) -> bytes:
-        """Return the next line without its delimiter, calling *read* until one is buffered.
+    def read_line(self) -> bytes:
+        """Return the next line without its delimiter, reading until one is buffered.
 
-        *read* takes a maximum byte count and returns whatever is available,
-        possibly nothing; an empty read is retried in a tight loop.
+        An empty read is retried in a tight loop.
         """
         while FRAME_DELIMITER not in self._buffered:
-            chunk = read(_READ_SIZE)
+            chunk = self._read(_READ_SIZE)
             if chunk:
                 self._buffered += chunk
         line, _, self._buffered = self._buffered.partition(FRAME_DELIMITER)

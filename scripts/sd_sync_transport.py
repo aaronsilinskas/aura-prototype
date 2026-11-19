@@ -18,7 +18,7 @@ from typing import Final
 
 from adafruit_board_toolkit import circuitpython_serial
 
-from hardware.shared.sd_sync_protocol import LineFramer, Transport, frame_line
+from hardware.shared.sd_sync_protocol import LineFramer, Transport, delimit_line
 from scripts.deploy_watch import SerialHandle, open_serial_with_retry
 
 TYPE_CHECKING = False
@@ -66,15 +66,16 @@ class SerialTransport(Transport):
 
     def __init__(self, handle: SerialHandle) -> None:
         self._handle = handle
-        self._framer = LineFramer()
+        # Through the handle, not a bound ser.read: SerialHandle may swap .ser on reconnect.
+        self._framer = LineFramer(lambda size: handle.ser.read(size))
 
     def send(self, line: bytes) -> None:
         """Write *line* followed by the delimiter :meth:`recv` looks for."""
-        self._handle.ser.write(frame_line(line))
+        self._handle.ser.write(delimit_line(line))
 
     def recv(self) -> bytes:
         """Return the next line, with its delimiter stripped."""
-        return self._framer.read_line(self._handle.ser.read)
+        return self._framer.read_line()
 
 
 def open_serial_transport(port: str, baud: int = _DEFAULT_BAUD) -> SerialTransport:

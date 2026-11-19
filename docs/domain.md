@@ -230,7 +230,7 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `SdSyncServer` | `hardware/shared/sd_sync_server.py` | Board-free device side of the SD-sync protocol (ADR-0011) |
 | `SdSyncClient` | `scripts/sd_sync_client.py` | Board-free (CPython-only) host side of the SD-sync protocol (ADR-0011) |
 | `Transport` (SD sync) | `hardware/shared/sd_sync_protocol.py` | Board-free port `SdSyncClient`/`SdSyncServer` exchange base64-framed lines through (ADR-0011); live adapters `UsbCdcTransport` (device) / `SerialTransport` (host) |
-| `LineFramer` | `hardware/shared/sd_sync_protocol.py` | Splits a byte stream into SD-sync frame lines at `FRAME_DELIMITER`; `frame_line` terminates outgoing ones. Both live transports frame through it, and both ends check acks with `expect_ack` |
+| `LineFramer` | `hardware/shared/sd_sync_protocol.py` | Splits a byte stream into SD-sync frame lines at `FRAME_DELIMITER`; `delimit_line` terminates outgoing ones. Both live transports frame through it, and both ends check acks with `expect_ack` |
 | `UsbCdcTransport` | `hardware/circuitpython/usb_cdc_transport.py` | Live `Transport` framing SD-sync lines with `LineFramer` over any `read`/`write` stream (on-device, `usb_cdc.data`); needs no `usb_cdc` import itself, so it is CPython-testable against a fake stream |
 | `SerialTransport` | `scripts/sd_sync_transport.py` | Live host-side `Transport`, framing SD-sync lines with `LineFramer` like `UsbCdcTransport` but over a host serial port opened via `deploy_watch`'s `SerialHandle`/`open_serial_with_retry` |
 | `find_data_port` / `select_data_port` | `scripts/sd_sync_transport.py` | Data-channel **Port auto-detect** for `scripts/sd_sync.py`; `--port` overrides |

@@ -417,7 +417,7 @@ _Avoid_: opening the host file before the server confirms the pull will proceed 
 The board-free port `SdSyncClient`/`SdSyncServer` exchange base64-framed lines through, one `Frame` at a time. Live adapters are `UsbCdcTransport` (device) and `SerialTransport` (host); an in-memory loopback stands in for CI.
 
 ### LineFramer
-The board-free splitter in `sd_sync_protocol` that turns a byte stream into SD-sync frame lines, each ended by `FRAME_DELIMITER` (a newline, which base64 never produces). Both live transports use it, with `frame_line` on the sending side.
+The board-free splitter in `sd_sync_protocol` that turns a byte stream into SD-sync frame lines, each ended by `FRAME_DELIMITER` (a newline, which base64 never produces). Both live transports use it, with `delimit_line` on the sending side.
 
 ### UsbCdcTransport
 The live device-side `Transport` adapter, framing SD-sync lines over a serial-like stream with the shared `LineFramer`. Duck-typed against any `read`/`write` stream — it imports no `usb_cdc`, so it is CPython-testable against a fake stream.

@@ -8,9 +8,9 @@ from hardware.shared.sd_sync_protocol import (
     Frame,
     LineFramer,
     Transport,
+    delimit_line,
     encode_frame,
     expect_ack,
-    frame_line,
 )
 
 
@@ -38,31 +38,30 @@ class _ReplyTransport(Transport):
         return self._reply
 
 
-def test_frame_line_terminates_a_line_with_one_newline():
-    assert frame_line(b"YWNrIDAK") == b"YWNrIDAK\n"
+def test_delimit_line_terminates_a_line_with_one_newline():
+    assert delimit_line(b"YWNrIDAK") == b"YWNrIDAK\n"
 
 
 def test_read_line_assembles_a_line_split_across_reads():
-    framer = LineFramer()
+    framer = LineFramer(_ScriptedReads([b"YW", b"", b"NrIDAK\n"]))
 
-    assert framer.read_line(_ScriptedReads([b"YW", b"", b"NrIDAK\n"])) == b"YWNrIDAK"
+    assert framer.read_line() == b"YWNrIDAK"
 
 
 def test_read_line_returns_two_lines_from_one_read_without_reading_again():
-    framer = LineFramer()
     read = _ScriptedReads([b"first\nsecond\n"])
+    framer = LineFramer(read)
 
-    assert framer.read_line(read) == b"first"
-    assert framer.read_line(read) == b"second"
+    assert framer.read_line() == b"first"
+    assert framer.read_line() == b"second"
     assert read.calls == 1
 
 
 def test_read_line_keeps_a_partial_next_line_for_the_following_call():
-    framer = LineFramer()
-    read = _ScriptedReads([b"first\nsec", b"ond\n"])
+    framer = LineFramer(_ScriptedReads([b"first\nsec", b"ond\n"]))
 
-    assert framer.read_line(read) == b"first"
-    assert framer.read_line(read) == b"second"
+    assert framer.read_line() == b"first"
+    assert framer.read_line() == b"second"
 
 
 def test_expect_ack_accepts_the_ack_carrying_the_sequence_number():

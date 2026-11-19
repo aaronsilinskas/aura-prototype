@@ -7,7 +7,7 @@ frame per :meth:`~UsbCdcTransport.send`/:meth:`~UsbCdcTransport.recv`.
 
 from __future__ import annotations
 
-from hardware.shared.sd_sync_protocol import LineFramer, Transport, frame_line
+from hardware.shared.sd_sync_protocol import LineFramer, Transport, delimit_line
 
 TYPE_CHECKING = False
 
@@ -31,11 +31,11 @@ class UsbCdcTransport(Transport):
         # nothing) so it can poll for a newline across short frames instead.
         serial.timeout = 0
         self._serial = serial
-        self._framer = LineFramer()
+        self._framer = LineFramer(serial.read)
 
     def send(self, line: bytes) -> None:
         """Write *line* followed by the delimiter :meth:`recv` looks for."""
-        self._serial.write(frame_line(line))
+        self._serial.write(delimit_line(line))
 
     def recv(self) -> bytes:
         """Return the next line, with its delimiter stripped.
@@ -44,4 +44,4 @@ class UsbCdcTransport(Transport):
         single-connection device-side loop, which has nothing else to do while
         waiting for the next request.
         """
-        return self._framer.read_line(self._serial.read)
+        return self._framer.read_line()

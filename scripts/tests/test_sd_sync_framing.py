@@ -39,12 +39,20 @@ class _FakeStream:
         return b""
 
 
+def as_host_serial(stream: _FakeStream) -> "Serial":
+    return cast("Serial", stream)
+
+
+def as_usb_cdc_serial(stream: _FakeStream) -> "usb_cdc.Serial":
+    return cast("usb_cdc.Serial", stream)
+
+
 def _serial_transport(stream: _FakeStream) -> Transport:
-    return SerialTransport(SerialHandle(cast("Serial", stream), "/dev/fake", 115200))
+    return SerialTransport(SerialHandle(as_host_serial(stream), "/dev/fake", 115200))
 
 
 def _usb_cdc_transport(stream: _FakeStream) -> Transport:
-    return UsbCdcTransport(cast("usb_cdc.Serial", stream))
+    return UsbCdcTransport(as_usb_cdc_serial(stream))
 
 
 TRANSPORTS = pytest.mark.parametrize(
