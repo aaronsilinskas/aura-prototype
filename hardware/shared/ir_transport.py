@@ -367,10 +367,9 @@ class _InfraredReceiver:
         self.packets_surfaced: int = 0
         self.pulses_dropped_transmitting: int = 0
 
-        # Held rather than read live from the winning decoder, which may go on
-        # to decode a losing packet or be reset by a drain-but-discard.
-        self._last_signal_strength: float | None = None
-        self._last_error_margin: int | None = None
+        # The decoder object itself, not its index: apply_codec replaces the
+        # decoder list, and the last packet's signal outlives that swap.
+        self._last_winning_decoder: InfraredDecoder | None = None
         self._last_best_receiver: PulseReader | None = None
 
     def receive(self) -> "bytearray | None":
@@ -417,9 +416,7 @@ class _InfraredReceiver:
         if best_packet is None:
             return None
 
-        winning_decoder = decoders[best_i]
-        self._last_error_margin = best_margin
-        self._last_signal_strength = winning_decoder.last_signal_strength
+        self._last_winning_decoder = decoders[best_i]
         self._last_best_receiver = readers[best_i]
         self.packets_surfaced += 1
 
@@ -493,13 +490,15 @@ class _InfraredReceiver:
     def last_signal_strength(self) -> "float | None":
         """Normalised signal quality (0.0–1.0) of the last winning packet, or
         ``None`` before any packet has been received."""
-        return self._last_signal_strength
+        decoder = self._last_winning_decoder
+        return decoder.last_signal_strength if decoder is not None else None
 
     @property
     def last_error_margin(self) -> "int | None":
         """Worst-case timing deviation (µs) of the last winning packet, or
         ``None`` before any packet has been received."""
-        return self._last_error_margin
+        decoder = self._last_winning_decoder
+        return decoder.last_error_margin if decoder is not None else None
 
     @property
     def last_best_receiver(self) -> "PulseReader | None":
