@@ -59,9 +59,6 @@ def test_ice_shield_expires_after_max_hits(shield_fixture: IceShieldFixture) -> 
         aura.add_spell(shield_fixture.damage_spell)
         aura.update(0.1)
 
-    # Final update to process removals
-    aura.update(0.1)
-
     assert shield_fixture.shield_spell not in aura.spells, "Ice Shield should expire after max_hits"
 
 
@@ -95,9 +92,6 @@ def test_ice_shield_casts_freeze_on_max_hits(shield_fixture: IceShieldFixture) -
         aura.add_spell(shield_fixture.damage_spell)
         aura.update(0.1)
 
-    # Final update to process freeze spell
-    aura.update(0.1)
-
     assert shield_fixture.caster.was_cast(shield_fixture.freeze_spell, CastType.AREA_OF_EFFECT), (
         "Ice Shield should cast Freeze spell when max_hits exceeded"
     )
@@ -111,9 +105,6 @@ def test_ice_shield_casts_no_freeze_before_max_hits(shield_fixture: IceShieldFix
     for _ in range(shield_fixture.max_hits - 1):
         aura.add_spell(shield_fixture.damage_spell)
         aura.update(0.1)
-
-    # Final update to process removals
-    aura.update(0.1)
 
     assert len(shield_fixture.caster.cast_spells) == 0, (
         "Ice Shield should not cast Freeze spell before max_hits exceeded"

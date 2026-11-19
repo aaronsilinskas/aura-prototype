@@ -420,6 +420,13 @@ def test_a_phase_declared_to_end_when_its_effect_stops_outlasts_a_cover_that_hol
     assert device.strip(Scope.PERSONAL).all_lit(_GREEN)
 
 
+def test_popping_a_scene_nothing_covers_raises(simulation, card):
+    device = simulation.add_device("red", scene="counter", card=card)
+
+    with pytest.raises(ValueError):
+        device.pop()
+
+
 def test_covering_with_a_scene_the_device_cannot_run_raises(simulation, card):
     device = simulation.add_device("red", scene="counter", card=card, without={"accelerometer"})
 

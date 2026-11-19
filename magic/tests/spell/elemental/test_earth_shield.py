@@ -51,9 +51,6 @@ def test_earth_shield_expires_after_max_hits(shield_fixture: EarthShieldFixture)
         aura.add_spell(shield_fixture.damage_spell)
         aura.update(0.1)
 
-    # Final update to process removals because earth spell is processed before damage spell
-    aura.update(0.1)
-
     assert shield_fixture.shield_spell not in aura.spells, (
         "Earth Shield should expire after max_hits"
     )

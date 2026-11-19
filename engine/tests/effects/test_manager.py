@@ -10,7 +10,7 @@ from engine.events import EffectEvent
 from engine.namespace import CLIP, ActiveSceneNamespace, MissingPrefixError, UndeclaredPackError
 from engine.pack_catalog import PackCatalog
 from engine.packs import PackRegistry, UnknownItemError
-from engine.state import Scope
+from engine.state import EffectReceipt, Scope
 from engine.tests.effects.helpers import (
     AudioClipEffectBuilder,
     CapturingEffectBuilder,
@@ -545,6 +545,25 @@ def test_stop_effect_by_receipt_leaves_other_effects_running(pack_tree) -> None:
     receipt_a = manager.add_effect(Scope.PERSONAL, "stub.fire", {})
     manager.add_effect(Scope.PERSONAL, "stub.ice", {})
     receipt_a.stop()
+    manager.update(_make_timer())
+
+    assert len(output.update_pixels_calls) == 1
+
+
+def test_a_receipt_stopped_inside_output_flush_is_removed_on_the_next_tick(pack_tree) -> None:
+    class StopOnFlushOutput(SpyEffectOutput):
+        receipt_to_stop: EffectReceipt | None = None
+
+        def flush(self) -> None:
+            super().flush()
+            if self.receipt_to_stop is not None:
+                self.receipt_to_stop.stop()
+
+    output = StopOnFlushOutput(min_resolution=10, scopes=[Scope.PERSONAL])
+    manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
+    output.receipt_to_stop = manager.add_effect(Scope.PERSONAL, "stub.fire", {})
+
+    manager.update(_make_timer())
     manager.update(_make_timer())
 
     assert len(output.update_pixels_calls) == 1

@@ -12,10 +12,11 @@ class AbsorbSpell(Spell):
         self._absorb_count = 1
 
     def update(self, aura: Aura, elapsed_time: float) -> bool:
-        if self._absorb_count <= 0:
-            return True
-
         return self.duration.update(elapsed_time)
+
+    @property
+    def is_spent(self) -> bool:
+        return self._absorb_count <= 0
 
     def on_level_changed(self, level: int) -> None:
         self._absorb_count = round(Spell.LEVEL_SCALER.scale_value(1, level))

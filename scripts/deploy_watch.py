@@ -256,12 +256,15 @@ class SerialHandle:
 
 
 def iter_serial_lines(
-    handle: SerialHandle, *, reconnect_marker: str | None = None
+    handle: SerialHandle,
+    *,
+    reconnect_marker: str | None = None,
+    reopen: "Callable[[str, int], Serial]" = open_serial_with_retry,
 ) -> Iterable[str | None]:
     """Yield text lines from *handle*, or ``None`` when no data is available.
 
     Runs indefinitely; the caller (``watch_stream``) controls termination.
-    Reopens the connection (see ``SerialHandle``) if a read raises instead of
+    Reopens the connection with *reopen* (see ``SerialHandle``) if a read raises instead of
     propagating the error -- the glitch this works around tends to land right
     on the reboot boundary and can consume whatever the device was mid-write
     on, which is often the very banner line a caller is scanning for. When
@@ -287,7 +290,7 @@ def iter_serial_lines(
             chunk = handle.ser.read(handle.ser.in_waiting or 1)
         except serial.SerialException:
             handle.ser.close()
-            handle.ser = open_serial_with_retry(handle.port, handle.baud)
+            handle.ser = reopen(handle.port, handle.baud)
             buffer.clear()
             yield reconnect_marker
             continue

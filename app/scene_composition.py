@@ -1,9 +1,7 @@
 """The Scene boot: ``build_scene_boot`` turns a device's hardware into a booted scene and its tick.
 
 Its interface is ``build_scene_boot`` and the ``SceneBoot`` it returns; every
-boot step below is private. It imports only ``engine`` and the board-free
-modules under ``hardware.shared``, so it runs under CPython as well as on the
-device.
+boot step below is private. It runs under CPython as well as on the device.
 """
 
 from __future__ import annotations
@@ -278,8 +276,7 @@ def _build_scene_tick(hw: DeviceHardware, runtime: SceneRuntime) -> Callable[[],
         runtime.advance_clock()
         elapsed = runtime.elapsed
         # Polled whether or not a scene is active, so a send in flight across
-        # a scene transition still completes and a packet received with no
-        # scene active is drained and dropped; only building events waits on
+        # a scene transition still completes; only building events waits on
         # a scene.
         for part in polled:
             part.update(elapsed)

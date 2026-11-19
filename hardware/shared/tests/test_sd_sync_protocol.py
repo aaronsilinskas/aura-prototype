@@ -1,4 +1,4 @@
-"""Behaviour tests for the SD-sync line framing and ack check both ends share."""
+"""Tests for the shared SD-sync protocol helpers that the loopback tests can't isolate."""
 
 from collections.abc import Sequence
 
@@ -11,6 +11,7 @@ from hardware.shared.sd_sync_protocol import (
     delimit_line,
     encode_frame,
     expect_ack,
+    iter_chunks,
 )
 
 
@@ -88,3 +89,7 @@ def test_expect_ack_raises_the_callers_error_type():
 
     with pytest.raises(_PeerError):
         expect_ack(_ReplyTransport(Frame("ack", "0")), 1, error=_PeerError)
+
+
+def test_iter_chunks_of_empty_data_yields_no_chunks():
+    assert list(iter_chunks(b"")) == []

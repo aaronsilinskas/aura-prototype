@@ -205,7 +205,7 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `Event` / `EventGroup` | `engine/events.py` | Named events grouped by category |
 | `Timer` | `engine/timer.py` | Per-tick elapsed/cumulative time tracker |
 | `Aura` | `magic/aura.py` | A player/object's magic pool + active `Spells` collection |
-| `Spell` | `magic/aura.py` | Base class for spells; `update` returns `True` to self-remove |
+| `Spell` | `magic/aura.py` | Base class for spells; `update` returns `True` to self-remove, or `is_spent` turns true when events use it up |
 | `Spells` | `magic/aura.py` | Collection with lookup by name, tag, or class |
 | `AuraEvent` | `magic/aura.py` | Base event routed through active spells; can be canceled |
 | `MinMaxValue` | `magic/values.py` | Clamped float with dynamic max (via `ValueWithModifiers`) |
