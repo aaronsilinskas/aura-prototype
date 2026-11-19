@@ -9,8 +9,6 @@ from magic.aura import (
     Spell,
     SpellTags,
 )
-from magic.spell.elemental.earth_shield import EarthShieldSpell
-from magic.spell.elemental.slice import SliceSpell
 from magic.tests.helpers import AuraFixture, MockEventListener, NoopSpell
 from magic.values import ValueModifier
 
@@ -65,19 +63,42 @@ def test_update_triggers_cast_delay_update(fixture: AuraFixture) -> None:
     assert len(aura.cast_delay.modifiers) == 0
 
 
-@pytest.mark.parametrize("shield_first", [True, False], ids=["shield_first", "damage_first"])
+class SpentByOneHitSpell(NoopSpell):
+    def __init__(self) -> None:
+        super().__init__(tags=[])
+        self.hit = False
+
+    @property
+    def is_spent(self) -> bool:
+        return self.hit
+
+    def modify_event(self, aura: Aura, event: AuraEvent) -> None:
+        if isinstance(event, DamageEvent):
+            self.hit = True
+
+
+class HitEveryUpdateSpell(NoopSpell):
+    def __init__(self) -> None:
+        super().__init__(tags=[])
+
+    def update(self, aura: Aura, elapsed_time: float) -> bool:
+        aura.process_event(DamageEvent(1.0))
+        return False
+
+
+@pytest.mark.parametrize("spent_first", [True, False], ids=["spent_first", "hitter_first"])
 def test_a_spell_spent_by_another_spells_update_leaves_in_that_same_update(
-    fixture: AuraFixture, shield_first: bool
+    fixture: AuraFixture, spent_first: bool
 ) -> None:
     aura = fixture.aura
-    shield = EarthShieldSpell(reduction=0.5, max_hits=1, duration=10.0)
-    damage = SliceSpell(damage=1.0)
-    for spell in [shield, damage] if shield_first else [damage, shield]:
+    spent = SpentByOneHitSpell()
+    hitter = HitEveryUpdateSpell()
+    for spell in [spent, hitter] if spent_first else [hitter, spent]:
         aura.add_spell(spell)
 
     aura.update(0.1)
 
-    assert list(aura.spells) == []
+    assert list(aura.spells) == [hitter]
 
 
 def test_listeners_hear_a_spent_spell_removed_in_the_update_that_spent_it(
@@ -86,14 +107,14 @@ def test_listeners_hear_a_spent_spell_removed_in_the_update_that_spent_it(
     aura = fixture.aura
     listener = MockEventListener()
     aura.event_listeners.append(listener)
-    shield = EarthShieldSpell(reduction=0.5, max_hits=1, duration=10.0)
-    aura.add_spell(shield)
-    aura.add_spell(SliceSpell(damage=1.0))
+    spent = SpentByOneHitSpell()
+    aura.add_spell(spent)
+    aura.add_spell(HitEveryUpdateSpell())
 
     aura.update(0.1)
 
     removed = [e.spell for _, e in listener.events if isinstance(e, RemoveSpellEvent)]
-    assert shield in removed
+    assert removed == [spent]
 
 
 def test_update_runs_each_spells_update_once_even_when_a_spell_is_spent(
@@ -112,8 +133,8 @@ def test_update_runs_each_spells_update_once_even_when_a_spell_is_spent(
 
     counting = CountingSpell()
     aura.add_spell(counting)
-    aura.add_spell(EarthShieldSpell(reduction=0.5, max_hits=1, duration=10.0))
-    aura.add_spell(SliceSpell(damage=1.0))
+    aura.add_spell(SpentByOneHitSpell())
+    aura.add_spell(HitEveryUpdateSpell())
 
     aura.update(0.1)
 

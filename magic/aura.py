@@ -58,8 +58,8 @@ class Spell:
 
     @property
     def is_spent(self) -> bool:
-        """Whether events have used the spell up; ``Aura.update`` removes it once every spell
-        has updated, so a spell spent by a later spell's update still leaves that update.
+        """Whether events have used the spell up; ``Aura.update`` removes spent spells after
+        every spell has updated, so a spell spent during an update is gone when it returns.
         """
         return False
 

@@ -21,7 +21,7 @@ class EarthShieldSpell(Spell):
         return self.hits.is_max
 
     def modify_event(self, aura: Aura, event: AuraEvent) -> None:
-        if self.duration.is_expired or self.hits.is_max:
+        if self.duration.is_expired or self.is_spent:
             return
 
         if isinstance(event, DamageEvent):
