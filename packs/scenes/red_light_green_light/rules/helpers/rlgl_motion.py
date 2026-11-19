@@ -18,16 +18,14 @@ _MOTION_KEY: Final = "rlgl_motion"
 class RlglMotion:
     """Mutable gravity/motion-EMA tracking state for the RLGL scene.
 
-    The gravity estimate is held as three float fields plus a ``_seeded`` flag
-    rather than a tuple, so :meth:`update` can advance it without allocating
-    on every accelerometer sample.
-
     The gravity estimate is tracked per-axis with a slow low-pass filter and
     subtracted as a vector from each sample so motion reads the same in any
-    orientation. "Unseeded" gravity is a distinct third state (neither zeroed
-    nor an arbitrary orientation): :meth:`reset_gravity` clears the seeded
-    flag so the next :meth:`update` call seeds gravity directly from that
-    sample instead of carrying over a stale orientation.
+    orientation. It is held in three float fields rather than a tuple so
+    :meth:`update` advances it without allocating. "Unseeded" gravity is a
+    distinct third state (neither zeroed nor an arbitrary orientation):
+    :meth:`reset_gravity` clears the seeded flag so the next :meth:`update`
+    call seeds gravity directly from that sample instead of carrying over a
+    stale orientation.
     """
 
     __slots__ = (

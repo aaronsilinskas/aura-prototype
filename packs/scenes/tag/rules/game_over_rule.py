@@ -10,7 +10,10 @@ from packs.scenes.tag.rules.helpers.phases import (
 
 
 class TagGameOverRule(PhaseRule):
-    """The looping fire needs no ``on_exit``: entering Ready replaces it."""
+    """Plays fire and the game-over sting, then returns to Ready when the sting ends.
+
+    The looping fire needs no ``on_exit``: entering Ready replaces it.
+    """
 
     def __init__(self) -> None:
         super().__init__(PHASE_GAME_OVER, tag_phase)

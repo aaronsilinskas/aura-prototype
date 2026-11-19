@@ -5,7 +5,8 @@ from magic.spell.elemental.ignite import IgniteSpell
 
 class CombustCombination(SpellCombination):
     """Merges two or more Ignite spells into one with their summed damage per second
-    and the longest duration."""
+    and the longest duration.
+    """
 
     def check(self, aura: Aura) -> bool:
         ignite_spells = aura.spells.get_by_class(IgniteSpell)

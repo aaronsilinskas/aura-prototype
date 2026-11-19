@@ -173,7 +173,8 @@ class Aura:
 
     def process_event(self, event: AuraEvent) -> None:
         """Passes ``event`` to each active spell; if one cancels it, it is neither
-        applied nor sent to listeners."""
+        applied nor sent to listeners.
+        """
         for spell in self.spells:
             spell.modify_event(self, event)
             if event.is_canceled:
@@ -218,5 +219,6 @@ class Aura:
     @property
     def event_listeners(self) -> list[EventListener]:
         """The registered listeners, notified after each event is processed by
-        active spells and the Aura."""
+        active spells and the Aura.
+        """
         return self._event_listeners

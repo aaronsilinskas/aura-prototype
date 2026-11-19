@@ -11,7 +11,9 @@ _STATE_KEY: Final = "tag_state"
 
 
 class ShotState:
-    """``reload_started_at`` is ``None`` when not reloading, else the
+    """Ammo, shot-cooldown and reload tracking.
+
+    ``reload_started_at`` is ``None`` when not reloading, else the
     ``state.total`` timestamp the current hold-to-reload began.
     ``reload_receipt`` is the in-flight ``scene.reload`` effect on
     ``Scope.Global.BUFF``, if any.

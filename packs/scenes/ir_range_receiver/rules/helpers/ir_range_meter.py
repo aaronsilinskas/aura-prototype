@@ -1,5 +1,8 @@
-"""Kept separate from ``reception_quality_meter.py`` so that module stays a pure,
-``GameState``-free classifier."""
+"""The per-scene ``ReceptionQualityMeter`` accessor.
+
+Kept separate from ``reception_quality_meter.py`` so that module stays a pure,
+``GameState``-free classifier.
+"""
 
 from __future__ import annotations
 

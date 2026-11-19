@@ -19,7 +19,9 @@ AMMO_COLOR: Final = 0xFFBF00
 
 
 class TagPlayingRule(PhaseRule):
-    """``Global.BUFF`` is torn down with ``stop_effect`` rather than a stored
+    """Owns the Playing phase lifecycle: hitpoints, the hitpoint and ammo bars, and the GO cue.
+
+    ``Global.BUFF`` is torn down with ``stop_effect`` rather than a stored
     receipt, since any of the ammo effects, or none, may hold it at exit.
     """
 

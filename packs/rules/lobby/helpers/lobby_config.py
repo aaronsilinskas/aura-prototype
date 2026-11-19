@@ -68,8 +68,9 @@ class LobbyConfig:
     in order, only the entries whose scene *can_run* accepts
     (``SceneControls.can_run`` on a device), so the lobby offers only scenes
     this prop can play. Every entry is checked before any is left out. Both
-    Settings are required, and an empty or malformed one raises rather than
-    showing the wrong scenes or leaving the lobby dark.
+    Settings are required with no default (a missing entry list can't mean
+    "no scenes"), and an empty or malformed one raises rather than showing
+    the wrong scenes or leaving the lobby dark.
 
     Raises:
         ValueError: if an entry is not an object or is missing

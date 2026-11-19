@@ -88,7 +88,8 @@ class _LightningBolt(Layer):
 
 class LightningEffect(AddSamplesRenderer):
     """Sums its bolts through a palette, emitting one ``STRIKE`` per update in which a bolt
-    goes IDLE→STRIKE."""
+    goes IDLE→STRIKE.
+    """
 
     STRIKE: Final = EffectVerb("strike")
     VERBS: tuple[EffectVerb, ...] = (STRIKE,)

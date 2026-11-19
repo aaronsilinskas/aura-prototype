@@ -16,8 +16,8 @@ _dark_palette = bytes([0, 0, 0, 0,
 
 class DarkBuilder(EffectBuilder):
     def __call__(self, name: str, config: EffectConfig) -> Effect:
-        """Level adds sparks but slows each one's spawn, so the field grows denser
-        rather than quicker."""
+        # Level adds sparks but slows each one's spawn, so the field grows denser
+        # rather than quicker.
         level = effect_level(config)
         spawn_delay_min = level_lerp(level, 0.5, 1.0, EFFECT_TOP_LEVEL)
         spawn_delay_max = level_lerp(level, 3.0, 5.0, EFFECT_TOP_LEVEL)

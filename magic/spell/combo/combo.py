@@ -10,7 +10,8 @@ if TYPE_CHECKING:
 
 class SpellCombination:
     """Looks for a specific set of spells on an Aura and replaces them with a
-    new combined spell if found."""
+    new combined spell if found.
+    """
 
     def check(self, aura: Aura) -> bool:
         """Applies the combination if its spells are present, returning whether it fired."""

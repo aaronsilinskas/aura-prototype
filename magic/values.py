@@ -70,7 +70,8 @@ class ValueModifier:
 
 class ValueModifiers:
     """Manages a collection of ``ValueModifier`` objects, notifying an optional
-    callback whenever the collection changes."""
+    callback whenever the collection changes.
+    """
 
     def __init__(self, modifiers_changed: Callable | None = None) -> None:
         self._modifiers: list[ValueModifier] = []
@@ -121,8 +122,6 @@ class ValueModifiers:
 
 
 class ValueWithModifiers:
-    """A value that can be modified by a set of multipliers."""
-
     def __init__(self, base_value: float = 0.0, value_changed: Callable | None = None) -> None:
         self._base: float = base_value
         self._value: float = base_value
