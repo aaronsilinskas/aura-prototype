@@ -173,12 +173,6 @@ def test_write_pulses_converts_us_durations_to_loop_counts():
 
 @pytest.mark.parametrize("length", [1, 3, 17, 19])
 def test_every_accepted_frame_ends_with_the_inter_frame_gap(length):
-    """Each frame's buffer gets the gap appended after its durations.
-
-    The gap is the receiver's silence to delimit on, and it brings the buffer to
-    an even length so the PIO program's pull-mark/pull-space phase stays aligned
-    for the next frame.
-    """
     writer, sm = _make_writer()
     writer.write_pulses(array("H", [IR_UNIT] * (length - 1) + [IR_LEAD_OUT]))
     buffer = sm.background_writes[0]
@@ -190,11 +184,6 @@ def test_every_accepted_frame_ends_with_the_inter_frame_gap(length):
 
 
 def test_write_pulses_rejects_an_even_length_frame_naming_its_length():
-    """An even-length frame ends on a space, so no gap can keep the PIO phase.
-
-    The appended gap is a space, so the mark/space phase survives into the next
-    frame only when the frame ends on a mark.
-    """
     writer, sm = _make_writer()
     with pytest.raises(ValueError, match="has 4 durations"):
         writer.write_pulses(array("H", [IR_UNIT, IR_UNIT, IR_UNIT, IR_LEAD_OUT]))
