@@ -102,7 +102,7 @@ def test_a_new_combination_manager_iterates_nothing():
     assert result == []
 
 
-def test_an_added_spell_event_has_a_combination_check_the_aura(fixture: AuraFixture):
+def test_an_added_spell_event_checks_a_combination_against_the_aura(fixture: AuraFixture):
     aura = fixture.aura
 
     combinations = SpellCombinations()

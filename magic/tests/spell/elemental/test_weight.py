@@ -8,7 +8,7 @@ from magic.tests.helpers import AuraFixture
 class WeightFixture(AuraFixture):
     def __init__(self) -> None:
         super().__init__()
-        self.acceleration_threshold = 1.0
+        self.acceleration_threshold_m_per_s2 = 1.0
         self.accel_under_threshold_event = AccelerationEvent(
             x_accel=0.0, y_accel=-GRAVITY, z_accel=0.0, remove_gravity=True
         )
@@ -20,7 +20,7 @@ class WeightFixture(AuraFixture):
         self.duration = 10.0
 
         self.weight_spell = WeightSpell(
-            acceleration_threshold=self.acceleration_threshold,
+            acceleration_threshold=self.acceleration_threshold_m_per_s2,
             damage_per_second=self.damage_per_second,
             duration=self.duration,
         )

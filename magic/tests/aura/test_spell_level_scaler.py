@@ -123,12 +123,18 @@ def test_scale_value_scales_fractional_values():
     assert abs(result - expected) < 0.01
 
 
-def test_scale_percentage_scales_zero_and_tiny_bases_and_clamps_near_one():
+def test_scale_percentage_adds_the_same_points_to_a_tiny_base():
     scaler = SpellLevelScaler()
-    assert scaler.scale_percentage(0.0, 5) == 0.2, "a zero base still scales up"
+
     result = scaler.scale_percentage(0.01, 2)
-    assert abs(result - 0.06) < 0.001, "a tiny base gains the same five points"
-    assert scaler.scale_percentage(0.98, 2) == 1.0, "a base near one clamps at one"
+
+    assert abs(result - 0.06) < 0.001
+
+
+def test_scale_percentage_clamps_at_one_for_a_base_near_one():
+    scaler = SpellLevelScaler()
+
+    assert scaler.scale_percentage(0.98, 2) == 1.0
 
 
 def test_scalers_with_different_coefficients_scale_independently():

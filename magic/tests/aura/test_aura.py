@@ -184,7 +184,7 @@ def test_get_spells_by_tag_empty(fixture: AuraFixture) -> None:
     aura.add_spell(BuffSpell())
 
     spells = list(aura.spells.get_by_tag())
-    assert spells == [], "no tags match no spell"
+    assert spells == [], "asking for no tags matches nothing"
 
     spells = list(aura.spells.get_by_tag(SpellTags.DEBUFF))
     assert spells == [], "a tag no spell carries matches no spell"

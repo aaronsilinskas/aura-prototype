@@ -76,7 +76,7 @@ def test_ice_shield_expires_after_its_duration(
     assert shield_fixture.shield_spell not in aura.spells, "Ice Shield should expire after duration"
 
 
-def test_ice_shield_level_scales_reduction_capped_at_full(shield_fixture: IceShieldFixture) -> None:
+def test_ice_shield_level_scales_reduction(shield_fixture: IceShieldFixture) -> None:
     level = 2
     original_reduction = shield_fixture.damage_reduction
 

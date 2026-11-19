@@ -72,7 +72,7 @@ def test_earth_shield_expires_after_its_duration(
     )
 
 
-def test_earth_shield_level_scales_reduction_capped_at_full(
+def test_earth_shield_level_scales_reduction(
     shield_fixture: EarthShieldFixture,
 ) -> None:
     level = 2
