@@ -1,4 +1,4 @@
-"""Tests for deploy_watch: watch_stream, discard_until, exit codes, SplitWriter, port selection,
+"""Tests for deploy_watch: watch_stream, discard_until, exit codes, SplitWriter,
 reading serial lines, and the CLI's deploy step."""
 
 import functools
@@ -12,25 +12,20 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
-import pytest
 import serial
 
 from scripts.deploy import deploy
 from scripts.deploy_watch import (
-    ConsolePortError,
     SerialHandle,
     SplitWriter,
     WatchReason,
     discard_until,
     exit_code_for,
-    find_console_port,
     iter_serial_lines,
     parse_args,
     run_deploy,
-    select_console_port,
     watch_stream,
 )
-from scripts.tests.fake_comport import fake_comport
 
 if TYPE_CHECKING:
     from serial import Serial
@@ -326,32 +321,6 @@ def test_split_writer_file_excludes_lines_written_directly_to_stdout() -> None:
 
     assert file_out.getvalue() == "BOOT OK\nsensor=42\nDONE\n"
     assert "Deploying" not in file_out.getvalue()
-
-
-# A console port alongside a data port needs no case here: repl_comports()
-# filters the data channel out before selection.
-
-
-def test_select_console_port_auto_selects_the_single_console_port() -> None:
-    port = select_console_port([fake_comport("/dev/cu.usbmodem1101")])
-
-    assert port == "/dev/cu.usbmodem1101"
-
-
-def test_select_console_port_raises_when_no_console_port_found() -> None:
-    with pytest.raises(ConsolePortError, match="--port"):
-        select_console_port([])
-
-
-def test_select_console_port_raises_listing_candidates_when_multiple_console_ports_found() -> None:
-    with pytest.raises(ConsolePortError, match=r"cu\.usbmodem1101.*cu\.usbmodem2101.*--port"):
-        select_console_port(
-            [fake_comport("/dev/cu.usbmodem1101"), fake_comport("/dev/cu.usbmodem2101")]
-        )
-
-
-def test_find_console_port_returns_an_explicit_port_unchanged() -> None:
-    assert find_console_port(explicit_port="/dev/tty.explicit") == "/dev/tty.explicit"
 
 
 def _deploy_from_source(tmp_path: Path) -> "Callable[..., int]":
