@@ -10,10 +10,6 @@ No ``pulseio`` import — safe on CPython, CircuitPython 10.x, and MicroPython.
 
 from array import array
 
-# ---------------------------------------------------------------------------
-# Abstract base classes
-# ---------------------------------------------------------------------------
-
 
 class InfraredEncoder:
     """Abstract base: encodes byte payloads into IR pulse sequences.
@@ -122,10 +118,6 @@ class InfraredDecoder:
         self.mark_reject: int = 0
         self.space_reject: int = 0
 
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
-
     def decode(self, pulse: int) -> bytearray | None:
         """Process a single pulse duration and return decoded data if complete.
 
@@ -175,10 +167,6 @@ class InfraredDecoder:
         self._received_byte = 0
         self._max_error_margin = 0
         self._last_error_margin = error_margin
-
-    # ------------------------------------------------------------------
-    # Helpers for subclasses (not part of the public API)
-    # ------------------------------------------------------------------
 
     def _check_pulse(
         self, received: int, expected: int, error_threshold: int | None = None

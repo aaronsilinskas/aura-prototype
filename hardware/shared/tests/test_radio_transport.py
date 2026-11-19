@@ -8,10 +8,6 @@ import pytest
 
 from hardware.shared.radio_transport import RadioTransport
 
-# ---------------------------------------------------------------------------
-# Port contract
-# ---------------------------------------------------------------------------
-
 
 def test_radio_transport_send_base_raises_not_implemented():
     transport = RadioTransport()

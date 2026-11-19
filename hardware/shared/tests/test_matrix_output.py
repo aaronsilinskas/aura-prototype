@@ -3,10 +3,6 @@ import pytest
 from effects.effect import PixelBuffer
 from hardware.shared.matrix_output import MatrixEffectOutput
 
-# ---------------------------------------------------------------------------
-# Test double — concrete subclass with spy on _write_row
-# ---------------------------------------------------------------------------
-
 
 class SpyMatrixOutput(MatrixEffectOutput):
     """Concrete subclass that records every _write_row call for assertion."""
@@ -19,10 +15,6 @@ class SpyMatrixOutput(MatrixEffectOutput):
     def _write_row(self, row: int, pixels: PixelBuffer) -> None:
         self.write_row_calls.append((row, pixels))
 
-
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
 
 _SCOPE_ROWS = {
     "global.buff": range(0, 1),
@@ -39,11 +31,6 @@ def output() -> SpyMatrixOutput:
     return SpyMatrixOutput(cols=_COLS, scope_rows=_SCOPE_ROWS)
 
 
-# ---------------------------------------------------------------------------
-# Construction
-# ---------------------------------------------------------------------------
-
-
 def test_min_resolution_equals_cols(output: SpyMatrixOutput) -> None:
     assert output.min_resolution == _COLS
 
@@ -57,11 +44,6 @@ def test_create_buffer_returns_new_instance_each_call(output: SpyMatrixOutput) -
     buf_a = output.create_buffer("personal")
     buf_b = output.create_buffer("personal")
     assert buf_a is not buf_b
-
-
-# ---------------------------------------------------------------------------
-# update_pixels — row band routing
-# ---------------------------------------------------------------------------
 
 
 def test_update_pixels_routes_buffer_to_every_row_in_scope_band(output: SpyMatrixOutput) -> None:
@@ -106,11 +88,6 @@ def test_update_pixels_writes_the_same_buffer_verbatim_to_every_row(
         assert pixels is buf
 
 
-# ---------------------------------------------------------------------------
-# clear_pixels — zeros the row band
-# ---------------------------------------------------------------------------
-
-
 def test_clear_pixels_zeros_every_row_in_scope_band(output: SpyMatrixOutput) -> None:
     output.clear_pixels("global.main")
     rows_written = [r for r, _ in output.write_row_calls]
@@ -131,11 +108,6 @@ def test_clear_pixels_writes_zeros_regardless_of_prior_state(output: SpyMatrixOu
     output.clear_pixels("personal")
     for _, pixels in output.write_row_calls:
         assert all(c == 0 for c in pixels)
-
-
-# ---------------------------------------------------------------------------
-# _write_row is abstract
-# ---------------------------------------------------------------------------
 
 
 def test_write_row_raises_not_implemented() -> None:

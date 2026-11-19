@@ -20,10 +20,6 @@ from typing import TYPE_CHECKING, cast
 if TYPE_CHECKING:
     import rp2pio
 
-# ---------------------------------------------------------------------------
-# Test doubles for rp2pio.StateMachine and adafruit_pioasm.Program.
-# ---------------------------------------------------------------------------
-
 
 class _FakeStateMachine:
     """Recording stub for ``rp2pio.StateMachine``.
@@ -91,11 +87,6 @@ def _loops_to_us(loops: int) -> int:
     return (loops + 1) * _CARRIER_PERIOD_US
 
 
-# ---------------------------------------------------------------------------
-# write_pulses — non-blocking start
-# ---------------------------------------------------------------------------
-
-
 def test_write_pulses_starts_a_background_write():
     writer, sm = _make_writer()
     writer.write_pulses(array("H", [100, 200, 300]))
@@ -106,11 +97,6 @@ def test_write_pulses_returns_before_transmission_completes():
     writer, _sm = _make_writer()
     writer.write_pulses(array("H", [100, 200]))
     assert writer.is_busy() is True
-
-
-# ---------------------------------------------------------------------------
-# is_busy — reflects the state machine's writing flag
-# ---------------------------------------------------------------------------
 
 
 def test_is_busy_is_false_before_any_write():
@@ -140,11 +126,6 @@ def test_is_busy_reflects_state_machine_writing_flag():
     assert writer.is_busy() is False
 
 
-# ---------------------------------------------------------------------------
-# Buffer ownership — held for the DMA lifetime, dropped when idle
-# ---------------------------------------------------------------------------
-
-
 def test_write_pulses_hands_the_built_buffer_to_the_dma():
     """The exact buffer handed to background_write is the writer's in-flight one.
 
@@ -171,11 +152,6 @@ def test_busy_query_keeps_buffer_while_still_writing():
     writer.write_pulses(array("H", [100, 200]))
     assert writer.is_busy() is True
     assert writer._inflight is sm.background_writes[0]
-
-
-# ---------------------------------------------------------------------------
-# µs → carrier-period loop-count conversion
-# ---------------------------------------------------------------------------
 
 
 def test_write_pulses_converts_us_durations_to_loop_counts():

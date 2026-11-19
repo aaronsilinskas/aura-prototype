@@ -37,9 +37,6 @@ def test_solid_effect_name_is_basic_solid() -> None:
     assert effect.name == "basic.solid"
 
 
-# --- Raw color pass-through ---
-
-
 def test_solid_stores_raw_color_unscaled() -> None:
     pixels = _render(color=0xFFFFFF)
     assert all(p == 0xFFFFFF for p in pixels)
@@ -62,9 +59,6 @@ def test_solid_ignores_brightness_option() -> None:
     assert all(p == 0xFFFFFF for p in buf)
 
 
-# --- Defaults ---
-
-
 def test_solid_no_color_option_defaults_to_white() -> None:
     from packs.effects.basic.solid import BUILD
 
@@ -74,9 +68,6 @@ def test_solid_no_color_option_defaults_to_white() -> None:
     assert effect.pixels is not None
     effect.pixels.render(buf)
     assert all(p == 0xFFFFFF for p in buf)
-
-
-# --- Determinism ---
 
 
 def test_solid_render_is_deterministic() -> None:

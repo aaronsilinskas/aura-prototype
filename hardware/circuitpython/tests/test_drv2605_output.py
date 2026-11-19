@@ -10,10 +10,6 @@ from engine.events import EffectEvent
 from engine.state import EffectReceipt, Scope
 from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 _SEQ_LEN = 8
 
 
@@ -50,11 +46,6 @@ def _effect_with_sequence(verb: EffectVerb, sequence: list[int]) -> Effect:
     )
 
 
-# ---------------------------------------------------------------------------
-# Construction
-# ---------------------------------------------------------------------------
-
-
 def test_construction_sets_min_resolution_to_one() -> None:
     """Drv2605EffectOutput exposes min_resolution = 1 so it is compatible with all effects."""
     output, _ = _make_output()
@@ -67,11 +58,6 @@ def test_construction_sets_scopes_to_all() -> None:
     output, _ = _make_output()
 
     assert output.scopes == [Scope.ALL]
-
-
-# ---------------------------------------------------------------------------
-# handle_event — correct sequence written and driver plays
-# ---------------------------------------------------------------------------
 
 
 def test_known_verb_writes_effect_to_driver_sequence() -> None:
@@ -132,11 +118,6 @@ def test_known_verb_calls_driver_play() -> None:
     assert driver.play_calls == 1
 
 
-# ---------------------------------------------------------------------------
-# handle_event — slot clearing
-# ---------------------------------------------------------------------------
-
-
 def test_shorter_sequence_clears_remaining_slots_to_effect_zero() -> None:
     output, driver = _make_output()
     effect = _effect_with_sequence(EffectVerb.START, [HapticPattern.STRONG_CLICK])
@@ -180,11 +161,6 @@ def test_second_event_with_shorter_sequence_clears_stale_slots() -> None:
         assert driver.sequence[i] == adafruit_drv2605.Effect(0)
 
 
-# ---------------------------------------------------------------------------
-# handle_event — interruption
-# ---------------------------------------------------------------------------
-
-
 def test_second_event_calls_play_again_without_stop() -> None:
     output, driver = _make_output()
     effect = _effect_with_sequence(EffectVerb.START, [HapticPattern.STRONG_CLICK])
@@ -200,11 +176,6 @@ def test_second_event_calls_play_again_without_stop() -> None:
 
     assert driver.play_calls == 2
     assert driver.stop_calls == 0
-
-
-# ---------------------------------------------------------------------------
-# handle_event — early-return guards
-# ---------------------------------------------------------------------------
 
 
 def test_handle_event_ignores_effect_with_no_haptic() -> None:
@@ -229,11 +200,6 @@ def test_handle_event_ignores_unknown_verb() -> None:
     )
 
     assert driver.play_calls == 0
-
-
-# ---------------------------------------------------------------------------
-# handle_event — error cases
-# ---------------------------------------------------------------------------
 
 
 def test_sequence_longer_than_8_raises() -> None:
@@ -261,11 +227,6 @@ def test_unknown_constant_in_sequence_raises() -> None:
         output.handle_event(
             EffectEvent("rlgl", "haptic", EffectVerb.START), frozenset({"all"}), effect, receipt
         )
-
-
-# ---------------------------------------------------------------------------
-# flush — receipt externally stopped
-# ---------------------------------------------------------------------------
 
 
 def test_flush_calls_driver_stop_when_active_receipt_is_externally_stopped() -> None:
@@ -317,11 +278,6 @@ def test_flush_does_nothing_when_receipt_is_still_active() -> None:
     output.flush()
 
     assert driver.stop_calls == 0
-
-
-# ---------------------------------------------------------------------------
-# hold_effect / restore_effect — an Overlay covers the effect's scene
-# ---------------------------------------------------------------------------
 
 
 def test_holding_the_effect_whose_sequence_is_playing_interrupts_it() -> None:

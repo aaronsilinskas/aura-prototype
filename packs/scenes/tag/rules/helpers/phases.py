@@ -22,9 +22,6 @@ TYPE_CHECKING = False
 if TYPE_CHECKING:
     from typing import Final
 
-# ---------------------------------------------------------------------------
-# Phase keys — identity-typed singletons owned by the scene
-# ---------------------------------------------------------------------------
 
 PHASE_READY: Final = PhaseKey("ready")
 PHASE_STARTING: Final = PhaseKey("starting")

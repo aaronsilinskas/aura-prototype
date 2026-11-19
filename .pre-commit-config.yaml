@@ -42,3 +42,11 @@ repos:
         entry: uv run mypy
         language: system
         pass_filenames: false
+      - id: banner-comments
+        name: no section-banner comments
+        description: >-
+          Reject section-banner comments in Python: a full-line rule of 10 or more - or =,
+          or a titled one-line banner such as "# --- port discovery ---".
+        entry: '^\s*# ?[-=]{10,}\s*$|^\s*# -{2,3} .+ -{2,3}\s*$'
+        language: pygrep
+        types: [python]

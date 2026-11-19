@@ -20,11 +20,6 @@ def _settings(**values: object) -> Settings:
     return settings_for("ir_range_transmitter", settings=values)
 
 
-# ---------------------------------------------------------------------------
-# Derived values
-# ---------------------------------------------------------------------------
-
-
 def test_send_period_seconds_is_the_reciprocal_of_send_rate():
     config = TransmitterConfig(_settings(send_rate_hz=10.0))
 
@@ -35,11 +30,6 @@ def test_payload_padding_carries_a_fixed_non_zero_marker_in_every_padding_byte()
     config = TransmitterConfig(_settings(payload_size=4))
 
     assert config.payload_padding == bytes([0xA1, 0xA2, 0xA3])
-
-
-# ---------------------------------------------------------------------------
-# transmitter_config — get-or-create accessor
-# ---------------------------------------------------------------------------
 
 
 def test_transmitter_config_builds_from_the_state_settings():

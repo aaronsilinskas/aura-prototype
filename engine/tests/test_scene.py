@@ -32,10 +32,6 @@ from engine.tests.helpers import (
 )
 from engine.version import Version
 
-# ---------------------------------------------------------------------------
-# Helpers / fixtures
-# ---------------------------------------------------------------------------
-
 _GROUP = EventGroup("test")
 
 _COLOR_EFFECTS = {
@@ -113,11 +109,6 @@ def _rule(name: str = "test.rule") -> GameRule:
     return GameRule()
 
 
-# ---------------------------------------------------------------------------
-# SceneControls — abstract base
-# ---------------------------------------------------------------------------
-
-
 def test_scene_controls_overlay_raises_not_implemented_error() -> None:
     sc = SceneControls()
 
@@ -160,11 +151,6 @@ def test_scene_reboot_reboot_to_previous_raises_not_implemented_error() -> None:
         port.reboot_to_previous()
 
 
-# ---------------------------------------------------------------------------
-# Scene — declarative data bundle
-# ---------------------------------------------------------------------------
-
-
 def test_scene_effect_packs_accessible_after_construction() -> None:
     effect_packs = [_ref("fx")]
     scene = Scene(effect_packs=effect_packs, rule_packs=[])
@@ -186,11 +172,6 @@ def test_scene_rejects_unknown_attributes() -> None:
         scene.runtime_state = "mutable"  # type: ignore[attr-defined]  # slotted, must raise
 
 
-# ---------------------------------------------------------------------------
-# SceneManager — construction
-# ---------------------------------------------------------------------------
-
-
 def test_scene_manager_satisfies_scene_controls_interface() -> None:
     rule_registry = PackRegistry()
     scene_registry = make_scene_registry()
@@ -203,20 +184,10 @@ def test_scene_manager_satisfies_scene_controls_interface() -> None:
     assert isinstance(manager, SceneControls)
 
 
-# ---------------------------------------------------------------------------
-# SceneManager — active_state
-# ---------------------------------------------------------------------------
-
-
 def test_active_state_is_none_before_any_scene_is_loaded() -> None:
     manager = _make_scene_manager()
 
     assert manager.active_state is None
-
-
-# ---------------------------------------------------------------------------
-# SceneManager — immediate validation (ValueError raised before any state change)
-# ---------------------------------------------------------------------------
 
 
 def test_overlay_raises_immediately_for_unregistered_scene_name() -> None:
@@ -250,11 +221,6 @@ def test_pop_raises_immediately_with_exactly_one_entry_on_stack() -> None:
 
     with pytest.raises(ValueError):
         manager.pop()
-
-
-# ---------------------------------------------------------------------------
-# SceneManager — reboot_into / reboot_to_previous (immediate, not deferred)
-# ---------------------------------------------------------------------------
 
 
 def test_reboot_into_delegates_to_the_injected_scene_reboot_port() -> None:
@@ -300,11 +266,6 @@ def test_reboot_to_previous_into_an_unknown_scene_logs_it_and_never_reaches_the_
 
     assert scene_reboot.reboot_to_previous_calls == 0
     assert lines == ["[scene] return_to 'elsewhere' is not a known scene; not rebooting\n"]
-
-
-# ---------------------------------------------------------------------------
-# SceneManager — update(elapsed) ticks the top scene, then deferred transitions
-# ---------------------------------------------------------------------------
 
 
 def test_update_with_no_scene_active_does_nothing() -> None:
@@ -360,11 +321,6 @@ def test_last_pending_transition_wins_within_one_tick() -> None:
     assert active_state(manager).settings.get("scene", "which") == "b", (
         "last overlay() call in tick should win"
     )
-
-
-# ---------------------------------------------------------------------------
-# SceneManager — boot-scene activation (the boot composition's, not the rules')
-# ---------------------------------------------------------------------------
 
 
 def test_scene_controls_offer_rules_no_way_to_load_a_scene_in_process() -> None:
@@ -494,11 +450,6 @@ def test_activating_the_boot_scene_enters_it_with_its_view(pack_tree) -> None:
     assert view.declared_packs == frozenset({"fx"})
 
 
-# ---------------------------------------------------------------------------
-# SceneManager — the active boot scene
-# ---------------------------------------------------------------------------
-
-
 def test_the_boot_scenes_state_carries_the_scene_manager_as_scene_controls() -> None:
     scene_reg = make_scene_registry(("main", make_scene()))
     manager = _make_scene_manager(scene_registry=scene_reg)
@@ -614,11 +565,6 @@ def test_scene_rules_fire_before_pack_rules(pack_tree) -> None:
     assert fired.index("scene") < fired.index("pack")
 
 
-# ---------------------------------------------------------------------------
-# SceneManager — overlay() lifecycle
-# ---------------------------------------------------------------------------
-
-
 def test_overlay_suspends_active_scene_and_pushes_without_clearing_stack() -> None:
     scene_reg = make_scene_registry(
         ("base", make_scene(settings=_which("base"))),
@@ -639,11 +585,6 @@ def test_overlay_suspends_active_scene_and_pushes_without_clearing_stack() -> No
     manager.update(_STEP)
     manager.update(_STEP)
     assert active_state(manager).settings.get("scene", "which") == "base"
-
-
-# ---------------------------------------------------------------------------
-# SceneManager — pop() lifecycle
-# ---------------------------------------------------------------------------
 
 
 def test_pop_restores_base_scene_rules_so_events_dispatch_to_base_rules(pack_tree) -> None:
@@ -712,11 +653,6 @@ def test_pop_restores_scene_below_in_deep_overlay_stack() -> None:
     manager.update(_STEP)
 
     assert active_state(manager).settings.get("scene", "which") == "base"
-
-
-# ---------------------------------------------------------------------------
-# SceneManager — a covered scene's game time stops
-# ---------------------------------------------------------------------------
 
 
 def _covered_scene_manager(
@@ -835,11 +771,6 @@ def test_an_overlays_game_time_starts_when_the_overlay_arrives() -> None:
     assert active_state(manager).total == 3 * _STEP
 
 
-# ---------------------------------------------------------------------------
-# SceneManager — rule pack integration
-# ---------------------------------------------------------------------------
-
-
 def test_rule_pack_items_all_receive_events_after_load(pack_tree) -> None:
     rule_content = "from engine.engine import GameRule\nRULE = GameRule()\n"
     catalog = pack_tree.scan(
@@ -928,16 +859,6 @@ def test_a_flash_scene_runs_a_rule_from_a_card_rule_pack(pack_tree) -> None:
     manager.update(_STEP)
 
     assert state.get_or_none("card_pack_rule_ran", bool) is True
-
-
-# ---------------------------------------------------------------------------
-# SceneManager — GC eligibility after full unload
-# ---------------------------------------------------------------------------
-
-
-# ---------------------------------------------------------------------------
-# SceneManager — activation invariant pin
-# ---------------------------------------------------------------------------
 
 
 def test_pop_activates_revealed_entry_with_both_rules_and_its_view(pack_tree) -> None:
@@ -1053,16 +974,6 @@ def test_uncovering_carries_the_covered_scenes_whole_view(pack_tree) -> None:
     assert view.local_effects is catalog.scene_registry.get("base").local_effect_registry
     assert list(view.local_sounds) == ["win"]
     assert view.declared_packs == frozenset({"fx"})
-
-
-# ---------------------------------------------------------------------------
-# SceneManager — resolution-failure ordering
-# ---------------------------------------------------------------------------
-
-
-# ---------------------------------------------------------------------------
-# Merge strategies and effects across an Overlay, through the SceneRuntime (issue #587)
-# ---------------------------------------------------------------------------
 
 
 class _Act(Event):
@@ -1277,10 +1188,6 @@ def test_nested_overlay_pop_merge_strategy_change_never_leaks_past_its_own_pop(
         "base's original Split choice must be restored once every overlay above it is popped"
     )
 
-
-# ---------------------------------------------------------------------------
-# SceneManager — every transition into a scene checks its Required capabilities
-# ---------------------------------------------------------------------------
 
 _HAS_BUTTONS = frozenset(("button.A", "button.B"))
 

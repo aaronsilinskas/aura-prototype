@@ -24,10 +24,6 @@ from engine.tests.helpers import (
 )
 from engine.timer import Timer
 
-# ---------------------------------------------------------------------------
-# Helpers / fixtures
-# ---------------------------------------------------------------------------
-
 
 def _stub_effect_source() -> str:
     return (
@@ -47,11 +43,6 @@ def _make_effect_manager(scene: Scene, outputs=None) -> EffectManager:
     view = SceneView(scene.local_effect_registry, scene.local_sound_map, frozenset())
     manager.enter_boot_scene(view)
     return manager
-
-
-# ---------------------------------------------------------------------------
-# SceneLocalRegistry — effects/ folder discovery via scan_pack_roots
-# ---------------------------------------------------------------------------
 
 
 def test_a_scenes_effects_folder_items_are_its_local_effects(pack_tree) -> None:
@@ -92,11 +83,6 @@ def test_a_scene_built_in_memory_has_an_empty_local_effect_registry() -> None:
     assert scene.local_effect_registry.items() == []
 
 
-# ---------------------------------------------------------------------------
-# EffectManager — scene. names resolve through the installed scene view
-# ---------------------------------------------------------------------------
-
-
 def test_scene_prefix_resolves_local_effect_when_scene_is_active(pack_tree) -> None:
     registry = pack_tree.scan(scenes={"forest": _local_effects("flash")}).scene_registry
     output = SpyEffectOutput(min_resolution=16, scopes=[Scope.PERSONAL])
@@ -118,11 +104,6 @@ def test_scene_prefix_fires_start_event_with_pack_equals_scene(pack_tree) -> Non
     assert output.handle_event_calls == [
         (EffectEvent("scene", "flash", EffectVerb.START), frozenset({"personal"}), ANY, receipt)
     ]
-
-
-# ---------------------------------------------------------------------------
-# Each transition hands EffectAdmin the top scene's local effects
-# ---------------------------------------------------------------------------
 
 
 def test_entering_the_boot_scene_carries_its_local_effects(pack_tree) -> None:
@@ -169,11 +150,6 @@ def test_uncovering_carries_the_covered_scenes_local_effects(pack_tree) -> None:
     local_effects = admin.steps[-1][1].local_effects
     assert local_effects is not None
     assert local_effects.items() == ["a_flash"]
-
-
-# ---------------------------------------------------------------------------
-# Each transition hands EffectAdmin the top scene's local sounds
-# ---------------------------------------------------------------------------
 
 
 def test_entering_the_boot_scene_carries_its_local_sounds(pack_tree) -> None:
@@ -233,11 +209,6 @@ def test_uncovering_carries_the_covered_scenes_local_sounds(pack_tree) -> None:
 
     local_sounds = admin.steps[-1][1].local_sounds
     assert list(local_sounds) == ["a_sting"]
-
-
-# ---------------------------------------------------------------------------
-# Isolation: scene-local effect not reachable from another scene
-# ---------------------------------------------------------------------------
 
 
 def test_loading_scene_b_after_a_does_not_expose_scene_a_locals(pack_tree) -> None:

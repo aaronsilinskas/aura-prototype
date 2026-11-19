@@ -16,11 +16,6 @@ def _make_state():
     return GameState(SpyEffectControls(), SceneControls())
 
 
-# ---------------------------------------------------------------------------
-# Construction defaults
-# ---------------------------------------------------------------------------
-
-
 def test_new_tag_state_starts_with_zeroed_gameplay_fields():
     tag = TagState()
 
@@ -45,11 +40,6 @@ def test_new_shot_state_is_not_reloading_and_has_no_reload_receipt():
 
     assert tag.shot.reload_started_at is None
     assert tag.shot.reload_receipt is None
-
-
-# ---------------------------------------------------------------------------
-# tag_state — get-or-create accessor
-# ---------------------------------------------------------------------------
 
 
 def test_tag_state_caches_the_same_instance_across_calls():

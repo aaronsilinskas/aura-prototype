@@ -28,11 +28,6 @@ class _UpdateCountLayer(Layer):
         return 0.0
 
 
-# ---------------------------------------------------------------------------
-# ScrollLayer — position transformation
-# ---------------------------------------------------------------------------
-
-
 def test_scroll_layer_does_not_shift_position_before_update() -> None:
     layer = ScrollLayer(_PositionLayer(), ScrollOffset(speed=1.0))
 

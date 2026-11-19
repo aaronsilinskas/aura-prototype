@@ -152,11 +152,6 @@ def test_a_booted_scenes_effects_draw_on_the_outputs_after_an_update(pack_tree) 
     assert _drawn(output) == [_RED] * 4
 
 
-# ---------------------------------------------------------------------------
-# Activating the boot scene
-# ---------------------------------------------------------------------------
-
-
 def test_activating_an_unknown_boot_scene_raises(pack_tree) -> None:
     runtime = _runtime(_catalog(pack_tree))
 
@@ -187,11 +182,6 @@ def test_activating_a_second_boot_scene_raises(pack_tree) -> None:
 
     with pytest.raises(ValueError, match="already active"):
         runtime.activate_boot_scene("cover")
-
-
-# ---------------------------------------------------------------------------
-# Queuing events
-# ---------------------------------------------------------------------------
 
 
 def test_an_event_queued_with_a_scene_active_reaches_its_rules_on_the_next_update(
@@ -233,11 +223,6 @@ def test_a_scene_is_active_only_once_the_boot_scene_is_activated(pack_tree) -> N
     assert (before_boot, runtime.has_active_scene) == (False, True)
 
 
-# ---------------------------------------------------------------------------
-# One update: dispatch, then transition, then effects
-# ---------------------------------------------------------------------------
-
-
 def test_an_overlay_requested_during_dispatch_covers_the_scene_within_the_same_update(
     pack_tree,
 ) -> None:
@@ -277,11 +262,6 @@ def test_a_pop_requested_during_dispatch_draws_the_revealed_scenes_effects_in_th
     runtime.update()
 
     assert _drawn(output) == [_RED] * 4
-
-
-# ---------------------------------------------------------------------------
-# Elapsed
-# ---------------------------------------------------------------------------
 
 
 def test_elapsed_follows_the_clock_given_at_construction(pack_tree) -> None:
@@ -335,11 +315,6 @@ def test_a_scenes_rules_see_the_elapsed_time_the_runtime_reports(pack_tree) -> N
     assert seen == [runtime.elapsed] == [0.25]
 
 
-# ---------------------------------------------------------------------------
-# The Active scene namespace
-# ---------------------------------------------------------------------------
-
-
 def test_the_namespace_resolves_the_active_scenes_names_across_boot_overlay_and_pop(
     pack_tree,
 ) -> None:
@@ -359,11 +334,6 @@ def test_the_namespace_resolves_the_active_scenes_names_across_boot_overlay_and_
     after_pop = resolvable()
 
     assert (at_boot, under_overlay, after_pop) == ((True, False), (False, True), (True, False))
-
-
-# ---------------------------------------------------------------------------
-# SceneControls
-# ---------------------------------------------------------------------------
 
 
 def test_the_runtimes_scene_controls_cover_the_active_scene(pack_tree) -> None:
@@ -408,11 +378,6 @@ def test_the_runtimes_scene_controls_reboot_through_the_scene_reboot_port(pack_t
     runtime.scene_controls.reboot_into("cover")
 
     assert reboot.reboot_into_calls == ["cover"]
-
-
-# ---------------------------------------------------------------------------
-# Steady-state allocation
-# ---------------------------------------------------------------------------
 
 
 def _steady_runtime(pack_tree, output: SpyEffectOutput) -> SceneRuntime:

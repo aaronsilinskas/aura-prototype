@@ -2,10 +2,6 @@ import pytest
 
 from effects.layers.scroll import PhaseScroll, ScrollOffset
 
-# ---------------------------------------------------------------------------
-# ScrollOffset — position shift
-# ---------------------------------------------------------------------------
-
 
 def test_scroll_offset_apply_returns_same_position_before_first_update() -> None:
     scroll = ScrollOffset(speed=1.0)
@@ -43,11 +39,6 @@ def test_scroll_offset_offset_wraps_when_it_exceeds_one() -> None:
     scroll.update(1.5)  # offset = 1.5 % 1.0 = 0.5
 
     assert scroll.apply(0.0) == pytest.approx(0.5)
-
-
-# ---------------------------------------------------------------------------
-# PhaseScroll — returned position is always in [0.0, 1.0)
-# ---------------------------------------------------------------------------
 
 
 def test_phase_scroll_apply_returns_value_in_unit_range_before_update() -> None:

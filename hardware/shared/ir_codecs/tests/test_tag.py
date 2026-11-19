@@ -22,10 +22,6 @@ from hardware.shared.ir_codecs.tag import (
     TagInfraredEncoder,
 )
 
-# ---------------------------------------------------------------------------
-# Wire round-trip
-# ---------------------------------------------------------------------------
-
 
 def _encode_decode_byte(byte: int) -> bytearray | None:
     encoder = TagInfraredEncoder()
@@ -102,11 +98,6 @@ def test_encoder_encodes_zero_bit_as_short_space():
     assert pulses[first_bit_space_index] == 1000
 
 
-# ---------------------------------------------------------------------------
-# Telemetry: last_error_margin / last_signal_strength
-# ---------------------------------------------------------------------------
-
-
 def test_successful_decode_exposes_error_margin_and_signal_strength():
     encoder = TagInfraredEncoder()
     decoder = TagInfraredDecoder()
@@ -131,11 +122,6 @@ def test_perfect_timing_yields_zero_error_margin_and_full_signal_strength():
     assert decoder.last_signal_strength == 1.0
 
 
-# ---------------------------------------------------------------------------
-# Decoder: noise tolerance and frame rejection
-# ---------------------------------------------------------------------------
-
-
 def test_decoder_discards_unrecognised_pulses_before_preamble():
     encoder = TagInfraredEncoder()
     decoder = TagInfraredDecoder()
@@ -150,10 +136,6 @@ def test_decoder_discards_unrecognised_pulses_before_preamble():
             result = outcome
     assert result == bytearray([0x33])
 
-
-# ---------------------------------------------------------------------------
-# Decoder: per-stage error margin (preamble looser than data bits)
-# ---------------------------------------------------------------------------
 
 _BETWEEN_MARGINS = (TAG_ERROR_MARGIN + TAG_PREAMBLE_ERROR_MARGIN) // 2
 
@@ -180,11 +162,6 @@ def test_data_bit_pulse_outside_narrow_margin_still_rejects_despite_wider_preamb
         decoder.decode(pulse)
 
     assert decoder.mark_reject == 1
-
-
-# ---------------------------------------------------------------------------
-# Decoder: inter-frame gap termination
-# ---------------------------------------------------------------------------
 
 
 def test_gap_pulse_mid_preamble_returns_none_instead_of_decoding_as_data():
@@ -260,11 +237,6 @@ def test_invalid_preamble_pulse_resets_decoder():
         if outcome is not None:
             result = outcome
     assert result is None
-
-
-# ---------------------------------------------------------------------------
-# Telemetry: per-stage reject/completion counters
-# ---------------------------------------------------------------------------
 
 
 def test_invalid_preamble_pulse_increments_preamble_reject():

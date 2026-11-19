@@ -22,11 +22,6 @@ class _ConstantLayer(Layer):
         return self._value
 
 
-# ---------------------------------------------------------------------------
-# LayerRenderer — render output
-# ---------------------------------------------------------------------------
-
-
 def test_layer_renderer_maps_layer_sample_through_palette_for_each_pixel() -> None:
     palette = PaletteLUT256(_BLACK_TO_WHITE)
     layer = _ConstantLayer(0.5)
@@ -59,11 +54,6 @@ def test_layer_renderer_passes_normalized_position_per_pixel_to_layer() -> None:
     for i in range(count):
         pos = i / count
         assert output[i] == palette.lookup(pos)
-
-
-# ---------------------------------------------------------------------------
-# LayerRenderer — update advances layer
-# ---------------------------------------------------------------------------
 
 
 def test_layer_renderer_update_passes_elapsed_to_layer() -> None:

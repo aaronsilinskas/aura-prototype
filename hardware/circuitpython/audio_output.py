@@ -89,10 +89,6 @@ class AudioEffectOutput(EffectOutput, VoiceSink):
     def flush(self) -> None:
         self._pool.sweep(self)
 
-    # ------------------------------------------------------------------
-    # VoiceSink — last-mile hardware mapping
-    # ------------------------------------------------------------------
-
     def open_source(self, path: str) -> tuple[BinaryIO, audiocore.WaveFile] | None:
         try:
             f = open(path, "rb")  # noqa: SIM115

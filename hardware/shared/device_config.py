@@ -42,9 +42,6 @@ __all__ = [
     "validate_band_map",
 ]
 
-# ---------------------------------------------------------------------------
-# Valid key sets
-# ---------------------------------------------------------------------------
 
 _VALID_SCOPE_KEYS: Final = set(Scope.ALL.keys)
 
@@ -90,10 +87,6 @@ _ISOLATE_EXCLUDED_COMPONENTS: Final = (
     "buttons",
     "neopixel_current_budget",
 )
-
-# ---------------------------------------------------------------------------
-# Config data classes
-# ---------------------------------------------------------------------------
 
 
 class PinRef:
@@ -505,11 +498,6 @@ class DeviceConfig:
         return DeviceConfig(**kwargs)
 
 
-# ---------------------------------------------------------------------------
-# Band-map validator (shared)
-# ---------------------------------------------------------------------------
-
-
 def validate_band_map(bands: dict[str, range], context: str) -> None:
     """Validate that all scope keys are valid and bands do not overlap.
 
@@ -537,11 +525,6 @@ def validate_band_map(bands: dict[str, range], context: str) -> None:
                 )
 
 
-# ---------------------------------------------------------------------------
-# Brightness validator (shared across matrix and strip entries)
-# ---------------------------------------------------------------------------
-
-
 def _parse_brightness(mapping: dict, key: str, field: str) -> float:
     """Return the brightness value at *key* in *mapping*, defaulting to 1.0.
 
@@ -565,11 +548,6 @@ def _parse_brightness(mapping: dict, key: str, field: str) -> float:
     return float(value)
 
 
-# ---------------------------------------------------------------------------
-# NeoPixel count validator
-# ---------------------------------------------------------------------------
-
-
 def _parse_count(mapping: dict, key: str, field: str) -> int:
     """Return the required pixel count at *key* in *mapping*.
 
@@ -587,12 +565,6 @@ def _parse_count(mapping: dict, key: str, field: str) -> int:
         raise ValueError(f"{field} must be a positive integer, got {value!r}")
     return value
 
-
-# ---------------------------------------------------------------------------
-# I2C address validator (for I2C-device config sections that declare an
-# address, e.g. matrix pixels; intended for reuse by future I2C-device
-# sections)
-# ---------------------------------------------------------------------------
 
 # 0x00-0x07 and 0x78-0x7F are reserved by the I2C spec (general call/start
 # byte and the 10-bit-addressing/future-use block), so a configured 7-bit
@@ -651,12 +623,6 @@ def _parse_address(mapping: dict, key: str, field: str) -> int | None:
     return address
 
 
-# ---------------------------------------------------------------------------
-# Enabled validator (shared across ir, audio, i2c, accelerometer, haptics,
-# and every pixels-list entry)
-# ---------------------------------------------------------------------------
-
-
 def _parse_enabled(mapping: dict, field: str) -> bool:
     """Return ``mapping["enabled"]``, defaulting to ``True`` when absent.
 
@@ -693,11 +659,6 @@ def _parse_pin(mapping: dict, key: str, field: str) -> PinRef:
     if not isinstance(name, str):
         raise ValueError(f"{field} must be a string pin name")
     return PinRef(name, field)
-
-
-# ---------------------------------------------------------------------------
-# Parser
-# ---------------------------------------------------------------------------
 
 
 def _parse_matrix_pixels(

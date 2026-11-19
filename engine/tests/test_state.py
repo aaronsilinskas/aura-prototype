@@ -10,10 +10,6 @@ from engine.state import (
     StateSlot,
 )
 
-# ---------------------------------------------------------------------------
-# GameState.get_or_none
-# ---------------------------------------------------------------------------
-
 
 def _make_state() -> GameState:
     return GameState(effect_controls=EffectControls(), scene_controls=SceneControls())
@@ -40,11 +36,6 @@ def test_get_or_none_raises_value_error_when_type_mismatch() -> None:
         state.get_or_none("name", str)
 
 
-# ---------------------------------------------------------------------------
-# ScopeValue — leaf scopes
-# ---------------------------------------------------------------------------
-
-
 def test_leaf_scope_key_matches_its_value() -> None:
     scope = ScopeValue("personal")
 
@@ -61,11 +52,6 @@ def test_leaf_scope_repr_is_its_value_string() -> None:
     scope = ScopeValue("personal")
 
     assert repr(scope) == "personal"
-
-
-# ---------------------------------------------------------------------------
-# ScopeValue — composite scopes
-# ---------------------------------------------------------------------------
 
 
 def test_composite_scope_keys_are_union_of_member_keys() -> None:
@@ -104,11 +90,6 @@ def test_nested_composite_scope_members_are_direct_children_not_leaves() -> None
     assert outer.members == [inner, c]
 
 
-# ---------------------------------------------------------------------------
-# Scope constants — leaf keys
-# ---------------------------------------------------------------------------
-
-
 def test_personal_scope_routes_to_personal_key() -> None:
     assert Scope.PERSONAL.keys == ("personal",)
 
@@ -127,11 +108,6 @@ def test_global_buff_scope_routes_to_global_buff_key() -> None:
 
 def test_global_debuff_scope_routes_to_global_debuff_key() -> None:
     assert Scope.Global.DEBUFF.keys == ("global.debuff",)
-
-
-# ---------------------------------------------------------------------------
-# Scope constants — composite expansion
-# ---------------------------------------------------------------------------
 
 
 def test_global_all_expands_to_all_three_global_zones() -> None:
@@ -159,11 +135,6 @@ def test_global_all_keys_are_subset_of_scope_all_keys() -> None:
     assert set(Scope.Global.ALL.keys).issubset(set(Scope.ALL.keys))
 
 
-# ---------------------------------------------------------------------------
-# Scope constants — AMBIENT and NON_AMBIENT
-# ---------------------------------------------------------------------------
-
-
 def test_ambient_scope_routes_to_ambient_key() -> None:
     assert Scope.AMBIENT.keys == ("ambient",)
 
@@ -188,11 +159,6 @@ def test_non_ambient_does_not_include_ambient_key() -> None:
 
 def test_scope_all_includes_ambient() -> None:
     assert "ambient" in Scope.ALL.keys
-
-
-# ---------------------------------------------------------------------------
-# EffectReceipt — brightness and loudness slots
-# ---------------------------------------------------------------------------
 
 
 def test_effect_receipt_brightness_defaults_to_one() -> None:
@@ -297,11 +263,6 @@ def test_effect_receipt_loudness_rejects_nan() -> None:
         receipt.loudness = float("nan")
 
 
-# ---------------------------------------------------------------------------
-# StateSlot
-# ---------------------------------------------------------------------------
-
-
 class _Marker:
     __slots__ = ()
 
@@ -397,11 +358,6 @@ def test_state_slot_is_independent_across_separate_game_state_instances() -> Non
     assert v1 is not v2
 
 
-# ---------------------------------------------------------------------------
-# StateSlot — two slots sharing a key resolve the same cached value
-# ---------------------------------------------------------------------------
-
-
 def test_two_state_slots_with_the_same_key_resolve_the_same_cached_value() -> None:
     shared_key = "shared_machine"
     slot_a = StateSlot(shared_key, lambda s: _Marker(), _Marker)
@@ -412,11 +368,6 @@ def test_two_state_slots_with_the_same_key_resolve_the_same_cached_value() -> No
     b = slot_b(state)
 
     assert a is b
-
-
-# ---------------------------------------------------------------------------
-# StateSlot.is_in
-# ---------------------------------------------------------------------------
 
 
 def test_state_slot_is_in_returns_false_before_first_call() -> None:
@@ -443,11 +394,6 @@ def test_state_slot_is_in_is_false_after_key_deleted_from_state() -> None:
     assert not slot.is_in(state)
 
 
-# ---------------------------------------------------------------------------
-# GameState.elapsed / total / dispatch_count — read-only to rules
-# ---------------------------------------------------------------------------
-
-
 def test_elapsed_is_read_only() -> None:
     state = _make_state()
 
@@ -467,11 +413,6 @@ def test_dispatch_count_is_read_only() -> None:
 
     with pytest.raises(AttributeError):
         state.dispatch_count = 1  # type: ignore[misc]  # read-only, must raise
-
-
-# ---------------------------------------------------------------------------
-# GameState — typed accessor API (get, set, pop, delete, has)
-# ---------------------------------------------------------------------------
 
 
 def test_get_returns_value_when_key_is_present() -> None:
@@ -541,11 +482,6 @@ def test_has_returns_false_when_key_is_absent() -> None:
     state = _make_state()
 
     assert "absent" not in state
-
-
-# ---------------------------------------------------------------------------
-# GameState.scene_controls — scene transition interface
-# ---------------------------------------------------------------------------
 
 
 def test_state_exposes_scene_controls_passed_at_construction() -> None:

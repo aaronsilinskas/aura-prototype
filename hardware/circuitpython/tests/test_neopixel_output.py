@@ -12,10 +12,6 @@ from unittest.mock import MagicMock, call
 
 from effects.effect import PixelBuffer
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 
 def _make_strip(count: int) -> MagicMock:
     """Return a mock NeoPixel strip with a list-like pixel interface."""
@@ -32,11 +28,6 @@ def _make_output(scope_key: str = "personal", count: int = 5):
     scope_pixels = {scope_key: range(0, count)}
     output = NeoPixelEffectOutput(strip, scope_pixels)
     return output, strip
-
-
-# ---------------------------------------------------------------------------
-# Construction
-# ---------------------------------------------------------------------------
 
 
 def test_scopes_contains_the_configured_scope_key() -> None:
@@ -56,20 +47,10 @@ def test_min_resolution_equals_strip_count() -> None:
     assert output.min_resolution == 10
 
 
-# ---------------------------------------------------------------------------
-# create_buffer
-# ---------------------------------------------------------------------------
-
-
 def test_create_buffer_returns_pixel_buffer_sized_to_strip_count() -> None:
     output, _ = _make_output(count=8)
     buf = output.create_buffer("personal")
     assert len(buf) == 8
-
-
-# ---------------------------------------------------------------------------
-# update_pixels — routing to the strip
-# ---------------------------------------------------------------------------
 
 
 def test_update_pixels_writes_the_single_buffer_verbatim() -> None:
@@ -120,22 +101,12 @@ def test_update_pixels_on_one_scope_leaves_another_scope_segment_untouched() -> 
     assert written == {0, 1}
 
 
-# ---------------------------------------------------------------------------
-# clear_pixels
-# ---------------------------------------------------------------------------
-
-
 def test_clear_pixels_writes_zeros_to_strip() -> None:
     output, strip = _make_output(count=3)
 
     output.clear_pixels("personal")
 
     strip.__setitem__.assert_has_calls([call(0, 0), call(1, 0), call(2, 0)])
-
-
-# ---------------------------------------------------------------------------
-# flush — delegates to strip.show()
-# ---------------------------------------------------------------------------
 
 
 def test_flush_calls_show_on_its_strip() -> None:

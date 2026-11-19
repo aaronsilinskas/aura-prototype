@@ -24,10 +24,6 @@ if TYPE_CHECKING:
 
     from hardware.circuitpython.audio_output import AudioEffectOutput
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 
 def _make_receipt(loudness: float = 1.0) -> MagicMock:
     r = MagicMock(spec=EffectReceipt)
@@ -102,11 +98,6 @@ def _wav(tmp_path, name: str = "clip") -> str:
     return str(wav)
 
 
-# ---------------------------------------------------------------------------
-# Constructor
-# ---------------------------------------------------------------------------
-
-
 def test_i2sout_constructed_with_caller_supplied_pins() -> None:
     """audiobusio.I2SOut is constructed with the caller-supplied I2S pins."""
     _make_output()
@@ -123,11 +114,6 @@ def test_mixer_constructed_with_num_voices() -> None:
     mixer_class = _installed_mock("audiomixer", "Mixer")
     mixer_class.assert_called_once()
     assert mixer_class.call_args[1]["voice_count"] == 4
-
-
-# ---------------------------------------------------------------------------
-# handle_event — events with no playable clip
-# ---------------------------------------------------------------------------
 
 
 def test_an_event_with_no_clip_plays_nothing() -> None:
@@ -171,11 +157,6 @@ def test_a_stops_effect_clip_whose_file_cannot_be_opened_stops_the_receipt(tmp_p
     )
 
     receipt.stop.assert_called_once()
-
-
-# ---------------------------------------------------------------------------
-# handle_event — playing the resolved clip's path
-# ---------------------------------------------------------------------------
 
 
 def test_the_resolved_clips_path_plays_on_an_idle_voice(tmp_path) -> None:
@@ -237,11 +218,6 @@ def test_a_finished_clip_with_pixels_and_no_stops_effect_leaves_the_receipt_to_r
     receipt.stop.assert_not_called()
 
 
-# ---------------------------------------------------------------------------
-# hold_effect / restore_effect — routed to the pool's hold and restore
-# ---------------------------------------------------------------------------
-
-
 def test_holding_an_effect_silences_its_voice(tmp_path) -> None:
     output, mixer = _make_output()
     effect, receipt = _with_pixels(), _make_receipt()
@@ -264,11 +240,6 @@ def test_restoring_an_effect_plays_its_held_loop_again(tmp_path) -> None:
 
     assert mixer.voice[0].play.call_args[1]["loop"] is True
     output.stop(0)
-
-
-# ---------------------------------------------------------------------------
-# VoiceSink — last-mile hardware mapping
-# ---------------------------------------------------------------------------
 
 
 def test_open_source_opens_file_and_wraps_wavefile(tmp_path) -> None:

@@ -15,10 +15,6 @@ from hardware.circuitpython.is31fl3741_output import (
     build_offset_table,
 )
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 _COLS = 13
 
 _SCOPE_ROWS = {
@@ -54,11 +50,6 @@ class _RecordingMatrix:
 
     def show(self) -> None:
         self.shown = True
-
-
-# ---------------------------------------------------------------------------
-# build_offset_table — the IS31FL3741's register-addressing contract
-# ---------------------------------------------------------------------------
 
 
 def test_offset_table_places_red_at_the_base_register_for_a_bank0_even_column() -> None:
@@ -111,11 +102,6 @@ def test_offset_table_switches_addressing_scheme_at_the_bank_boundary() -> None:
     assert hi == (272, 271, 270)
 
 
-# ---------------------------------------------------------------------------
-# Construction
-# ---------------------------------------------------------------------------
-
-
 def test_accepts_caller_supplied_cols_and_scope_rows() -> None:
     output, _ = _make_output(cols=5, scope_rows={"personal": range(0, 2)})
     assert output.min_resolution == 5
@@ -124,11 +110,6 @@ def test_accepts_caller_supplied_cols_and_scope_rows() -> None:
 def test_registered_on_all_scopes() -> None:
     output, _ = _make_output()
     assert Scope.ALL in output.scopes
-
-
-# ---------------------------------------------------------------------------
-# Hardware routing — _write_row writes channel bytes directly to matrix buffer
-# ---------------------------------------------------------------------------
 
 
 def test_write_row_emits_one_byte_per_channel() -> None:
@@ -178,11 +159,6 @@ def test_write_row_routes_red_byte_to_the_b_off_register_and_blue_to_r_off() -> 
     assert matrix.writes[242] == 0xAA  # b_off
     assert matrix.writes[241] == 0xBB  # g_off
     assert matrix.writes[240] == 0xCC  # r_off
-
-
-# ---------------------------------------------------------------------------
-# flush — delegates to matrix.show
-# ---------------------------------------------------------------------------
 
 
 def test_flush_calls_matrix_show() -> None:

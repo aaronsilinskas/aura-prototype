@@ -35,10 +35,6 @@ from scripts.sd_sync_client import (
     SdSyncNotFoundError,
 )
 
-# ---------------------------------------------------------------------------
-# Loopback wiring
-# ---------------------------------------------------------------------------
-
 
 class _QueueTransport(Transport):
     """One end of a two-queue in-memory ``Transport`` pair."""
@@ -150,11 +146,6 @@ def make_loopback_client(
     return SdSyncClient(client_transport, **client_kwargs), client_transport
 
 
-# ---------------------------------------------------------------------------
-# Exact round-trip
-# ---------------------------------------------------------------------------
-
-
 def test_pull_writes_the_exact_sd_bytes_to_the_host_path(
     device_storage: DeviceStorage, tmp_path: Path
 ):
@@ -179,11 +170,6 @@ def test_pull_preserves_a_relative_subpath_by_creating_missing_host_directories(
     assert host_path.read_bytes() == b"{}"
 
 
-# ---------------------------------------------------------------------------
-# Binary payload
-# ---------------------------------------------------------------------------
-
-
 def test_pull_round_trips_a_binary_payload_intact(device_storage: DeviceStorage, tmp_path: Path):
     binary_content = bytes(range(256)) * 4  # every byte value, including NUL and 0x0A/0x0D
     device_storage.write_bytes("capture.bin", binary_content)
@@ -193,11 +179,6 @@ def test_pull_round_trips_a_binary_payload_intact(device_storage: DeviceStorage,
     client.pull("capture.bin", str(host_path))
 
     assert host_path.read_bytes() == binary_content
-
-
-# ---------------------------------------------------------------------------
-# Chunked / large payload
-# ---------------------------------------------------------------------------
 
 
 def test_pull_round_trips_a_large_payload_through_multiple_chunks(
@@ -225,11 +206,6 @@ def test_pull_of_a_small_payload_sends_exactly_one_ack(
     client.pull("small.txt", str(host_path))
 
     assert transport.sent_kind_counts["ack"] == 1
-
-
-# ---------------------------------------------------------------------------
-# CRC-32 verification, retry, and exhausted-retry failure
-# ---------------------------------------------------------------------------
 
 
 def test_pull_retries_and_succeeds_after_one_transient_checksum_mismatch(
@@ -279,11 +255,6 @@ def test_pull_leaves_no_host_file_after_exhausting_retries(
     assert not host_path.exists()
 
 
-# ---------------------------------------------------------------------------
-# Not found / no SD configured
-# ---------------------------------------------------------------------------
-
-
 def test_pull_of_a_nonexistent_sd_path_raises_not_found(
     device_storage: DeviceStorage, tmp_path: Path
 ):
@@ -322,11 +293,6 @@ def test_pull_with_no_sd_configured_leaves_no_host_file(tmp_path: Path):
         client.pull("aura-state.json", str(host_path))
 
     assert not host_path.exists()
-
-
-# ---------------------------------------------------------------------------
-# Push -- exact round-trip
-# ---------------------------------------------------------------------------
 
 
 def test_push_writes_the_exact_host_bytes_to_the_named_sd_path(
@@ -368,11 +334,6 @@ def test_push_preserves_the_named_sd_path_even_when_the_host_layout_differs(
     assert device_storage.read_bytes("local-copy/state.json") is None
 
 
-# ---------------------------------------------------------------------------
-# Push -- binary payload
-# ---------------------------------------------------------------------------
-
-
 def test_push_round_trips_a_binary_payload_intact(device_storage: DeviceStorage, tmp_path: Path):
     binary_content = bytes(range(256)) * 4  # every byte value, including NUL and 0x0A/0x0D
     client, _ = make_loopback_client(device_storage, verb="push")
@@ -382,11 +343,6 @@ def test_push_round_trips_a_binary_payload_intact(device_storage: DeviceStorage,
     client.push(str(host_path), "capture.bin")
 
     assert device_storage.read_bytes("capture.bin") == binary_content
-
-
-# ---------------------------------------------------------------------------
-# Push -- chunked / large payload
-# ---------------------------------------------------------------------------
 
 
 def test_push_round_trips_a_large_payload_through_multiple_chunks(
@@ -414,11 +370,6 @@ def test_push_of_a_small_payload_sends_exactly_one_chunk(
     client.push(str(host_path), "small.txt")
 
     assert transport.sent_kind_counts["chunk"] == 1
-
-
-# ---------------------------------------------------------------------------
-# Push -- CRC-32 verification, retry, and exhausted-retry failure
-# ---------------------------------------------------------------------------
 
 
 def test_push_retries_and_succeeds_after_one_transient_checksum_mismatch(
@@ -472,11 +423,6 @@ def test_push_after_exhausting_retries_leaves_prior_sd_content_intact(
     assert device_storage.read_bytes("corrupt.json") == b'{"scene": "original"}'
 
 
-# ---------------------------------------------------------------------------
-# Push -- no SD configured
-# ---------------------------------------------------------------------------
-
-
 def test_push_with_no_sd_configured_raises_no_storage_error(tmp_path: Path):
     client, _ = make_loopback_client(storage=None, verb="push")
     host_path = tmp_path / "aura-state.json"
@@ -484,11 +430,6 @@ def test_push_with_no_sd_configured_raises_no_storage_error(tmp_path: Path):
 
     with pytest.raises(SdSyncNoStorageError, match=r"aura-state\.json"):
         client.push(str(host_path), "aura-state.json")
-
-
-# ---------------------------------------------------------------------------
-# Pull -> edit -> push round trip (#925's motivating scene-change scenario)
-# ---------------------------------------------------------------------------
 
 
 def test_pull_edit_push_round_trip_changes_scene_and_preserves_return_to(
@@ -513,11 +454,6 @@ def test_pull_edit_push_round_trip_changes_scene_and_preserves_return_to(
         "scene": "tag",
         "return_to": "lobby",
     }
-
-
-# ---------------------------------------------------------------------------
-# list_files
-# ---------------------------------------------------------------------------
 
 
 def test_list_files_returns_every_seeded_path_and_size_at_the_card_root(device_storage):
@@ -551,11 +487,6 @@ def test_list_files_with_no_sd_configured_raises_no_storage_error():
 
     with pytest.raises(SdSyncNoStorageError):
         client.list_files()
-
-
-# ---------------------------------------------------------------------------
-# serve_one dispatch -- one connection services a mix of verbs (#930)
-# ---------------------------------------------------------------------------
 
 
 def test_one_connection_services_pull_then_push_then_list_in_sequence(

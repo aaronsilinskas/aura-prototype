@@ -21,11 +21,6 @@ def _make_state():
     return GameState(SpyEffectControls(), SceneControls())
 
 
-# ---------------------------------------------------------------------------
-# Gravity isolation — first sample seeds gravity, no motion is registered
-# ---------------------------------------------------------------------------
-
-
 def test_first_update_seeds_gravity_and_reports_no_motion():
     """The first sample after construction seeds gravity rather than starting
     at zero, so a device held steady reads zero motion immediately."""
@@ -47,11 +42,6 @@ def test_update_reports_motion_relative_to_seeded_gravity():
     assert pytest.approx(2.0) == ema
 
 
-# ---------------------------------------------------------------------------
-# reset_gravity — re-seeds from the first sample of the next phase
-# ---------------------------------------------------------------------------
-
-
 def test_reset_gravity_reseeds_from_the_next_sample_instead_of_carrying_over():
     """After reset_gravity, the next update seeds gravity fresh from that
     sample rather than carrying over the old orientation."""
@@ -68,11 +58,6 @@ def test_reset_gravity_reseeds_from_the_next_sample_instead_of_carrying_over():
     assert pytest.approx(0.0) == ema
 
 
-# ---------------------------------------------------------------------------
-# EMA smoothing
-# ---------------------------------------------------------------------------
-
-
 def test_update_smooths_motion_with_the_given_factor():
     """A lone spike is smoothed toward but not equal to the raw deviation."""
     motion = RlglMotion()
@@ -83,11 +68,6 @@ def test_update_smooths_motion_with_the_given_factor():
 
     # low_pass(0.0, 2.0, 0.5) == 1.0
     assert pytest.approx(1.0) == ema
-
-
-# ---------------------------------------------------------------------------
-# rlgl_motion — get-or-create accessor
-# ---------------------------------------------------------------------------
 
 
 def test_rlgl_motion_caches_the_same_instance_across_calls():

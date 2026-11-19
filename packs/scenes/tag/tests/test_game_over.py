@@ -49,11 +49,6 @@ def sting_ends(simulation: Simulation, player: SimulatedDevice) -> None:
     simulation.run_until(lambda: player.has_played("scene.ready_shots_start"))
 
 
-# ---------------------------------------------------------------------------
-# Game over
-# ---------------------------------------------------------------------------
-
-
 def test_the_last_hitpoint_lost_plays_the_game_over_sting(simulation):
     player = simulation.add_device(
         "red", scene="tag", setting_overrides=tag_settings(TWO_HITS_TO_LOSE)
@@ -130,11 +125,6 @@ def test_a_reload_in_progress_when_the_game_ends_stops_its_loop(simulation):
     run_out_of_hitpoints(simulation, player)
 
     assert (reloading, player.is_playing("scene.reload")) == (True, False)
-
-
-# ---------------------------------------------------------------------------
-# Back to Ready
-# ---------------------------------------------------------------------------
 
 
 def test_the_device_returns_to_ready_the_moment_the_sting_ends(simulation):

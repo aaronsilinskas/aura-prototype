@@ -75,11 +75,6 @@ def _output_parts(hw: DeviceHardware) -> list[str]:
     return parts
 
 
-# ---------------------------------------------------------------------------
-# Gating
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.parametrize(("section", "section_config", "part"), _SECTIONS, ids=_SECTION_IDS)
 def test_a_declared_enabled_section_asks_for_its_part(section, section_config, part):
     _hw, parts = _assemble(_config(**{section: section_config}))
@@ -202,10 +197,6 @@ def test_a_disabled_sdcard_builds_no_storage():
     assert hw.storage is None
 
 
-# ---------------------------------------------------------------------------
-# Named I2C buses
-# ---------------------------------------------------------------------------
-
 _I2C_BUSES = {
     "default": {"sda": "GP4", "scl": "GP5"},
     "sensors": {"sda": "GP6", "scl": "GP7"},
@@ -286,10 +277,6 @@ def test_the_boot_narration_names_each_i2c_bus_it_opens():
 def test_an_undeclared_default_i2c_bus_narrates_as_the_board_bus():
     assert "[hw] i2c default board ok\n" in _narration(_config(haptics={}))
 
-
-# ---------------------------------------------------------------------------
-# Named SPI buses
-# ---------------------------------------------------------------------------
 
 _SPI_BUSES = {
     "default": {"sck": "GP2", "mosi": "GP3", "miso": "GP0"},
@@ -437,11 +424,6 @@ def test_a_segmented_strip_is_one_strip_carrying_every_segment():
     assert len(hw.outputs) == 1
 
 
-# ---------------------------------------------------------------------------
-# Bus requirements
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.parametrize("bus", ["default", "sensors"])
 @pytest.mark.parametrize("section", ["accelerometer", "magnetometer", "haptics"])
 def test_an_i2c_chip_section_on_a_bus_that_cannot_open_is_rejected_naming_the_bus(section, bus):
@@ -468,11 +450,6 @@ def test_an_unbuildable_i2c_bus_is_narrated_as_no_bus():
         )
 
     assert "[hw] i2c default board no bus\n" in "".join(fragments)
-
-
-# ---------------------------------------------------------------------------
-# Build order
-# ---------------------------------------------------------------------------
 
 
 def test_parts_come_up_buses_pixels_buttons_sensors_audio_haptics_radio_storage_ir():
@@ -505,11 +482,6 @@ def test_parts_come_up_buses_pixels_buttons_sensors_audio_haptics_radio_storage_
         "ir_reader",
         "ir_writer",
     ]
-
-
-# ---------------------------------------------------------------------------
-# Narration
-# ---------------------------------------------------------------------------
 
 
 def test_a_boot_narrates_begin_each_step_and_ready():
@@ -775,11 +747,6 @@ def test_without_a_logger_the_assembly_is_silent(capsys):
     assert capsys.readouterr().out == ""
 
 
-# ---------------------------------------------------------------------------
-# Buttons
-# ---------------------------------------------------------------------------
-
-
 def test_each_button_pin_is_read_with_its_field_in_declared_order():
     _hw, parts = _assemble(_config(buttons=["GP3", "GP7"]))
 
@@ -806,11 +773,6 @@ def test_the_buttons_line_lists_each_label_with_its_pin_in_declared_order():
 
 def test_with_no_buttons_the_buttons_line_lists_none():
     assert "[hw] buttons ok\n" in _narration(_config())
-
-
-# ---------------------------------------------------------------------------
-# IR
-# ---------------------------------------------------------------------------
 
 
 def test_a_single_ir_receiver_is_read_on_ir_rx():
@@ -875,11 +837,6 @@ def test_ir_emitters_narrate_in_ir_emitters_order_not_config_order():
     )
 
 
-# ---------------------------------------------------------------------------
-# Radio and network controls
-# ---------------------------------------------------------------------------
-
-
 def test_the_radio_transport_is_built_on_the_spi_bus_with_its_pins():
     _hw, parts = _assemble(_config(radio=_RADIO))
 
@@ -906,11 +863,6 @@ def test_without_ir_the_network_controls_cannot_send_ir():
 
     with pytest.raises(ValueError, match="line"):
         hw.network_controls.send_ir(b"\x01", LINE)
-
-
-# ---------------------------------------------------------------------------
-# DeviceHardware
-# ---------------------------------------------------------------------------
 
 
 def test_outputs_are_pixels_then_audio_then_haptics():
@@ -954,10 +906,6 @@ def test_a_bare_config_builds_no_optional_hardware():
         hw.storage,
     ) == ([], None, None, None, None, None)
 
-
-# ---------------------------------------------------------------------------
-# Capabilities
-# ---------------------------------------------------------------------------
 
 _FULL_IR = {"rx": "GP5", "line": "GP6", "cone": "GP7", "area_of_effect": "GP8"}
 _FULL_SECTIONS: dict[str, object] = {
@@ -1031,11 +979,6 @@ def test_an_isolated_device_has_only_its_kept_component_and_its_buttons():
     hw, _parts = _assemble(_config(**_FULL_SECTIONS).isolate(keep="radio"))
 
     assert hw.capabilities == {"button.A", "button.B", "radio"}
-
-
-# ---------------------------------------------------------------------------
-# Polled parts
-# ---------------------------------------------------------------------------
 
 
 def test_a_fully_built_device_polls_buttons_sensors_radio_and_ir_in_build_order():

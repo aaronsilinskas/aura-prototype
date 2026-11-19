@@ -11,10 +11,6 @@ from unittest.mock import patch
 
 from scripts.normalize_sounds import normalize
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 
 class _Result:
     def __init__(self, returncode: int = 0, stdout=b"", stderr=b"") -> None:
@@ -70,11 +66,6 @@ def _make_wav(path: Path, content: bytes = b"ORIGINAL") -> None:
     path.write_bytes(content)
 
 
-# ---------------------------------------------------------------------------
-# Discovery: recurses every pack's and scene's sounds/ folder in one run
-# ---------------------------------------------------------------------------
-
-
 def test_normalize_finds_wav_files_across_multiple_distributed_sounds_folders(
     tmp_path: Path, capsys
 ) -> None:
@@ -114,11 +105,6 @@ def test_normalize_ignores_non_wav_files_in_a_sounds_folder(tmp_path: Path, caps
     assert "No WAV files found" in capsys.readouterr().out
 
 
-# ---------------------------------------------------------------------------
-# Directory / ffmpeg preconditions
-# ---------------------------------------------------------------------------
-
-
 def test_normalize_returns_error_when_root_is_not_a_directory(tmp_path: Path, capsys) -> None:
     missing = tmp_path / "does-not-exist"
 
@@ -138,11 +124,6 @@ def test_normalize_returns_error_when_ffmpeg_is_unavailable(tmp_path: Path, caps
     assert "ffmpeg not found" in capsys.readouterr().err
 
 
-# ---------------------------------------------------------------------------
-# Dry run: reports measured gain, writes nothing
-# ---------------------------------------------------------------------------
-
-
 def test_dry_run_reports_measured_gain_without_writing(tmp_path: Path, capsys) -> None:
     wav = tmp_path / "packs" / "effects" / "basic" / "sounds" / "blip.wav"
     _make_wav(wav)
@@ -156,11 +137,6 @@ def test_dry_run_reports_measured_gain_without_writing(tmp_path: Path, capsys) -
     assert "[DRY RUN]" in out
     assert "peak=-6.0 dB" in out
     assert "gain=+5.9 dB" in out
-
-
-# ---------------------------------------------------------------------------
-# Real run: writes the normalized file in place
-# ---------------------------------------------------------------------------
 
 
 def test_normalize_writes_normalized_file_in_place(tmp_path: Path) -> None:
@@ -182,11 +158,6 @@ def test_normalize_reports_done_summary_on_success(tmp_path: Path, capsys) -> No
         normalize(tmp_path, dry_run=False)
 
     assert "Done. 1 normalized, 0 failed." in capsys.readouterr().out
-
-
-# ---------------------------------------------------------------------------
-# Error paths: one file failing does not stop the others
-# ---------------------------------------------------------------------------
 
 
 def test_normalize_reports_error_when_peak_cannot_be_measured(tmp_path: Path, capsys) -> None:

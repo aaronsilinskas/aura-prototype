@@ -2,10 +2,6 @@ import pytest
 
 from effects.layers.layer import Layer
 
-# ---------------------------------------------------------------------------
-# Layer — abstract interface
-# ---------------------------------------------------------------------------
-
 
 def test_layer_update_raises_not_implemented() -> None:
     layer = Layer()

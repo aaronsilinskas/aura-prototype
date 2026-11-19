@@ -66,11 +66,6 @@ def _shared_module_paths() -> list[Path]:
     )
 
 
-# ---------------------------------------------------------------------------
-# is_forbidden_root
-# ---------------------------------------------------------------------------
-
-
 def test_is_forbidden_root_matches_each_exact_device_only_name() -> None:
     for name in ("board", "busio", "pulseio", "digitalio", "microcontroller"):
         assert is_forbidden_root(name), f"{name} should be forbidden"
@@ -86,11 +81,6 @@ def test_is_forbidden_root_excludes_first_party_and_stdlib_names() -> None:
     assert not is_forbidden_root("hardware")
     assert not is_forbidden_root("sys")
     assert not is_forbidden_root("keyboard")  # exact root, not substring match
-
-
-# ---------------------------------------------------------------------------
-# forbidden_imports
-# ---------------------------------------------------------------------------
 
 
 def test_forbidden_imports_collects_a_plain_import() -> None:
@@ -113,11 +103,6 @@ def test_forbidden_imports_collects_import_nested_inside_a_function() -> None:
     source = "def build():\n    import busio\n    return busio\n"
 
     assert forbidden_imports(source) == ["busio"]
-
-
-# ---------------------------------------------------------------------------
-# Guard: no hardware/shared module imports a device-only library
-# ---------------------------------------------------------------------------
 
 
 def test_hardware_shared_modules_are_discovered() -> None:

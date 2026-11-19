@@ -12,9 +12,6 @@ def _layer(
     return PulseLayer(brighten, on, darken, off)
 
 
-# --- BRIGHTEN phase ---
-
-
 def test_pulse_layer_sample_returns_zero_before_first_update() -> None:
     layer = _layer()
     assert layer.sample(0.0, 10) == pytest.approx(0.0)
@@ -32,16 +29,10 @@ def test_pulse_layer_at_end_of_brighten_returns_full_brightness() -> None:
     assert layer.sample(0.0, 10) == pytest.approx(1.0)
 
 
-# --- ON phase ---
-
-
 def test_pulse_layer_on_phase_holds_full_brightness() -> None:
     layer = _layer(brighten=0.5, on=0.5)
     layer.update(0.75)  # mid-ON
     assert layer.sample(0.0, 10) == pytest.approx(1.0)
-
-
-# --- DARKEN phase ---
 
 
 def test_pulse_layer_darken_phase_interpolates_brightness_back_to_zero() -> None:
@@ -50,16 +41,10 @@ def test_pulse_layer_darken_phase_interpolates_brightness_back_to_zero() -> None
     assert layer.sample(0.0, 10) == pytest.approx(0.5)
 
 
-# --- OFF phase ---
-
-
 def test_pulse_layer_off_phase_returns_zero_brightness() -> None:
     layer = _layer(brighten=0.5, on=0.5, darken=0.5, off=0.5)
     layer.update(1.75)  # mid-OFF
     assert layer.sample(0.0, 10) == pytest.approx(0.0)
-
-
-# --- Wrap ---
 
 
 def test_pulse_layer_update_wraps_after_full_cycle() -> None:
@@ -72,17 +57,11 @@ def test_pulse_layer_update_wraps_after_full_cycle() -> None:
     assert layer_a.sample(0.0, 10) == pytest.approx(layer_b.sample(0.0, 10))
 
 
-# --- off_duration = 0 ---
-
-
 def test_pulse_layer_darken_brightness_is_correct_when_off_duration_is_zero() -> None:
     layer = _layer(brighten=0.5, on=0.5, darken=0.5, off=0.0)
     # cycle = 1.5 s; at t=1.4 (near end of DARKEN): t=(1.4-1.0)/0.5=0.8 → brightness=0.2
     layer.update(1.4)
     assert layer.sample(0.0, 10) == pytest.approx(0.2)
-
-
-# --- Unequal phase durations ---
 
 
 @pytest.mark.parametrize(
@@ -101,9 +80,6 @@ def test_pulse_layer_phases_follow_their_own_durations(elapsed: float, brightnes
     assert layer.sample(0.0, 10) == pytest.approx(brightness)
 
 
-# --- Position independence ---
-
-
 def test_pulse_layer_update_with_zero_elapsed_does_not_advance_phase() -> None:
     layer = _layer(brighten=0.5)
     layer.update(0.0)
@@ -115,9 +91,6 @@ def test_pulse_layer_sample_returns_same_value_for_all_positions() -> None:
     layer.update(0.25)
     assert layer.sample(0.0, 10) == pytest.approx(layer.sample(0.5, 10))
     assert layer.sample(0.0, 10) == pytest.approx(layer.sample(0.99, 10))
-
-
-# --- Construction errors ---
 
 
 @pytest.mark.parametrize(

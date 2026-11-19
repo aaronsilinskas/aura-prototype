@@ -15,11 +15,6 @@ from engine.tests.helpers import make_scene, make_scene_runtime, rule_source
 _PING = Event(EventGroup("test"), "ping")
 
 
-# ---------------------------------------------------------------------------
-# rules/ folder discovery
-# ---------------------------------------------------------------------------
-
-
 def test_a_scenes_rules_folder_items_are_its_local_rules(pack_tree) -> None:
     registry = pack_tree.scan(
         scenes={"forest": {"rules": {"ambush": rule_source("Ambush")}}}
@@ -53,11 +48,6 @@ def test_a_scenes_local_rules_are_not_visible_to_another_scene(pack_tree) -> Non
 
     cave_scene = registry.get("cave")
     assert "secret_rule" not in cave_scene.local_rule_registry.items()
-
-
-# ---------------------------------------------------------------------------
-# The boot scene runs its scene-local rules, after its pack rules
-# ---------------------------------------------------------------------------
 
 
 def _local_rule(catalog: PackCatalog, scene_name: str, item_name: str) -> GameRule:

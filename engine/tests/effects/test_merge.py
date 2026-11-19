@@ -17,11 +17,6 @@ def _receipt(brightness: float) -> EffectReceipt:
     return receipt
 
 
-# ---------------------------------------------------------------------------
-# SplitMerge.prepare_buffers — partitioning
-# ---------------------------------------------------------------------------
-
-
 def test_split_prepare_buffers_gives_single_buffer_the_full_region() -> None:
     buffers = [PixelBuffer(6)]
 
@@ -52,11 +47,6 @@ def test_split_prepare_buffers_zero_sizes_surplus_when_more_buffers_than_pixels(
     SPLIT.prepare_buffers(buffers)
 
     assert [len(b) for b in buffers] == [1, 1, 0]
-
-
-# ---------------------------------------------------------------------------
-# SplitMerge.merge — compositing
-# ---------------------------------------------------------------------------
 
 
 def test_split_merge_of_single_buffer_is_bit_identical_at_full_brightness() -> None:
@@ -101,11 +91,6 @@ def test_split_merge_treats_missing_receipt_as_full_brightness() -> None:
     assert list(result) == [0x646464]
 
 
-# ---------------------------------------------------------------------------
-# AdditiveMerge.prepare_buffers — full-width sizing
-# ---------------------------------------------------------------------------
-
-
 def test_additive_prepare_buffers_sizes_every_buffer_to_full_region_width() -> None:
     buffers = [PixelBuffer(5), PixelBuffer(5), PixelBuffer(5)]
 
@@ -122,11 +107,6 @@ def test_additive_prepare_buffers_restores_full_width_after_split_left_it_partit
     ADDITIVE.prepare_buffers(buffers)
 
     assert [len(b) for b in buffers] == [6, 6]
-
-
-# ---------------------------------------------------------------------------
-# AdditiveMerge.merge — blending
-# ---------------------------------------------------------------------------
 
 
 def test_additive_merge_of_single_buffer_is_bit_identical_to_split_single_buffer_result() -> None:

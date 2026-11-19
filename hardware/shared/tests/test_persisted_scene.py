@@ -42,11 +42,6 @@ def counting_storage(device_storage) -> WriteCountingStorage:
     return WriteCountingStorage(device_storage.mount_root)
 
 
-# ---------------------------------------------------------------------------
-# boot_candidates
-# ---------------------------------------------------------------------------
-
-
 def test_a_persisted_scene_is_tried_before_a_different_flash_default(device_storage):
     record = _persisted_scene(device_storage)
     record.record_reboot("tag", "lobby")
@@ -95,11 +90,6 @@ def test_an_older_cards_unprefixed_scene_key_is_ignored(device_storage):
 
     assert record.boot_candidates(_DEFAULT) == (None, "red_light_green_light")
     assert record.previous_scene() is None
-
-
-# ---------------------------------------------------------------------------
-# record_reboot / record_return / previous_scene
-# ---------------------------------------------------------------------------
 
 
 def test_recording_a_reboot_records_the_scene_being_left_as_the_previous_scene(device_storage):
@@ -184,11 +174,6 @@ def test_every_change_to_the_record_keeps_other_keys_in_the_state_file(device_st
     assert store.get("reboot_demo_phase") == "into"
 
 
-# ---------------------------------------------------------------------------
-# apply_scene_deploy
-# ---------------------------------------------------------------------------
-
-
 def test_a_new_scene_deploy_token_clears_the_persisted_scene(device_storage):
     record = _persisted_scene(device_storage)
     record.record_reboot("tag", "lobby")
@@ -264,11 +249,6 @@ def test_applying_a_scene_deploy_over_a_malformed_card_logs_the_malformed_card_o
     )
 
     assert len([line for line in lines if "malformed" in line]) == 1
-
-
-# ---------------------------------------------------------------------------
-# The on-card layout
-# ---------------------------------------------------------------------------
 
 
 def test_the_record_on_the_card_has_a_fixed_json_layout(device_storage):

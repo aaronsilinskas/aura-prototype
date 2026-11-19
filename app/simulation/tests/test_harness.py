@@ -220,11 +220,6 @@ def test_a_looping_clip_is_playing_until_its_effect_stops(simulation):
     assert (looping, player.is_playing("scene.reload")) == (True, False)
 
 
-# ---------------------------------------------------------------------------
-# Accelerometer
-# ---------------------------------------------------------------------------
-
-
 def test_a_moving_device_reads_as_motion(simulation):
     player = simulation.add_device("p1", scene="red_light_green_light")
     start_red_light_warning(player)
@@ -268,10 +263,6 @@ def test_hold_still_stops_a_move(simulation):
 
     assert not caught_moving(player)
 
-
-# ---------------------------------------------------------------------------
-# Magnetometer
-# ---------------------------------------------------------------------------
 
 # hardware_test's magnetometer mode, two presses of B in, bars each axis of the
 # raw field, full at MAG_MAX µT: x on the personal strip (red when positive), y

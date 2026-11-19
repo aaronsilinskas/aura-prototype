@@ -12,10 +12,6 @@ from hardware.shared.device_config import (
 )
 from hardware.shared.tests.pixels_config import as_neopixel, first_strip
 
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
-
 
 @pytest.fixture
 def single_strip_config():
@@ -61,11 +57,6 @@ def two_strip_config():
         ],
         "buttons": ["D9"],
     }
-
-
-# ---------------------------------------------------------------------------
-# Happy path: single segmented strip
-# ---------------------------------------------------------------------------
 
 
 def test_parse_neopixel_entry_produces_single_pixels_output(single_strip_config):
@@ -146,11 +137,6 @@ def test_parse_neopixel_strip_explicit_order_and_brightness():
     assert strip.brightness == 0.5
 
 
-# ---------------------------------------------------------------------------
-# Validation: strip brightness
-# ---------------------------------------------------------------------------
-
-
 def test_parse_neopixel_strip_non_numeric_brightness_raises_value_error():
     config = {
         "pixels": [
@@ -224,21 +210,11 @@ def test_parse_neopixel_strip_brightness_boundary_zero_is_accepted():
     assert first_strip(result).brightness == 0.0
 
 
-# ---------------------------------------------------------------------------
-# Happy path: two separate strip entries
-# ---------------------------------------------------------------------------
-
-
 def test_parse_two_neopixel_strips_yields_two_entries(two_strip_config):
     result = parse_device_config(two_strip_config)
 
     total_strips = sum(len(p.strips) for p in result.pixels if isinstance(p, NeoPixelPixelsConfig))
     assert total_strips == 2
-
-
-# ---------------------------------------------------------------------------
-# Validation: scope_pixels required and non-empty
-# ---------------------------------------------------------------------------
 
 
 def test_parse_neopixel_strip_missing_scope_pixels_raises_value_error():
@@ -259,11 +235,6 @@ def test_parse_neopixel_strip_empty_scope_pixels_raises_value_error():
 
     with pytest.raises(ValueError, match=r"scope_pixels"):
         parse_device_config(config)
-
-
-# ---------------------------------------------------------------------------
-# Validation: pin required
-# ---------------------------------------------------------------------------
 
 
 def test_parse_neopixel_strip_missing_pin_raises_value_error():
@@ -293,11 +264,6 @@ def test_parse_legacy_scopes_entry_is_rejected_naming_the_entry_and_the_shape_to
         parse_device_config(single_strip_config)
 
 
-# ---------------------------------------------------------------------------
-# Validation: count required
-# ---------------------------------------------------------------------------
-
-
 def test_parse_neopixel_strip_missing_count_raises_value_error():
     config = {
         "pixels": [
@@ -322,11 +288,6 @@ def test_parse_neopixel_strip_count_not_positive_integer_raises_value_error_nami
 
     with pytest.raises(ValueError, match=r"pixels\[0\]\.count must be a positive integer"):
         parse_device_config(single_strip_config)
-
-
-# ---------------------------------------------------------------------------
-# Validation: unknown scope key
-# ---------------------------------------------------------------------------
 
 
 def test_parse_neopixel_strip_unknown_scope_key_raises_value_error():
@@ -361,11 +322,6 @@ def test_parse_neopixel_strip_unknown_scope_key_error_lists_valid_keys():
 
     with pytest.raises(ValueError, match="personal"):
         parse_device_config(config)
-
-
-# ---------------------------------------------------------------------------
-# Validation: out-of-range segment
-# ---------------------------------------------------------------------------
 
 
 def test_parse_neopixel_strip_segment_start_below_zero_raises_value_error():
@@ -453,11 +409,6 @@ def test_parse_neopixel_strip_out_of_range_error_names_scope():
         parse_device_config(config)
 
 
-# ---------------------------------------------------------------------------
-# Validation: overlapping segments on one strip
-# ---------------------------------------------------------------------------
-
-
 def test_parse_neopixel_strip_overlapping_segments_raise_value_error():
     config = {
         "pixels": [
@@ -498,11 +449,6 @@ def test_parse_neopixel_strip_overlapping_segments_error_names_conflicting_scope
         parse_device_config(config)
 
 
-# ---------------------------------------------------------------------------
-# Validation: duplicate pin across strip entries
-# ---------------------------------------------------------------------------
-
-
 def test_parse_neopixel_duplicate_pin_raises_value_error():
     config = {
         "pixels": [
@@ -524,11 +470,6 @@ def test_parse_neopixel_duplicate_pin_raises_value_error():
 
     with pytest.raises(ValueError, match="D5"):
         parse_device_config(config)
-
-
-# ---------------------------------------------------------------------------
-# Same scope key on multiple strips (mirrored outputs — issue #483)
-# ---------------------------------------------------------------------------
 
 
 def test_parse_two_strips_sharing_scope_key_produces_two_strip_configs():

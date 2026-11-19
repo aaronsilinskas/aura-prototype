@@ -18,11 +18,6 @@ def _settings(**values: object) -> Settings:
     return settings_for("ir_range_receiver", settings=values)
 
 
-# ---------------------------------------------------------------------------
-# ir_range_config — get-or-create accessor
-# ---------------------------------------------------------------------------
-
-
 def test_ir_range_config_builds_from_the_state_settings():
     state = GameState(EffectControls(), SceneControls(), settings=_settings(window_seconds=3.0))
 

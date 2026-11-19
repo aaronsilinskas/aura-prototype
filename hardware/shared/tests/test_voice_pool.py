@@ -4,10 +4,6 @@ from effects.effect import AudioPlaybackConfig, Effect, EffectHaptic, EffectPixe
 from engine.state import EffectReceipt
 from hardware.shared.voice_pool import VoicePool, VoiceSink, clip_stops_receipt
 
-# ---------------------------------------------------------------------------
-# Test double — a recording VoiceSink fake
-# ---------------------------------------------------------------------------
-
 
 class RecordingSink(VoiceSink):
     """A VoiceSink fake that records every call and tracks per-slot playing state.
@@ -50,10 +46,6 @@ class RecordingSink(VoiceSink):
         return self.playing[slot]
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 _NEXT_ID = [0]
 
 
@@ -80,11 +72,6 @@ def sink() -> RecordingSink:
 @pytest.fixture()
 def pool() -> VoicePool:
     return VoicePool(num_voices=3)
-
-
-# ---------------------------------------------------------------------------
-# claim — basic playback into an idle slot
-# ---------------------------------------------------------------------------
 
 
 def test_claim_plays_into_first_idle_slot(pool: VoicePool, sink: RecordingSink) -> None:
@@ -118,11 +105,6 @@ def test_claim_returns_minus_one_and_opens_nothing_when_all_loops_and_new_one_sh
     slot = pool.claim(sink, "shot.wav", loop=False, stops_receipt=True, receipt=make_receipt())
     assert slot == -1
     assert sink.calls == []  # nothing opened, nothing torn down
-
-
-# ---------------------------------------------------------------------------
-# claim — failed load evicts nothing
-# ---------------------------------------------------------------------------
 
 
 def test_failed_load_into_idle_slot_returns_minus_one_without_playing(
@@ -166,11 +148,6 @@ def test_failed_load_does_not_evict_a_live_voice(pool: VoicePool, sink: Recordin
     sink.calls.clear()
     dropped = pool.claim(sink, "shot.wav", loop=False, stops_receipt=True, receipt=make_receipt())
     assert dropped == -1
-
-
-# ---------------------------------------------------------------------------
-# claim — eviction policy
-# ---------------------------------------------------------------------------
 
 
 def test_new_loop_evicts_oldest_loop(pool: VoicePool, sink: RecordingSink) -> None:
@@ -224,11 +201,6 @@ def test_new_one_shot_never_evicts_a_loop(pool: VoicePool, sink: RecordingSink) 
     assert slot == -1
 
 
-# ---------------------------------------------------------------------------
-# claim — stops_receipt receipt-stop on eviction
-# ---------------------------------------------------------------------------
-
-
 def test_evicting_stops_receipt_slot_stops_its_receipt(
     pool: VoicePool, sink: RecordingSink
 ) -> None:
@@ -251,11 +223,6 @@ def test_evicting_slot_without_stops_receipt_leaves_receipt_to_rules(
     assert not evicted.is_stopped()
 
 
-# ---------------------------------------------------------------------------
-# claim — slot reuse after eviction (behavioural "freed")
-# ---------------------------------------------------------------------------
-
-
 def test_evicted_slot_is_reused_by_the_new_clip(pool: VoicePool, sink: RecordingSink) -> None:
     for _ in range(3):
         pool.claim(sink, "loop.wav", loop=True, stops_receipt=True, receipt=make_receipt())
@@ -264,11 +231,6 @@ def test_evicted_slot_is_reused_by_the_new_clip(pool: VoicePool, sink: Recording
     first_play = play_calls(sink)[0]
     assert last_play[1] == slot  # plays into the evicted slot
     assert last_play[2] != first_play[2]  # the new clip's source, not the evicted one
-
-
-# ---------------------------------------------------------------------------
-# sweep — natural one-shot finish
-# ---------------------------------------------------------------------------
 
 
 def test_sweep_frees_naturally_finished_one_shot(pool: VoicePool, sink: RecordingSink) -> None:
@@ -323,11 +285,6 @@ def test_sweep_does_not_free_a_finished_loop(pool: VoicePool, sink: RecordingSin
     assert stop_slots(sink) == []
 
 
-# ---------------------------------------------------------------------------
-# sweep — externally-stopped receipt
-# ---------------------------------------------------------------------------
-
-
 def test_sweep_frees_externally_stopped_receipt(pool: VoicePool, sink: RecordingSink) -> None:
     receipt = make_receipt()
     pool.claim(sink, "loop.wav", loop=True, stops_receipt=True, receipt=receipt)
@@ -358,11 +315,6 @@ def test_sweep_does_not_stop_an_already_externally_stopped_receipt_again(
     assert receipt.stop_count == 1  # sweep did not stop it a second time
 
 
-# ---------------------------------------------------------------------------
-# sweep — loudness change
-# ---------------------------------------------------------------------------
-
-
 def test_sweep_reapplies_changed_loudness(pool: VoicePool, sink: RecordingSink) -> None:
     receipt = make_receipt(loudness=1.0)
     pool.claim(sink, "loop.wav", loop=True, stops_receipt=True, receipt=receipt)
@@ -383,11 +335,6 @@ def test_sweep_does_not_reapply_unchanged_loudness(pool: VoicePool, sink: Record
 def test_sweep_ignores_idle_slots(pool: VoicePool, sink: RecordingSink) -> None:
     pool.sweep(sink)
     assert sink.calls == []
-
-
-# ---------------------------------------------------------------------------
-# hold / restore — an Overlay covers the effect's scene, then pops
-# ---------------------------------------------------------------------------
 
 
 def test_hold_frees_every_voice_of_the_held_receipt(pool: VoicePool, sink: RecordingSink) -> None:
@@ -516,10 +463,6 @@ def test_restore_plays_a_held_loop_only_once(pool: VoicePool, sink: RecordingSin
     assert play_calls(sink) == []
 
 
-# ---------------------------------------------------------------------------
-# clip_stops_receipt — the claim rule both audio outputs share
-# ---------------------------------------------------------------------------
-
 _PIXELS = EffectPixels()
 _HAPTIC = EffectHaptic(patterns={})
 
@@ -541,11 +484,6 @@ def test_clip_stops_receipt_when_audio_is_the_whole_effect_or_clip_says_so(
     clip = AudioPlaybackConfig(name="pack.clip", loop=False, stops_effect=stops_effect)
     effect = Effect(name="fx", pixels=pixels, haptic=haptic)
     assert clip_stops_receipt(effect, clip) is expected
-
-
-# ---------------------------------------------------------------------------
-# VoiceSink — abstract port
-# ---------------------------------------------------------------------------
 
 
 def test_voice_sink_methods_raise_not_implemented() -> None:

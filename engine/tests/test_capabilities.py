@@ -31,10 +31,6 @@ from engine.scene_runtime import SceneRuntime
 from engine.state import EffectControls, GameState, SceneControls
 from engine.tests.helpers import make_scene, make_scene_registry, make_scene_runtime
 
-# ---------------------------------------------------------------------------
-# Required capabilities
-# ---------------------------------------------------------------------------
-
 
 def test_a_scene_requires_the_capabilities_its_scene_json_lists(pack_tree) -> None:
     catalog = pack_tree.scan(scenes={"tag": {"requires": ["ir.line", "button.A"]}})
@@ -156,10 +152,6 @@ def test_required_capabilities_of_an_unregistered_scene_raises_value_error() -> 
         make_scene_registry().required_capabilities("nowhere")
 
 
-# ---------------------------------------------------------------------------
-# Scan failures
-# ---------------------------------------------------------------------------
-
 _UNKNOWN_NAMES = [
     pytest.param("pixels", id="not-a-capability"),
     pytest.param("button", id="button-without-label"),
@@ -235,11 +227,6 @@ def test_an_effect_pack_listing_requires_raises_malformed_manifest_error(pack_tr
     assert excinfo.value.path == str(pack_dir / "effects.json")
 
 
-# ---------------------------------------------------------------------------
-# Capability names for buttons and IR emitters
-# ---------------------------------------------------------------------------
-
-
 def test_a_button_label_names_its_button_capability() -> None:
     assert button_capability("B") == "button.B"
 
@@ -268,11 +255,6 @@ def test_the_ir_emitter_is_read_back_only_from_an_emitter_capability(name, emitt
     assert ir_emitter_of(name) == emitter
 
 
-# ---------------------------------------------------------------------------
-# MissingCapabilityError
-# ---------------------------------------------------------------------------
-
-
 def test_missing_capability_error_carries_the_missing_capabilities_and_the_scene() -> None:
     error = MissingCapabilityError(frozenset({"radio", "button.B"}), "tag")
 
@@ -284,11 +266,6 @@ def test_missing_capability_error_from_a_send_names_no_scene() -> None:
     error = MissingCapabilityError(frozenset({"ir.cone"}), None)
 
     assert (error.capabilities, error.scene) == ({"ir.cone"}, None)
-
-
-# ---------------------------------------------------------------------------
-# state.capabilities: rules ask what the device has
-# ---------------------------------------------------------------------------
 
 
 def _state_with(*names: str) -> GameState:

@@ -441,11 +441,6 @@ def test_a_refused_overlay_leaves_the_running_scene_uncovered(simulation, card):
     assert device.strip(Scope.PERSONAL).all_lit(_GREEN)
 
 
-# ---------------------------------------------------------------------------
-# The covered scene's effects are set aside and given back (#1194)
-# ---------------------------------------------------------------------------
-
-
 def test_while_covered_the_covered_scenes_lights_go_dark(simulation, card):
     device = simulation.add_device("red", scene="glow", card=card)
     simulation.advance(0.1)
@@ -497,10 +492,6 @@ def test_after_an_overlay_is_popped_tag_still_decodes_shots(simulation, card):
 
     assert red.has_played("scene.hit_start")
 
-
-# ---------------------------------------------------------------------------
-# The covered scene's sound falls silent and comes back (#1195)
-# ---------------------------------------------------------------------------
 
 _STING = "basic.game_over_sting_start"
 """Tag's game-over sting: a ``stops_effect`` one-shot whose end returns Tag to Ready."""

@@ -28,9 +28,6 @@ sys.modules.setdefault("microcontroller", _fake_module("microcontroller", Pin=ty
 
 _board = sys.modules["board"]
 
-# ---------------------------------------------------------------------------
-# adafruit_is31fl3741 stub — minimal for circuitpython_parts imports
-# ---------------------------------------------------------------------------
 
 sys.modules.setdefault("adafruit_is31fl3741", _fake_module("adafruit_is31fl3741", MUST_BUFFER=1))
 sys.modules.setdefault(
@@ -40,11 +37,6 @@ sys.modules.setdefault(
         Adafruit_RGBMatrixQT=type("Adafruit_RGBMatrixQT", (), {}),
     ),
 )
-
-
-# ---------------------------------------------------------------------------
-# adafruit_drv2605 stub — minimal Effect and Pause for Drv2605EffectOutput tests
-# ---------------------------------------------------------------------------
 
 
 class _Effect:
@@ -84,18 +76,10 @@ class _Pause:
 sys.modules["adafruit_drv2605"] = _fake_module("adafruit_drv2605", Effect=_Effect, Pause=_Pause)
 
 
-# ---------------------------------------------------------------------------
-# adafruit_rfm69 stub — minimal RFM69 placeholder for Rfm69RadioTransport tests
-# ---------------------------------------------------------------------------
-
 sys.modules.setdefault(
     "adafruit_rfm69", _fake_module("adafruit_rfm69", RFM69=type("RFM69", (), {}))
 )
 
-
-# ---------------------------------------------------------------------------
-# sdcardio / storage stubs -- minimal placeholders for SdCardStorage tests
-# ---------------------------------------------------------------------------
 
 sys.modules.setdefault("sdcardio", _fake_module("sdcardio", SDCard=type("SDCard", (), {})))
 sys.modules.setdefault(

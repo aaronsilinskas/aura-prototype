@@ -114,11 +114,6 @@ def test_pressing_a_button_the_device_lacks_raises_naming_it(simulation):
         device.tap("B")
 
 
-# ---------------------------------------------------------------------------
-# Boot runs only a scene the device can run (issue #1164)
-# ---------------------------------------------------------------------------
-
-
 def _persist(card: Path, scene: str) -> None:
     PersistedScene(DeviceStateStore(DeviceStorage(str(card)))).record_reboot(scene, "example_lobby")
 
@@ -160,11 +155,6 @@ def test_boot_raises_when_neither_the_persisted_nor_the_default_scene_fits(simul
         )
 
     assert (excinfo.value.scene, excinfo.value.capabilities) == ("tag", {"ir.line"})
-
-
-# ---------------------------------------------------------------------------
-# A shipped scene won't start on a device lacking what it requires
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(

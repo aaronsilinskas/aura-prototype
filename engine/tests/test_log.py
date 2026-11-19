@@ -6,22 +6,12 @@ def _recording_logger(tag: str = "[hw]") -> tuple[Logger, list[str]]:
     return Logger(tag=tag, sink=fragments.append), fragments
 
 
-# ---------------------------------------------------------------------------
-# log() — one complete tagged line
-# ---------------------------------------------------------------------------
-
-
 def test_log_emits_tag_and_message_as_one_complete_line():
     logger, fragments = _recording_logger(tag="[hw]")
 
     logger.log("booting")
 
     assert "".join(fragments) == "[hw] booting\n"
-
-
-# ---------------------------------------------------------------------------
-# begin() / end() — open a line, then close it
-# ---------------------------------------------------------------------------
 
 
 def test_begin_then_end_produces_one_complete_line():
@@ -51,11 +41,6 @@ def test_end_accepts_a_non_default_suffix():
     assert "".join(fragments) == "[hw] uploading done\n"
 
 
-# ---------------------------------------------------------------------------
-# Stale open-line auto-close — defensive safety net
-# ---------------------------------------------------------------------------
-
-
 def test_begin_while_a_line_is_open_closes_the_stale_line_with_ok_first():
     logger, fragments = _recording_logger(tag="[hw]")
 
@@ -75,11 +60,6 @@ def test_log_while_a_line_is_open_closes_the_stale_line_with_ok_first():
     assert "".join(fragments) == "[hw] first ok\n[hw] second\n"
 
 
-# ---------------------------------------------------------------------------
-# fail() — closes an open line with FAILED, or no-ops
-# ---------------------------------------------------------------------------
-
-
 def test_fail_closes_an_open_line_with_failed_marker():
     logger, fragments = _recording_logger(tag="[hw]")
 
@@ -95,11 +75,6 @@ def test_fail_with_no_line_open_writes_nothing():
     logger.fail()
 
     assert fragments == []
-
-
-# ---------------------------------------------------------------------------
-# Logger.SILENT — shared singleton, no I/O
-# ---------------------------------------------------------------------------
 
 
 def test_silent_singleton_is_wired_to_the_shared_no_op_sink():

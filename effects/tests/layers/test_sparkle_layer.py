@@ -1,9 +1,5 @@
 from effects.layers.sparkle_layer import SparkleLayer
 
-# ---------------------------------------------------------------------------
-# SparkleLayer — sample range
-# ---------------------------------------------------------------------------
-
 
 def test_sparkle_layer_sample_returns_zero_for_all_slots_before_first_spawn() -> None:
     # spawn_delay_rate=100.0 means slots stay idle far longer than our test runs
@@ -31,11 +27,6 @@ def test_sparkle_layer_produces_nonzero_sample_after_spawn() -> None:
 
     samples = [layer.sample(i / 20, 20) for i in range(20)]
     assert any(v > 0.0 for v in samples), "no non-zero sample after spawn"
-
-
-# ---------------------------------------------------------------------------
-# SparkleLayer — sample uses pixel_count for falloff
-# ---------------------------------------------------------------------------
 
 
 def test_sparkle_layer_sample_peaks_at_sparkle_position() -> None:

@@ -21,11 +21,6 @@ def _feed_pulses(decoder: InfraredDecoder, pulses) -> bytearray | None:
     return None
 
 
-# ---------------------------------------------------------------------------
-# Base-class contracts
-# ---------------------------------------------------------------------------
-
-
 def test_encoder_base_rejects_call_without_subclass():
     enc = InfraredEncoder()
     with pytest.raises(NotImplementedError):
@@ -36,11 +31,6 @@ def test_decoder_base_rejects_call_without_subclass():
     dec = InfraredDecoder(_IR_ERROR_THRESHOLD)
     with pytest.raises(NotImplementedError):
         dec.decode(500)
-
-
-# ---------------------------------------------------------------------------
-# reset()
-# ---------------------------------------------------------------------------
 
 
 def test_reset_does_not_zero_telemetry_counters():

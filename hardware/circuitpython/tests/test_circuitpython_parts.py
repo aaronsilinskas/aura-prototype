@@ -88,11 +88,6 @@ def gpio(monkeypatch: pytest.MonkeyPatch) -> list[_FakeDigitalInOut]:
     return _FakeDigitalInOut.built
 
 
-# ---------------------------------------------------------------------------
-# Board name
-# ---------------------------------------------------------------------------
-
-
 def test_board_name_is_the_running_boards_id(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(sys.modules["board"], "board_id", "pimoroni_pico_plus2w", raising=False)
 
@@ -114,11 +109,6 @@ def test_board_name_is_the_platform_when_the_board_module_is_missing(
     monkeypatch.setitem(sys.modules, "board", None)
 
     assert parts.board_name() == sys.platform
-
-
-# ---------------------------------------------------------------------------
-# Buses
-# ---------------------------------------------------------------------------
 
 
 class _FakeI2C:
@@ -215,11 +205,6 @@ def test_spi_bus_reports_no_bus_when_the_board_has_no_default_spi_bus(buses: Non
     assert parts.spi_bus(None, None, None) is None
 
 
-# ---------------------------------------------------------------------------
-# Button pin readers
-# ---------------------------------------------------------------------------
-
-
 def test_button_reader_configures_its_pin_as_a_pulled_up_input(
     gpio: list[_FakeDigitalInOut],
 ) -> None:
@@ -242,11 +227,6 @@ def test_button_reader_reads_the_pins_current_raw_level(gpio: list[_FakeDigitalI
     pressed = read()
 
     assert (released, pressed) == (True, False)
-
-
-# ---------------------------------------------------------------------------
-# NeoPixel strips
-# ---------------------------------------------------------------------------
 
 
 class _FakeNeoPixel(list):
@@ -316,11 +296,6 @@ def test_neopixel_strip_writes_each_scope_into_its_own_segment(neopixel: None) -
     output.update_pixels("ambient", buffer)
 
     assert list(_FakeNeoPixel.built or []) == [0, 0, 0x112233, 0x445566]
-
-
-# ---------------------------------------------------------------------------
-# Matrix pixels
-# ---------------------------------------------------------------------------
 
 
 class _FakeMatrixDriver:
@@ -443,11 +418,6 @@ def test_matrix_that_never_responds_raises_after_the_startup_window(matrix_drive
 
     with pytest.raises(RuntimeError, match="IS31FL3741 matrix did not respond within 3s"):
         parts.matrix_pixels(_matrix(), fake_i2c())
-
-
-# ---------------------------------------------------------------------------
-# I2C sensors and haptics
-# ---------------------------------------------------------------------------
 
 
 class _FakeI2CChip:
@@ -664,11 +634,6 @@ def test_haptic_output_leaves_the_drivers_default_address_when_none_is_configure
     assert [d.kwargs for d in _FakeDrv2605.built] == [{}]
 
 
-# ---------------------------------------------------------------------------
-# Audio
-# ---------------------------------------------------------------------------
-
-
 class _FakeVoice:
     def __init__(self) -> None:
         self.level = 0.0
@@ -790,11 +755,6 @@ def test_audio_pin_naming_an_unknown_pin_raises_value_error_naming_its_field(
         parts.audio_output(_audio(), *pins)
 
 
-# ---------------------------------------------------------------------------
-# IR pulse readers
-# ---------------------------------------------------------------------------
-
-
 class _FakePulseIn(list):
     """A ``pulseio.PulseIn`` buffer of pulse durations, remembering how it was opened."""
 
@@ -844,11 +804,6 @@ def test_ir_reader_pin_naming_an_unknown_pin_raises_value_error_naming_its_field
 
     with pytest.raises(ValueError, match=r"^ir\.rx\[1\]: pin 'GP99' not found on board$"):
         parts.ir_reader(PinRef("GP99", "ir.rx[1]"))
-
-
-# ---------------------------------------------------------------------------
-# IR pulse writers
-# ---------------------------------------------------------------------------
 
 
 class _FakePulseOut:
@@ -964,11 +919,6 @@ def test_ir_writer_pin_naming_an_unknown_pin_raises_value_error_naming_its_field
         parts.ir_writer("cone", PinRef("GP99", "ir.cone"))
 
 
-# ---------------------------------------------------------------------------
-# Radio transport
-# ---------------------------------------------------------------------------
-
-
 class _FakeRfm69:
     """An ``adafruit_rfm69.RFM69`` chip, remembering how it was built and what it sent."""
 
@@ -1039,11 +989,6 @@ def test_radio_pin_naming_an_unknown_pin_raises_value_error_naming_its_field(
         CircuitPythonParts(_board("D10", "D11")).radio_transport(
             RadioConfig(*_RADIO_PINS, 433.0, 7), fake_spi(), *pins
         )
-
-
-# ---------------------------------------------------------------------------
-# Storage
-# ---------------------------------------------------------------------------
 
 
 class _FakeSDCard:
@@ -1119,11 +1064,6 @@ def test_storage_whose_card_fails_to_mount_raises_sd_card_mount_error_naming_cs_
             PinRef("D24", "sdcard.cs"),
         )
     assert isinstance(raised.value.__cause__, OSError)
-
-
-# ---------------------------------------------------------------------------
-# Optional driver libraries
-# ---------------------------------------------------------------------------
 
 
 _OPTIONAL_PARTS = {

@@ -536,11 +536,6 @@ def test_a_root_parent_already_on_the_import_path_is_not_added_again(pack_tree, 
     assert sys.path.count(str(tmp_path / "sd")) == 1
 
 
-# ---------------------------------------------------------------------------
-# Scene declarations
-# ---------------------------------------------------------------------------
-
-
 def test_a_scene_declaring_a_missing_effect_pack_raises_unknown_declared_pack_error(
     pack_tree,
 ) -> None:
@@ -720,11 +715,6 @@ def test_a_declaration_failure_is_caught_as_a_scene_declaration_pack_scan_error(
     assert (excinfo.value.scene, excinfo.value.pack) == ("lobby", "basic")
 
 
-# ---------------------------------------------------------------------------
-# Scan side effects
-# ---------------------------------------------------------------------------
-
-
 def test_the_scan_imports_no_item_module(pack_tree) -> None:
     root = pack_tree.root("tc_flash")
     pack_tree.effect_pack(root, "basic", items={"glow": "BUILD = 1"})
@@ -735,11 +725,6 @@ def test_the_scan_imports_no_item_module(pack_tree) -> None:
     scan_pack_roots([str(root)])
 
     assert set(sys.modules) - known_before == set()
-
-
-# ---------------------------------------------------------------------------
-# Scene discovery
-# ---------------------------------------------------------------------------
 
 
 def test_a_plain_file_in_the_scenes_folder_is_not_a_scene(pack_tree) -> None:

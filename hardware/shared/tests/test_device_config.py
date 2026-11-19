@@ -20,10 +20,6 @@ from hardware.shared.tests.pixels_config import as_matrix
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _SAMPLE_CONFIG_PATH = _REPO_ROOT / "examples" / "aura-device.pico-2.json"
 
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
-
 
 @pytest.fixture
 def matrix_config():
@@ -91,11 +87,6 @@ def full_isolatable_config(matrix_config):
     return matrix_config
 
 
-# ---------------------------------------------------------------------------
-# Happy path: full matrix config
-# ---------------------------------------------------------------------------
-
-
 def test_parse_full_matrix_config_maps_every_section(matrix_config):
     result = parse_device_config(matrix_config)
 
@@ -122,11 +113,6 @@ def test_parse_matrix_config_scope_rows_converted_to_ranges(matrix_config):
     assert scope_rows["ambient"] == range(8, 9)
 
 
-# ---------------------------------------------------------------------------
-# read_device_config_mapping — loading from disk
-# ---------------------------------------------------------------------------
-
-
 def test_read_device_config_mapping_preserves_keys_the_parser_ignores(tmp_path):
     path = tmp_path / "aura-device.json"
     path.write_text(json.dumps({"buttons": ["D9"], "scene": "tag"}))
@@ -139,11 +125,6 @@ def test_read_device_config_mapping_preserves_keys_the_parser_ignores(tmp_path):
 def test_read_device_config_mapping_raises_when_file_absent(tmp_path):
     with pytest.raises(RuntimeError, match="not found"):
         read_device_config_mapping(str(tmp_path / "missing.json"))
-
-
-# ---------------------------------------------------------------------------
-# pixels list shape: optional/empty, and duplicate matrix
-# ---------------------------------------------------------------------------
 
 
 def test_parse_pixels_given_as_dict_raises_value_error(matrix_config):
@@ -182,11 +163,6 @@ def test_parse_unknown_pixels_entry_type_raises_value_error_naming_entry(matrix_
         parse_device_config(matrix_config)
 
 
-# ---------------------------------------------------------------------------
-# Matrix shape validation
-# ---------------------------------------------------------------------------
-
-
 def test_parse_matrix_without_cols_raises_value_error(matrix_config):
     del matrix_config["pixels"][0]["cols"]
 
@@ -213,11 +189,6 @@ def test_parse_matrix_scope_rows_error_lists_valid_keys(matrix_config):
 
     with pytest.raises(ValueError, match="personal"):
         parse_device_config(matrix_config)
-
-
-# ---------------------------------------------------------------------------
-# Matrix brightness
-# ---------------------------------------------------------------------------
 
 
 def test_parse_matrix_without_brightness_defaults_to_one(matrix_config):
@@ -269,11 +240,6 @@ def test_parse_matrix_negative_brightness_raises_value_error(matrix_config):
 
     with pytest.raises(ValueError, match=r"pixels\[0\]\.brightness"):
         parse_device_config(matrix_config)
-
-
-# ---------------------------------------------------------------------------
-# Matrix I2C address (_parse_address validator)
-# ---------------------------------------------------------------------------
 
 
 def test_parse_matrix_without_address_defaults_to_none(matrix_config):
@@ -371,11 +337,6 @@ def test_parse_matrix_float_address_raises_value_error(matrix_config):
         parse_device_config(matrix_config)
 
 
-# ---------------------------------------------------------------------------
-# Pixels entry enabled toggle
-# ---------------------------------------------------------------------------
-
-
 def test_parse_matrix_pixels_absent_enabled_key_defaults_to_true(matrix_config):
     result = parse_device_config(matrix_config)
 
@@ -464,11 +425,6 @@ def test_parse_disabled_neopixel_pixels_entry_reusing_pin_still_raises_value_err
         parse_device_config(mapping)
 
 
-# ---------------------------------------------------------------------------
-# Band-map validator: overlapping scope_rows
-# ---------------------------------------------------------------------------
-
-
 def test_parse_matrix_overlapping_scope_rows_raises_value_error(matrix_config):
     matrix_config["pixels"][0]["scope_rows"] = {
         "global.main": [0, 5],
@@ -510,21 +466,11 @@ def test_validate_band_map_invalid_scope_key_raises_value_error():
         validate_band_map(bands, "test")
 
 
-# ---------------------------------------------------------------------------
-# Unknown pixels.type
-# ---------------------------------------------------------------------------
-
-
 def test_parse_unknown_pixels_type_raises_value_error(matrix_config):
     matrix_config["pixels"][0]["type"] = "led_strip"
 
     with pytest.raises(ValueError, match="led_strip"):
         parse_device_config(matrix_config)
-
-
-# ---------------------------------------------------------------------------
-# Button validation: optional/empty
-# ---------------------------------------------------------------------------
 
 
 def test_parse_absent_buttons_key_yields_empty_list():
@@ -546,11 +492,6 @@ def test_parse_non_string_button_pin_raises_value_error(matrix_config):
 
     with pytest.raises(ValueError, match=r"buttons\[0\]"):
         parse_device_config(matrix_config)
-
-
-# ---------------------------------------------------------------------------
-# IR validation
-# ---------------------------------------------------------------------------
 
 
 def test_parse_ir_without_rx_declares_no_receivers(matrix_config):
@@ -679,12 +620,9 @@ def test_parse_ir_non_boolean_enabled_raises_value_error_naming_field(matrix_con
         parse_device_config(matrix_config)
 
 
-# ---------------------------------------------------------------------------
-# I2C-device validation (accelerometer, magnetometer, haptics) -- the three
-# sections share one I2CDeviceConfig type and one _parse_i2c_device parser, so
-# each rule below is asserted once, parametrized over every section, rather
-# than spelled out three times.
-# ---------------------------------------------------------------------------
+# The accelerometer, magnetometer and haptics sections share one I2CDeviceConfig
+# type and one _parse_i2c_device parser, so each rule below is asserted once,
+# parametrized over every section, rather than spelled out three times.
 
 _I2C_DEVICE_SECTIONS = ("accelerometer", "magnetometer", "haptics")
 
@@ -798,11 +736,6 @@ def test_parse_i2c_device_bad_string_address_raises_value_error_naming_field(
         parse_device_config(matrix_config)
 
 
-# ---------------------------------------------------------------------------
-# I2C validation
-# ---------------------------------------------------------------------------
-
-
 def test_parse_i2c_section_maps_each_named_bus_to_its_pins(matrix_config):
     matrix_config["i2c"] = {
         "default": {"sda": "GP4", "scl": "GP5"},
@@ -891,11 +824,6 @@ def test_an_i2c_device_naming_an_undeclared_bus_raises_naming_the_field_and_bus(
 
     with pytest.raises(ValueError, match=rf"^{re.escape(field)}\.i2c names I2C bus 'snesors'"):
         parse_device_config(config)
-
-
-# ---------------------------------------------------------------------------
-# SPI validation
-# ---------------------------------------------------------------------------
 
 
 def test_parse_spi_section_maps_each_named_bus_to_its_pins(matrix_config):
@@ -1005,11 +933,6 @@ def test_an_undeclared_bus_error_lists_the_declared_buses_and_default_sorted(mat
 
     with pytest.raises(ValueError, match=r"valid buses: default, radio, storage$"):
         parse_device_config(matrix_config)
-
-
-# ---------------------------------------------------------------------------
-# Radio validation
-# ---------------------------------------------------------------------------
 
 
 def test_parse_radio_section_maps_cs_reset_frequency_node(matrix_config):
@@ -1175,11 +1098,6 @@ def test_parse_radio_non_boolean_enabled_raises_value_error_naming_field(matrix_
         parse_device_config(matrix_config)
 
 
-# ---------------------------------------------------------------------------
-# SD card validation
-# ---------------------------------------------------------------------------
-
-
 def test_parse_sdcard_section_maps_cs_mount_and_enabled(matrix_config):
     matrix_config["sdcard"] = {"cs": "GP9", "mount": "/data", "enabled": False}
 
@@ -1287,22 +1205,12 @@ def test_parse_sdcard_enabled_false_invalid_mount_still_raises_value_error(matri
         parse_device_config(matrix_config)
 
 
-# ---------------------------------------------------------------------------
-# Stale high-current rail section
-# ---------------------------------------------------------------------------
-
-
 def test_parse_stale_high_current_rail_section_is_ignored_and_exposes_no_rail(matrix_config):
     matrix_config["high_current_rail"] = {"pin": "GP28", "active_high": False, "enabled": False}
 
     result = parse_device_config(matrix_config)
 
     assert not hasattr(result, "high_current_rail")
-
-
-# ---------------------------------------------------------------------------
-# Audio validation
-# ---------------------------------------------------------------------------
 
 
 def test_parse_audio_bad_voice_count_raises_value_error(matrix_config):
@@ -1365,12 +1273,6 @@ def test_parse_audio_non_boolean_enabled_raises_value_error_naming_field(matrix_
         parse_device_config(matrix_config)
 
 
-# ---------------------------------------------------------------------------
-# Audio I2S pin validation — required-together, single error naming all
-# missing fields, and string-type guards.
-# ---------------------------------------------------------------------------
-
-
 def test_parse_audio_missing_one_i2s_pin_raises_value_error(matrix_config):
     del matrix_config["audio"]["i2s_data"]
 
@@ -1416,11 +1318,6 @@ def test_parse_audio_i2s_data_non_string_raises_value_error(matrix_config):
 
     with pytest.raises(ValueError, match=r"audio\.i2s_data must be a string pin name"):
         parse_device_config(matrix_config)
-
-
-# ---------------------------------------------------------------------------
-# Committed sample config — examples/aura-device.pico-2.json parses as-is
-# ---------------------------------------------------------------------------
 
 
 def test_committed_sample_device_config_parses():
@@ -1472,11 +1369,6 @@ def test_committed_sample_device_config_carries_no_clips_map():
     assert "clips" not in mapping["audio"]
 
 
-# ---------------------------------------------------------------------------
-# load_device_config — board-free parse-and-load pair
-# ---------------------------------------------------------------------------
-
-
 def test_load_device_config_parses_valid_file(tmp_path, matrix_config):
     path = tmp_path / "aura-device.json"
     path.write_text(json.dumps(matrix_config))
@@ -1490,11 +1382,6 @@ def test_load_device_config_parses_valid_file(tmp_path, matrix_config):
 def test_load_device_config_raises_when_file_missing(tmp_path):
     with pytest.raises(RuntimeError, match="not found"):
         load_device_config(str(tmp_path / "missing.json"))
-
-
-# ---------------------------------------------------------------------------
-# DeviceConfig.isolate — derived, non-reparsing single-component isolation
-# ---------------------------------------------------------------------------
 
 
 def test_isolate_returns_a_new_device_config_distinct_from_the_original(full_isolatable_config):

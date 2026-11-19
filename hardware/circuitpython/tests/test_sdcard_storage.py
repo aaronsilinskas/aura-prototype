@@ -9,10 +9,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 
 def _build_storage(mount: str = "/sd"):
     """Return an SdCardStorage plus the mocks its construction touched."""
@@ -33,11 +29,6 @@ def _build_storage(mount: str = "/sd"):
         )
 
         return storage_instance, mock_sdcard_cls, mock_vfsfat_cls, mock_mount, mock_card, mock_vfs
-
-
-# ---------------------------------------------------------------------------
-# construction -- mounts the card
-# ---------------------------------------------------------------------------
 
 
 def test_construction_builds_sdcard_from_given_spi_and_cs() -> None:
@@ -61,11 +52,6 @@ def test_construction_mounts_the_card_as_writable_fat_filesystem() -> None:
 
     mock_vfsfat_cls.assert_called_once_with(mock_card)
     mock_mount.assert_called_once_with(mock_vfs, "/sd", readonly=False)
-
-
-# ---------------------------------------------------------------------------
-# resulting instance -- behaves as a DeviceStorage against the mount point
-# ---------------------------------------------------------------------------
 
 
 def test_sdcard_storage_is_a_device_storage_rooted_at_the_mount_point() -> None:

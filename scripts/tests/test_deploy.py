@@ -18,11 +18,6 @@ def fake_compile(src: Path, dest: Path) -> None:
     dest.write_text(f"FAKE_MPY:{src.name}")
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
 def make_source_tree(root: Path) -> None:
     """Create a minimal fake source tree that mirrors the real repo layout."""
     (root / "effects").mkdir()
@@ -45,11 +40,6 @@ def make_source_tree(root: Path) -> None:
 def boot_py_source(root: Path) -> Path:
     """Return the fixture path for boot.py's new home under hardware/circuitpython/."""
     return root / "hardware" / "circuitpython" / "boot.py"
-
-
-# ---------------------------------------------------------------------------
-# Mount validation
-# ---------------------------------------------------------------------------
 
 
 def test_nonexistent_mount_exits_with_nonzero_code(tmp_path: Path) -> None:
@@ -102,11 +92,6 @@ def test_read_only_mount_copies_nothing(tmp_path: Path) -> None:
         mount.chmod(0o755)
 
 
-# ---------------------------------------------------------------------------
-# Example file deploy
-# ---------------------------------------------------------------------------
-
-
 def test_example_file_is_deployed_as_code_py(tmp_path: Path) -> None:
     source = tmp_path / "source"
     source.mkdir()
@@ -152,11 +137,6 @@ def test_no_example_file_leaves_code_py_untouched(tmp_path: Path) -> None:
     deploy(None, mount, source_root=source, compile=fake_compile)
 
     assert existing.read_text() == "# original"
-
-
-# ---------------------------------------------------------------------------
-# boot.py deploy pairing (#930)
-# ---------------------------------------------------------------------------
 
 
 def test_boot_py_is_deployed_alongside_code_py(tmp_path: Path) -> None:
@@ -275,11 +255,6 @@ def test_boot_py_is_not_duplicated_into_mounts_hardware_circuitpython_on_raw_sou
     assert not (mount / "hardware" / "circuitpython" / "boot.mpy").exists()
 
 
-# ---------------------------------------------------------------------------
-# Module directory sync
-# ---------------------------------------------------------------------------
-
-
 def test_module_directories_are_synced_to_mount(tmp_path: Path) -> None:
     source = tmp_path / "source"
     source.mkdir()
@@ -309,11 +284,6 @@ def test_hardware_subdirectory_modules_are_deployed(tmp_path: Path) -> None:
     assert (mount / "hardware" / "shared" / "matrix_output.mpy").exists()
 
 
-# ---------------------------------------------------------------------------
-# Skip logic (existing destination = up to date for slice 1)
-# ---------------------------------------------------------------------------
-
-
 def test_existing_destination_file_is_not_overwritten(tmp_path: Path) -> None:
     source = tmp_path / "source"
     source.mkdir()
@@ -329,10 +299,6 @@ def test_existing_destination_file_is_not_overwritten(tmp_path: Path) -> None:
 
     assert dest.read_bytes() == b"DEVICE_MPY"
 
-
-# ---------------------------------------------------------------------------
-# Skip logic — FAT32 mtime tolerance (#40)
-# ---------------------------------------------------------------------------
 
 _BASE_TIME = 1_000_000.0
 
@@ -397,11 +363,6 @@ def test_stale_destination_file_is_overwritten(tmp_path: Path) -> None:
     assert dest.read_text() == "FAKE_MPY:render.py"
 
 
-# ---------------------------------------------------------------------------
-# Dry run (#42)
-# ---------------------------------------------------------------------------
-
-
 def test_dry_run_skips_mount_existence_check(tmp_path: Path) -> None:
     source = tmp_path / "source"
     source.mkdir()
@@ -437,11 +398,6 @@ def test_dry_run_output_shows_dry_run_prefix_for_copies(tmp_path: Path, capsys) 
 
     captured = capsys.readouterr()
     assert "[DRY RUN] COPY" in captured.out
-
-
-# ---------------------------------------------------------------------------
-# Pruning stale files (#72)
-# ---------------------------------------------------------------------------
 
 
 def test_stale_py_file_is_deleted_from_mount(tmp_path: Path) -> None:
@@ -679,11 +635,6 @@ def test_summary_includes_pruned_count(tmp_path: Path, capsys) -> None:
     assert "2 pruned" in captured.out
 
 
-# ---------------------------------------------------------------------------
-# --scene flag: write default_scene to aura-boot.json (#880)
-# ---------------------------------------------------------------------------
-
-
 def test_scene_flag_sets_default_scene_in_existing_boot_file(tmp_path: Path) -> None:
     source = tmp_path / "source"
     source.mkdir()
@@ -836,11 +787,6 @@ def test_scene_flag_with_dry_run_creates_no_boot_file_when_absent(tmp_path: Path
     assert not (mount / "aura-boot.json").exists()
 
 
-# ---------------------------------------------------------------------------
-# Build integration: deploy compiles .py to .mpy via build stage (#514)
-# ---------------------------------------------------------------------------
-
-
 def test_deploy_ships_mpy_not_py_for_compiled_modules(tmp_path: Path) -> None:
     source = tmp_path / "source"
     source.mkdir()
@@ -937,11 +883,6 @@ def test_deploy_compile_failure_prints_error_with_file_and_toolchain_output(
     assert "SyntaxError" in captured.err
 
 
-# ---------------------------------------------------------------------------
-# mpy-cross version validation (#515)
-# ---------------------------------------------------------------------------
-
-
 def _boot_out(major: int = 10) -> str:
     return f"Adafruit CircuitPython {major}.2.1 on 2025-01-15; Adafruit Feather RP2040"
 
@@ -1029,11 +970,6 @@ def test_dry_run_matching_version_succeeds(tmp_path: Path) -> None:
         )
 
     assert result == 0
-
-
-# ---------------------------------------------------------------------------
-# --source flag: raw .py deploy without mpy-cross (#516)
-# ---------------------------------------------------------------------------
 
 
 def test_source_mode_returns_success(tmp_path: Path) -> None:
@@ -1150,10 +1086,6 @@ def test_source_mode_succeeds_without_mpy_cross_installed(tmp_path: Path) -> Non
     mock_validate.assert_not_called()
 
 
-# ---------------------------------------------------------------------------
-# End to end: the real repo tree
-# ---------------------------------------------------------------------------
-
 _REPO_ROOT = Path(__file__).parents[2]
 
 
@@ -1183,11 +1115,6 @@ def test_real_repo_tree_lands_exactly_the_ship_list_and_code_py_on_the_mount(
     assert result == 0
     assert {Path("code.py"), Path("boot.py"), hardware_init} <= landed
     assert landed == listed | {Path("code.py")}
-
-
-# ---------------------------------------------------------------------------
-# Command line
-# ---------------------------------------------------------------------------
 
 
 def test_deploy_runs_as_a_script_file_outside_the_repo_root(tmp_path: Path) -> None:

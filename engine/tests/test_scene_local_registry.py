@@ -15,20 +15,11 @@ from engine.packs import ItemTypeError, MissingItemAttributeError, UnknownItemEr
 from engine.scene import SceneLocalRegistry
 from engine.tests.helpers import rule_source
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 
 def _local_rules(pack_tree, rules: dict[str, str] | None) -> SceneLocalRegistry:
     """Scan one scene with local *rules*; return its local rule registry."""
     catalog = pack_tree.scan(scenes={"forest": {"rules": rules}})
     return catalog.scene_registry.get("forest").local_rule_registry
-
-
-# ---------------------------------------------------------------------------
-# Construction
-# ---------------------------------------------------------------------------
 
 
 def test_scene_local_registry_with_no_arguments_is_a_valid_empty_registry() -> None:
@@ -38,11 +29,6 @@ def test_scene_local_registry_with_no_arguments_is_a_valid_empty_registry() -> N
     with pytest.raises(UnknownItemError) as excinfo:
         registry.get("anything", object)
     assert excinfo.value.item_name == "anything"
-
-
-# ---------------------------------------------------------------------------
-# Population from the scanned scene's rules/ folder
-# ---------------------------------------------------------------------------
 
 
 def test_a_scene_whose_rules_entry_is_a_file_has_an_empty_local_rule_registry(
@@ -61,11 +47,6 @@ def test_a_populated_rules_folder_yields_its_items(pack_tree) -> None:
     registry = _local_rules(pack_tree, {"alpha": rule_source("Alpha"), "beta": rule_source("Beta")})
 
     assert registry.items() == ["alpha", "beta"]
-
-
-# ---------------------------------------------------------------------------
-# SceneLocalRegistry.get — item loading
-# ---------------------------------------------------------------------------
 
 
 def test_get_returns_game_rule_for_registered_item_name(pack_tree) -> None:
@@ -111,11 +92,6 @@ def test_get_raises_when_rule_attribute_is_not_a_game_rule(pack_tree) -> None:
     assert excinfo.value.expected_class is GameRule
 
 
-# ---------------------------------------------------------------------------
-# SceneLocalRegistry.items — listing
-# ---------------------------------------------------------------------------
-
-
 def test_items_returns_sorted_item_names(pack_tree) -> None:
     registry = _local_rules(
         pack_tree,
@@ -127,11 +103,6 @@ def test_items_returns_sorted_item_names(pack_tree) -> None:
     )
 
     assert registry.items() == ["alpha", "mango", "zebra"]
-
-
-# ---------------------------------------------------------------------------
-# SceneLocalRegistry — uses __slots__
-# ---------------------------------------------------------------------------
 
 
 def test_scene_local_registry_uses_slots() -> None:

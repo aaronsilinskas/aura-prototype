@@ -31,11 +31,6 @@ def _effect_registry(pack_tree, packs: dict[str, dict[str, str]]) -> PackRegistr
     return scan_pack_roots([str(root)]).effect_registry
 
 
-# ---------------------------------------------------------------------------
-# Construction
-# ---------------------------------------------------------------------------
-
-
 def test_pack_registry_with_no_arguments_is_a_valid_empty_registry() -> None:
     registry = PackRegistry()
 
@@ -50,11 +45,6 @@ def test_pack_registry_does_not_allow_arbitrary_attributes() -> None:
 
     with pytest.raises(AttributeError):
         registry.unexpected_attr = "oops"  # type: ignore[attr-defined]  # slotted, must raise
-
-
-# ---------------------------------------------------------------------------
-# get — item lookup validation
-# ---------------------------------------------------------------------------
 
 
 def test_get_raises_for_unknown_pack(pack_tree) -> None:
@@ -93,11 +83,6 @@ def test_get_returns_value_from_sibling_of_init_py(pack_tree) -> None:
     assert registry.get("mypack", "item_a", int) == 7
 
 
-# ---------------------------------------------------------------------------
-# get — lazy import + caching
-# ---------------------------------------------------------------------------
-
-
 def test_get_imports_module_and_returns_its_export_on_first_call(pack_tree) -> None:
     registry = _effect_registry(pack_tree, {"mypack": {"fire": "BUILD = 42"}})
 
@@ -123,11 +108,6 @@ def test_get_only_imports_module_once(pack_tree) -> None:
     assert set(sys.modules) == modules_after_first
 
 
-# ---------------------------------------------------------------------------
-# get — missing attribute / wrong type
-# ---------------------------------------------------------------------------
-
-
 def test_get_raises_missing_item_attribute_error_when_export_is_absent(pack_tree) -> None:
     registry = _effect_registry(pack_tree, {"mypack": {"item_a": "WRONG_NAME = 99"}})
 
@@ -147,11 +127,6 @@ def test_get_raises_item_type_error_when_export_has_wrong_type(pack_tree) -> Non
     assert excinfo.value.context == "Pack 'mypack' item 'item_a'"
 
 
-# ---------------------------------------------------------------------------
-# names — pack name listing
-# ---------------------------------------------------------------------------
-
-
 def test_names_returns_sorted_pack_names(pack_tree) -> None:
     registry = _effect_registry(pack_tree, {"zebra": {}, "alpha": {}, "mango": {}})
 
@@ -162,11 +137,6 @@ def test_names_returns_empty_list_when_no_packs_are_scanned(pack_tree) -> None:
     registry = _effect_registry(pack_tree, {})
 
     assert registry.names() == []
-
-
-# ---------------------------------------------------------------------------
-# items — item name listing
-# ---------------------------------------------------------------------------
 
 
 def test_items_returns_sorted_item_names(pack_tree) -> None:
@@ -189,11 +159,6 @@ def test_items_raises_for_unknown_pack(pack_tree) -> None:
     with pytest.raises(UnknownPackError) as excinfo:
         registry.items("nonexistent")
     assert excinfo.value.pack_name == "nonexistent"
-
-
-# ---------------------------------------------------------------------------
-# scan_item_names — public helper
-# ---------------------------------------------------------------------------
 
 
 def test_scan_item_names_returns_py_files_as_item_names(tmp_path) -> None:

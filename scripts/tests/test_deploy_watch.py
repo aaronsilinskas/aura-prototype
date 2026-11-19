@@ -28,10 +28,6 @@ from scripts.tests.fake_comport import fake_comport
 
 _REPO_ROOT = Path(__file__).parents[2]
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 
 def lines(*items: str | None) -> list[str | None]:
     return list(items)
@@ -46,11 +42,6 @@ def fixed_clock(start: float = 0.0, step: float = 1.0) -> Callable[[], float]:
         return val
 
     return _clock
-
-
-# ---------------------------------------------------------------------------
-# watch_stream: stream_ended
-# ---------------------------------------------------------------------------
 
 
 def test_watch_stream_returns_stream_ended_when_iterable_exhausted() -> None:
@@ -69,11 +60,6 @@ def test_watch_stream_stream_ended_with_no_lines() -> None:
     out = io.StringIO()
     result = watch_stream(lines(), out=out)
     assert result.reason == "stream_ended"
-
-
-# ---------------------------------------------------------------------------
-# watch_stream: matched
-# ---------------------------------------------------------------------------
 
 
 def test_watch_stream_returns_matched_when_until_substring_found() -> None:
@@ -104,11 +90,6 @@ def test_watch_stream_no_match_returns_stream_ended() -> None:
     out = io.StringIO()
     result = watch_stream(lines("line1", "line2"), until="MISSING", out=out)
     assert result.reason == "stream_ended"
-
-
-# ---------------------------------------------------------------------------
-# watch_stream: timed_out
-# ---------------------------------------------------------------------------
 
 
 def test_watch_stream_returns_timed_out_on_idle_only_stream_when_timeout_elapses() -> None:
@@ -168,11 +149,6 @@ def test_watch_stream_timed_out_when_timeout_elapses_after_stream_exhausted() ->
     assert result.reason == "timed_out"
 
 
-# ---------------------------------------------------------------------------
-# exit_code_for: exit-code mapping
-# ---------------------------------------------------------------------------
-
-
 def test_exit_code_for_stream_ended_with_no_until_is_zero() -> None:
     assert exit_code_for("stream_ended", until=None) == 0
 
@@ -199,11 +175,6 @@ def test_exit_code_for_banner_missing_is_three() -> None:
 
 def test_exit_code_for_banner_missing_with_until_set_is_three() -> None:
     assert exit_code_for("banner_missing", until="MARKER") == 3
-
-
-# ---------------------------------------------------------------------------
-# discard_until
-# ---------------------------------------------------------------------------
 
 
 def test_discard_until_returns_true_when_marker_found_before_deadline() -> None:
@@ -264,11 +235,6 @@ def test_discard_until_returns_false_when_stream_exhausted_before_marker() -> No
         clock=fixed_clock(0.0, 0.0),
     )
     assert result is False
-
-
-# ---------------------------------------------------------------------------
-# SplitWriter
-# ---------------------------------------------------------------------------
 
 
 def test_split_writer_writes_to_stdout() -> None:
@@ -353,11 +319,6 @@ def test_split_writer_file_excludes_lines_written_directly_to_stdout() -> None:
     assert "Deploying" not in file_out.getvalue()
 
 
-# ---------------------------------------------------------------------------
-# select_console_port
-# ---------------------------------------------------------------------------
-
-
 # A console port alongside a data port needs no case here: repl_comports()
 # filters the data channel out before selection.
 
@@ -382,11 +343,6 @@ def test_select_console_port_raises_listing_candidates_when_multiple_console_por
 
 def test_find_console_port_returns_an_explicit_port_unchanged() -> None:
     assert find_console_port(explicit_port="/dev/tty.explicit") == "/dev/tty.explicit"
-
-
-# ---------------------------------------------------------------------------
-# CLI deploy step
-# ---------------------------------------------------------------------------
 
 
 def _deploy_from_source(tmp_path: Path) -> "Callable[..., int]":
@@ -450,11 +406,6 @@ def test_omitting_source_flag_deploys_compiled_modules(tmp_path: Path) -> None:
     run_deploy(args, deploy=_recording_deploy(calls))
 
     assert calls[0]["use_source"] is False
-
-
-# ---------------------------------------------------------------------------
-# Command line
-# ---------------------------------------------------------------------------
 
 
 def test_deploy_watch_runs_as_a_script_file_outside_the_repo_root(tmp_path: Path) -> None:

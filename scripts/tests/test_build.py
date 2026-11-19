@@ -7,10 +7,6 @@ import pytest
 
 from scripts.build import BuildError, build
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 
 def fake_compile(src: Path, dest: Path) -> None:
     dest.parent.mkdir(parents=True, exist_ok=True)
@@ -41,11 +37,6 @@ def make_source_tree(root: Path) -> None:
     (root / "hardware" / "shared").mkdir()
     (root / "hardware" / "shared" / "__init__.py").write_text("# hw shared init")
     (root / "hardware" / "shared" / "matrix_output.py").write_text("# matrix_output")
-
-
-# ---------------------------------------------------------------------------
-# Staging tree: .py files are compiled to .mpy
-# ---------------------------------------------------------------------------
 
 
 def test_python_module_is_compiled_to_mpy_in_staging_tree(tmp_path: Path) -> None:
@@ -119,11 +110,6 @@ def test_intermediate_package_inits_are_compiled(tmp_path: Path) -> None:
     assert (staging / "hardware" / "__init__.mpy").exists()
 
 
-# ---------------------------------------------------------------------------
-# Staging tree: data files are copied raw
-# ---------------------------------------------------------------------------
-
-
 def test_json_file_is_copied_raw(tmp_path: Path) -> None:
     source = tmp_path / "source"
     source.mkdir()
@@ -155,11 +141,6 @@ def test_wav_file_is_copied_raw(tmp_path: Path) -> None:
     build(source_root=source, staging_root=staging, compile=fake_compile)
 
     assert (staging / "packs" / "sounds" / "click.wav").read_bytes() == b"RIFF"
-
-
-# ---------------------------------------------------------------------------
-# Compile failure aborts the build
-# ---------------------------------------------------------------------------
 
 
 def test_compile_failure_raises_build_error(tmp_path: Path) -> None:
@@ -200,11 +181,6 @@ def test_compile_failure_leaves_no_partial_staging_tree(tmp_path: Path) -> None:
     assert not staging.exists() or not any(staging.rglob("*.mpy"))
 
 
-# ---------------------------------------------------------------------------
-# Return value: compiled count
-# ---------------------------------------------------------------------------
-
-
 def test_build_returns_compiled_count(tmp_path: Path) -> None:
     source = tmp_path / "source"
     source.mkdir()
@@ -227,11 +203,6 @@ def test_build_compiled_count_matches_py_files_processed(tmp_path: Path) -> None
     result = build(source_root=source, staging_root=staging, compile=fake_compile)
 
     assert result.compiled == 1
-
-
-# ---------------------------------------------------------------------------
-# Incremental build: unchanged modules are skipped
-# ---------------------------------------------------------------------------
 
 
 def test_unchanged_module_is_skipped_on_second_build(tmp_path: Path) -> None:
@@ -305,11 +276,6 @@ def test_only_changed_module_is_recompiled_not_unchanged_sibling(tmp_path: Path)
     assert result.skipped >= 1
 
 
-# ---------------------------------------------------------------------------
-# Incremental build: deleted source prunes the staged .mpy
-# ---------------------------------------------------------------------------
-
-
 def test_deleted_source_py_is_pruned_from_staging_tree(tmp_path: Path) -> None:
     source = tmp_path / "source"
     source.mkdir()
@@ -348,11 +314,6 @@ def test_multiple_deleted_sources_are_all_pruned_from_staging_tree(tmp_path: Pat
     assert not (staging / "effects" / "a.mpy").exists()
     assert not (staging / "effects" / "b.mpy").exists()
     assert (staging / "effects" / "c.mpy").exists()
-
-
-# ---------------------------------------------------------------------------
-# Incremental build: content-hash skip is immune to mtime tolerance window
-# ---------------------------------------------------------------------------
 
 
 def test_skip_decision_uses_content_hash_not_mtime(tmp_path: Path) -> None:
@@ -409,11 +370,6 @@ def test_module_with_identical_content_is_skipped_even_when_mtime_advances(
     assert result.skipped >= 1
 
 
-# ---------------------------------------------------------------------------
-# Incremental build: first-ever build always compiles (no staged file yet)
-# ---------------------------------------------------------------------------
-
-
 def test_first_build_compiles_all_modules_with_no_prior_staging_tree(tmp_path: Path) -> None:
     source = tmp_path / "source"
     source.mkdir()
@@ -432,11 +388,6 @@ def test_first_build_compiles_all_modules_with_no_prior_staging_tree(tmp_path: P
     assert sorted(compile_calls) == ["palette.py", "render.py"]
     assert result.compiled == 2
     assert result.skipped == 0
-
-
-# ---------------------------------------------------------------------------
-# Staging holds only what the Ship list produces
-# ---------------------------------------------------------------------------
 
 
 def test_deleted_raw_data_file_is_pruned_from_staging_tree(tmp_path: Path) -> None:

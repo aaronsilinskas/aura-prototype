@@ -8,10 +8,6 @@ from hardware.circuitpython.infrared_io import PulseInReader, PulseOutWriter
 if TYPE_CHECKING:
     import pulseio
 
-# ---------------------------------------------------------------------------
-# Fake pulseio hardware stubs
-# ---------------------------------------------------------------------------
-
 
 class FakePulseIn:
     """Minimal stub for pulseio.PulseIn.
@@ -52,11 +48,6 @@ def as_pulse_out(pulseout: FakePulseOut) -> "pulseio.PulseOut":
     return cast("pulseio.PulseOut", pulseout)
 
 
-# ---------------------------------------------------------------------------
-# PulseInReader — wraps pulseio.PulseIn
-# ---------------------------------------------------------------------------
-
-
 def test_pulse_in_reader_returns_none_when_buffer_empty():
     reader = PulseInReader(fake_pulse_in())
     assert reader.read_pulse() is None
@@ -86,11 +77,6 @@ def test_pulse_in_reader_returns_none_after_buffer_drained():
     reader = PulseInReader(fake_pulse_in([500]))
     reader.read_pulse()
     assert reader.read_pulse() is None
-
-
-# ---------------------------------------------------------------------------
-# PulseInReader — buffer_full_on_poll telemetry
-# ---------------------------------------------------------------------------
 
 
 def test_buffer_full_on_poll_increments_when_buffer_at_maxlen_on_read():
@@ -128,11 +114,6 @@ def test_buffer_full_on_poll_counts_once_per_full_read_not_per_drain():
     assert reader.buffer_full_on_poll == 1
 
 
-# ---------------------------------------------------------------------------
-# PulseOutWriter — wraps pulseio.PulseOut
-# ---------------------------------------------------------------------------
-
-
 def test_pulse_out_writer_sends_pulses_via_pulseout():
     pulseout = FakePulseOut()
     writer = PulseOutWriter(as_pulse_out(pulseout))
@@ -148,11 +129,6 @@ def test_pulse_out_writer_sends_each_call_separately():
     writer.write_pulses(array("H", [100]))
     writer.write_pulses(array("H", [200]))
     assert len(pulseout.send_calls) == 2
-
-
-# ---------------------------------------------------------------------------
-# PulseOutWriter — is_busy reports across a (faked) blocking send
-# ---------------------------------------------------------------------------
 
 
 def test_pulse_out_writer_is_busy_false_before_any_send():

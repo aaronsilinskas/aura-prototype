@@ -32,11 +32,6 @@ def _transceiver_over(
 _ALL_PINS = {LINE: "GP1", CONE: "GP2", AREA_OF_EFFECT: "GP3"}
 
 
-# ---------------------------------------------------------------------------
-# Construction — wires itself from pulse readers, emitter pins and a writer factory
-# ---------------------------------------------------------------------------
-
-
 def test_constructor_calls_the_factory_once_per_emitter_in_ir_emitters_order_with_its_pin() -> None:
     factory = EmitterWriterFactory()
     pins = {AREA_OF_EFFECT: object(), LINE: object(), CONE: object()}
@@ -129,11 +124,6 @@ def test_no_reader_receives_the_self_echo_of_a_send_on_any_emitter(
     assert transceiver.received is None
 
 
-# ---------------------------------------------------------------------------
-# send() — raises for an emitter that isn't wired
-# ---------------------------------------------------------------------------
-
-
 def test_send_raises_with_no_emitter_wired() -> None:
     transceiver = _transceiver_over()
 
@@ -145,11 +135,6 @@ def test_transceiver_does_not_expose_transmitters_as_a_public_collection() -> No
     transceiver = _transceiver_over(writers={LINE: EmitterPulseWriter()})
 
     assert not hasattr(transceiver, "transmitters")
-
-
-# ---------------------------------------------------------------------------
-# busy() — reports and pumps one emitter
-# ---------------------------------------------------------------------------
 
 
 def test_busy_reports_idle_for_a_blocking_writer() -> None:
@@ -165,11 +150,6 @@ def test_busy_raises_for_unwired_emitter() -> None:
 
     with pytest.raises(ValueError):
         transceiver.busy(CONE)
-
-
-# ---------------------------------------------------------------------------
-# update() — pumps every transmitter, then receives
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize("reader_count", [0, 1])
@@ -200,22 +180,12 @@ def test_update_with_nothing_wired_leaves_received_none() -> None:
     assert transceiver.received is None
 
 
-# ---------------------------------------------------------------------------
-# received — set only on a decoding tick
-# ---------------------------------------------------------------------------
-
-
 def test_received_is_none_when_the_pulses_decode_nothing() -> None:
     transceiver = _transceiver_over([ReplayingPulseReader([100, 200])])
 
     transceiver.update(0.0)
 
     assert transceiver.received is None
-
-
-# ---------------------------------------------------------------------------
-# apply_codec()
-# ---------------------------------------------------------------------------
 
 
 def test_apply_codec_makes_every_emitter_send_in_the_new_wire_frame() -> None:
@@ -257,11 +227,6 @@ def test_apply_codec_is_a_safe_noop_with_nothing_wired() -> None:
     transceiver.apply_codec(TagInfraredEncoder, TagInfraredDecoder)  # must not raise
 
 
-# ---------------------------------------------------------------------------
-# codec — the installed class pair, read back
-# ---------------------------------------------------------------------------
-
-
 def test_codec_is_the_aura_pair_before_any_codec_is_applied() -> None:
     transceiver = _transceiver_over()
 
@@ -281,11 +246,6 @@ def test_codec_cannot_be_assigned() -> None:
 
     with pytest.raises(AttributeError):
         transceiver.codec = (TagInfraredEncoder, TagInfraredDecoder)  # type: ignore[misc]  # proves it is read-only
-
-
-# ---------------------------------------------------------------------------
-# telemetry_line() — every receive-path stage reports
-# ---------------------------------------------------------------------------
 
 
 def test_telemetry_line_reports_a_decoded_frame_through_every_stage() -> None:

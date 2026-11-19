@@ -7,10 +7,6 @@ from __future__ import annotations
 
 from engine.tests.helpers import make_scene
 
-# ---------------------------------------------------------------------------
-# sounds/ folder discovery
-# ---------------------------------------------------------------------------
-
 
 def test_a_scenes_sounds_folder_wavs_are_in_its_local_sound_map(pack_tree) -> None:
     registry = pack_tree.scan(scenes={"forest": {"sounds": ["victory_sting"]}}).scene_registry

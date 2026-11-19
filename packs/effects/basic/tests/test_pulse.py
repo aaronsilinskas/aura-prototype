@@ -24,15 +24,9 @@ def _render(effect, pixel_count: int = 4) -> list:
     return list(buf)
 
 
-# --- Builder ---
-
-
 def test_pulse_effect_name_is_basic_pulse() -> None:
     effect = _build()
     assert effect.name == "basic.pulse"
-
-
-# --- Raw color pass-through ---
 
 
 def test_pulse_stores_start_color_unscaled() -> None:
@@ -93,9 +87,6 @@ def test_pulse_ignores_brightness_option() -> None:
     assert all(p == 0xFFFFFF for p in _render(effect_without_brightness))
 
 
-# --- Default options ---
-
-
 def test_pulse_default_start_color_is_black() -> None:
     effect = _build()
     effect.pixels.update(0.0)
@@ -115,7 +106,6 @@ def test_pulse_default_durations_make_a_two_second_cycle() -> None:
     assert all(p == 0x112233 for p in _render(effect))
 
 
-# --- Each duration option sets its phase length ---
 # Black-to-white, sampled where a phase boundary would sit elsewhere if the
 # option fell back to its 0.5 s default.
 
@@ -145,9 +135,6 @@ def test_pulse_duration_option_sets_its_phase_length(
     )
     effect.pixels.update(elapsed)
     assert all(p == expected for p in _render(effect))
-
-
-# --- ValueError at build time ---
 
 
 def test_pulse_negative_brighten_duration_raises_value_error() -> None:

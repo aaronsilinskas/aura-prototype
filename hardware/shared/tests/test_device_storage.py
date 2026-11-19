@@ -24,11 +24,6 @@ def _break_temp_file_writes(monkeypatch):
     monkeypatch.setattr(builtins, "open", flaky_open)
 
 
-# ---------------------------------------------------------------------------
-# DeviceStorage — read_bytes / write_bytes round-trip
-# ---------------------------------------------------------------------------
-
-
 def test_read_bytes_returns_none_for_a_never_written_name(tmp_path):
     storage = DeviceStorage(str(tmp_path))
 
@@ -64,11 +59,6 @@ def test_read_bytes_propagates_an_open_error_other_than_missing_file(tmp_path, m
         storage.read_bytes("state.json")
 
 
-# ---------------------------------------------------------------------------
-# DeviceStorage — read_chunks
-# ---------------------------------------------------------------------------
-
-
 def test_read_chunks_returns_none_for_a_never_written_name(tmp_path):
     storage = DeviceStorage(str(tmp_path))
 
@@ -101,11 +91,6 @@ def test_read_chunks_rejects_a_name_that_escapes_the_mount_root(tmp_path, escapi
 
     with pytest.raises(ValueError):
         storage.read_chunks(escaping_name, chunk_size=8)
-
-
-# ---------------------------------------------------------------------------
-# DeviceStorage — write_chunks
-# ---------------------------------------------------------------------------
 
 
 def test_write_chunks_concatenates_chunks_in_order(tmp_path):
@@ -168,11 +153,6 @@ def test_write_bytes_is_equivalent_to_write_chunks_with_one_chunk(tmp_path):
     assert storage.read_bytes("state.json") == b"\x00\x01hello\xff"
 
 
-# ---------------------------------------------------------------------------
-# DeviceStorage — atomic-replace semantics
-# ---------------------------------------------------------------------------
-
-
 def test_failed_write_bytes_leaves_prior_content_intact(tmp_path, monkeypatch):
     storage = DeviceStorage(str(tmp_path))
     storage.write_bytes("state.json", b"original-content")
@@ -222,11 +202,6 @@ def test_write_bytes_propagates_a_mkdir_error_other_than_already_exists(tmp_path
         storage.write_bytes("scenes/tag/state.json", b"data")
 
 
-# ---------------------------------------------------------------------------
-# DeviceStorage — subpaths
-# ---------------------------------------------------------------------------
-
-
 def test_write_bytes_auto_creates_missing_parent_directories(tmp_path):
     storage = DeviceStorage(str(tmp_path))
 
@@ -242,11 +217,6 @@ def test_write_bytes_tolerates_already_present_parent_directories(tmp_path):
     storage.write_bytes("scenes/tag/other.json", b"second")
 
     assert storage.read_bytes("scenes/tag/other.json") == b"second"
-
-
-# ---------------------------------------------------------------------------
-# DeviceStorage — escape rejection
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize("escaping_name", ESCAPING_NAMES)
@@ -282,11 +252,6 @@ def test_write_bytes_rejecting_an_escaping_name_leaves_no_file_written(tmp_path)
     assert os.listdir(tmp_path) == []
 
 
-# ---------------------------------------------------------------------------
-# DeviceStorage — path()
-# ---------------------------------------------------------------------------
-
-
 def test_path_returns_a_resolved_path_under_the_mount_root(tmp_path):
     storage = DeviceStorage(str(tmp_path))
 
@@ -303,11 +268,6 @@ def test_path_creates_no_directories(tmp_path):
     assert not os.path.isdir(tmp_path / "scenes")
 
 
-# ---------------------------------------------------------------------------
-# DeviceStorage — mount_root
-# ---------------------------------------------------------------------------
-
-
 def test_mount_root_strips_trailing_slash_passed_to_constructor(tmp_path):
     storage = DeviceStorage(str(tmp_path) + "/")
 
@@ -319,11 +279,6 @@ def test_mount_root_omits_the_trailing_slash_that_path_of_empty_string_includes(
 
     assert storage.mount_root == str(tmp_path)
     assert storage.path("") == str(tmp_path) + "/"
-
-
-# ---------------------------------------------------------------------------
-# DeviceStorage — read_json / write_json
-# ---------------------------------------------------------------------------
 
 
 def test_read_json_returns_none_for_a_never_written_name(tmp_path):
@@ -384,11 +339,6 @@ def test_failed_write_json_leaves_prior_content_intact(tmp_path, monkeypatch):
 
     monkeypatch.undo()
     assert storage.read_json("state.json") == {"scene": "tag"}
-
-
-# ---------------------------------------------------------------------------
-# DeviceStorage — walk()
-# ---------------------------------------------------------------------------
 
 
 def test_walk_returns_every_file_recursively_with_its_size(tmp_path):

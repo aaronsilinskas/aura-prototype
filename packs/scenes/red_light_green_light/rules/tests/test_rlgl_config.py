@@ -21,11 +21,6 @@ def _settings(**values: object) -> Settings:
     return settings_for("red_light_green_light", settings=values)
 
 
-# ---------------------------------------------------------------------------
-# Level-scaled warning pulse duration
-# ---------------------------------------------------------------------------
-
-
 def test_warning_pulse_duration_is_the_max_at_level_one():
     config = RlglConfig(_settings(warning_pulse_max=1.0, warning_pulse_min=0.4, max_level=10))
 
@@ -36,11 +31,6 @@ def test_warning_pulse_duration_shortens_to_the_min_at_max_level():
     config = RlglConfig(_settings(warning_pulse_max=1.0, warning_pulse_min=0.4, max_level=10))
 
     assert config.warning_pulse_duration(10) == pytest.approx(0.4)
-
-
-# ---------------------------------------------------------------------------
-# Cross-Setting check: gravity tracking slower than motion smoothing
-# ---------------------------------------------------------------------------
 
 
 def test_the_declared_gravity_tracking_is_slower_than_motion_smoothing():
@@ -58,11 +48,6 @@ def test_rejects_gravity_beta_not_below_motion_smoothing(gravity_beta):
     expected = rf"gravity_beta \({gravity_beta}\) must be below motion_smoothing \(0\.3\)"
     with pytest.raises(ValueError, match=expected):
         RlglConfig(settings)
-
-
-# ---------------------------------------------------------------------------
-# rlgl_config — get-or-create accessor
-# ---------------------------------------------------------------------------
 
 
 def test_rlgl_config_builds_from_the_state_settings():
