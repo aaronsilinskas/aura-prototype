@@ -14,13 +14,14 @@ class EarthShieldSpell(Spell):
         self.hits = Counter(max=max_hits)
 
     def update(self, aura: Aura, elapsed_time: float) -> bool:
-        if self.duration.update(elapsed_time):
-            return True
+        return self.duration.update(elapsed_time)
 
+    @property
+    def is_spent(self) -> bool:
         return self.hits.is_max
 
     def modify_event(self, aura: Aura, event: AuraEvent) -> None:
-        if self.duration.is_expired or self.hits.is_max:
+        if self.duration.is_expired or self.is_spent:
             return
 
         if isinstance(event, DamageEvent):
