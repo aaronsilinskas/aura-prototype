@@ -1230,7 +1230,7 @@ def test_parse_audio_non_integer_voices_raises_value_error(matrix_config):
 def test_parse_audio_section_with_no_clips_key_succeeds_and_carries_no_clips_attribute(
     matrix_config,
 ):
-    """AudioConfig no longer carries a clips map -- clip names resolve
+    """AudioConfig carries no clips map -- clip names resolve
     through the Active scene namespace -- so a clips-free audio section parses with
     voices/max_volume/I2S validation unaffected."""
     result = parse_device_config(matrix_config)

@@ -11,7 +11,8 @@ versus "text" content.
 ``Transport`` is the port both :class:`hardware.shared.sd_sync_server.SdSyncServer`
 and ``scripts.sd_sync_client.SdSyncClient`` reach each other through --
 ``send``/``recv`` of one already-encoded frame line at a time. The serial adapters
-(``UsbCdcTransport`` on the device, ``SerialTransport`` on the host) and the
+(:class:`~hardware.circuitpython.usb_cdc_transport.UsbCdcTransport` on the device,
+:class:`~scripts.sd_sync_transport.SerialTransport` on the host) and the
 in-memory loopback used by tests are all thin implementations of this port;
 neither this module nor its callers know or care which one is underneath.
 

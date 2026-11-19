@@ -4,9 +4,10 @@ Drives an :class:`~hardware.shared.sd_sync_server.SdSyncServer` (over an
 injected :class:`~hardware.shared.sd_sync_protocol.Transport`) to pull files off
 a device's SD card onto the host filesystem, push host files onto the card, and
 list directories on the card. CPython-only, like the rest of ``scripts/``; the
-real serial transport (``scripts/sd_sync_transport.py``, pointed at the device's
-data CDC port) is one implementation -- this client only knows the ``Transport``
-port, so it runs unchanged against that transport or an in-memory loopback.
+real serial transport (:class:`~scripts.sd_sync_transport.SerialTransport`, on the
+device's data channel) is one implementation -- this client only knows the
+``Transport`` port, so it runs unchanged against that transport or an in-memory
+loopback.
 
 Each ``pull``/``push`` streams bytes chunk-by-chunk as they are read/received,
 so the host process never holds a whole file in memory either -- the same
