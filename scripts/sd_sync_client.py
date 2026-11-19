@@ -86,8 +86,8 @@ class SdSyncClient:
 
         Creates any missing parent directories under *host_path* so a pull
         into a not-yet-existing host subtree works. *host_path* is replaced
-        only once a transfer's CRC-32 matches: a pull that fails for any
-        reason leaves an existing *host_path* unchanged and no partial file
+        only once a transfer's CRC-32 matches: a pull that raises (Ctrl-C
+        included) leaves an existing *host_path* unchanged and no partial file
         behind.
 
         Args:
@@ -136,13 +136,7 @@ class SdSyncClient:
         return decode_listing(response.payload)
 
     def _receive_verified(self, host_path: str) -> bool:
-        """Stream one pull response's chunks to *host_path*; return whether its CRC matched.
-
-        Runs after the server has already confirmed ``"ok"``. The chunks land
-        in a temporary file beside *host_path*, which replaces it only when the
-        CRC matches; on a mismatch or any exception the temporary file is
-        removed and *host_path* is left untouched.
-        """
+        """Receive one pull response into *host_path*; return whether its CRC matched."""
         parent = os.path.dirname(host_path)
         if parent:
             os.makedirs(parent, exist_ok=True)
@@ -161,12 +155,7 @@ class SdSyncClient:
             _remove_if_exists(temp_path)
 
     def _receive_chunks(self, dest: BinaryIO) -> bool:
-        """Write each chunk to *dest* as it arrives; return whether the closing CRC matched.
-
-        Acknowledges each chunk (stop-and-wait) and writes it immediately, so
-        no more than one pending chunk is held in memory before it lands on
-        disk.
-        """
+        """Write and ack each chunk to *dest* as it arrives; return whether the CRC matched."""
         crc = 0
         while True:
             frame = decode_frame(self._transport.recv())
@@ -236,7 +225,7 @@ class SdSyncClient:
 
 
 def _remove_if_exists(path: str) -> None:
-    """Remove *path* if present -- a pull's temporary file, already gone once replaced."""
+    """Remove *path* if it exists."""
     try:
         os.remove(path)
     except FileNotFoundError:
