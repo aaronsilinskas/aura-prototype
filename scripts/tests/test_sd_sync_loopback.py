@@ -389,12 +389,12 @@ class _AckReplacingTransport(Transport):
 
 
 @pytest.mark.parametrize(
-    "reply",
-    [Frame("resp", "error"), Frame("ack", "1")],
+    ("reply", "reported_reply"),
+    [(Frame("resp", "error"), "got 'resp' 'error'"), (Frame("ack", "1"), "got 'ack' '1'")],
     ids=["non-ack-frame", "ack-of-the-wrong-chunk"],
 )
 def test_push_stops_with_an_error_when_a_chunk_is_not_acked_by_its_sequence_number(
-    device_storage: DeviceStorage, tmp_path: Path, reply: Frame
+    device_storage: DeviceStorage, tmp_path: Path, reply: Frame, reported_reply: str
 ):
     client, transport = make_loopback_client(
         device_storage,
@@ -404,7 +404,7 @@ def test_push_stops_with_an_error_when_a_chunk_is_not_acked_by_its_sequence_numb
     host_path = tmp_path / "log.txt"
     host_path.write_bytes(b"x" * (CHUNK_SIZE + 1))
 
-    with pytest.raises(SdSyncProtocolError, match="ack"):
+    with pytest.raises(SdSyncProtocolError, match=reported_reply):
         client.push(str(host_path), "log.txt")
 
     assert transport.sent_kind_counts["chunk"] == 1
