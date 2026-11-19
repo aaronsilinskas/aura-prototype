@@ -113,8 +113,9 @@ name = "the Scene boot must not import board-only hardware"
 type = "forbidden"
 # build_scene_boot also boots the Simulated device under CPython, so neither
 # board-only hardware nor the CircuitPython-only modules it imports may load.
-# Keep this list in step with the libraries hardware/circuitpython imports:
-# a library missing here is not checked.
+# import-linter can't match adafruit_*, so each library is named.
+# hardware/circuitpython/tests/test_board_only_import_contract.py fails until
+# this list names exactly the external modules hardware/circuitpython imports.
 source_modules = ["app.scene_composition"]
 forbidden_modules = [
     "hardware.circuitpython",
@@ -161,3 +162,9 @@ enable_error_code = ["ignore-without-code"]
 [[tool.mypy.overrides]]
 module = ["*.tests.*"]
 disallow_untyped_defs = false
+
+# Tests read pyproject.toml with tomli on Python 3.10, where tomllib is missing;
+# mypy checks as 3.10 but newer interpreters don't install tomli.
+[[tool.mypy.overrides]]
+module = ["tomli"]
+ignore_missing_imports = true
