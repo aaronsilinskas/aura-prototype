@@ -1,30 +1,38 @@
 """Tests for deploy_watch: watch_stream, discard_until, exit codes, SplitWriter, port selection,
-and the CLI's deploy step."""
+reading serial lines, and the CLI's deploy step."""
 
 import functools
 import io
+import itertools
 import json
 import os
 import subprocess
 import sys
 from collections.abc import Callable
 from pathlib import Path
+from typing import TYPE_CHECKING, cast
 
 import pytest
+import serial
 
 from scripts.deploy import deploy
 from scripts.deploy_watch import (
     ConsolePortError,
+    SerialHandle,
     SplitWriter,
     discard_until,
     exit_code_for,
     find_console_port,
+    iter_serial_lines,
     parse_args,
     run_deploy,
     select_console_port,
     watch_stream,
 )
 from scripts.tests.fake_comport import fake_comport
+
+if TYPE_CHECKING:
+    from serial import Serial
 
 _REPO_ROOT = Path(__file__).parents[2]
 
@@ -420,3 +428,56 @@ def test_deploy_watch_runs_as_a_script_file_outside_the_repo_root(tmp_path: Path
     )
 
     assert result.returncode == 0, result.stderr
+
+
+class FakeSerial:
+    """A serial port whose reads return *reads* in order: bytes, or an exception to raise."""
+
+    def __init__(self, *reads: bytes | Exception) -> None:
+        self._reads = list(reads)
+
+    @property
+    def in_waiting(self) -> int:
+        pending = self._reads[0] if self._reads else b""
+        return len(pending) if isinstance(pending, bytes) else 0
+
+    def read(self, size: int = 1) -> bytes:
+        if not self._reads:
+            return b""
+        pending = self._reads.pop(0)
+        if isinstance(pending, Exception):
+            raise pending
+        return pending
+
+    def close(self) -> None:
+        pass
+
+
+def as_serial(fake: FakeSerial) -> "Serial":
+    return cast("Serial", fake)
+
+
+def first_items(handle: SerialHandle, count: int, **kwargs) -> list[str | None]:
+    return list(itertools.islice(iter_serial_lines(handle, **kwargs), count))
+
+
+def test_iter_serial_lines_keeps_the_bytes_after_a_newline_for_the_next_line() -> None:
+    handle = SerialHandle(as_serial(FakeSerial(b"first\nsec", b"ond\n")), "/dev/fake", 115200)
+
+    assert first_items(handle, 2) == ["first", "second"]
+
+
+def test_iter_serial_lines_yields_the_reconnect_marker_once_after_a_failed_read() -> None:
+    reopened = FakeSerial(b"after\n")
+    handle = SerialHandle(
+        as_serial(FakeSerial(serial.SerialException("device disconnected"))), "/dev/fake", 115200
+    )
+
+    items = first_items(
+        handle,
+        2,
+        reconnect_marker="soft reboot",
+        reopen=lambda port, baud: as_serial(reopened),
+    )
+
+    assert items == ["soft reboot", "after"]

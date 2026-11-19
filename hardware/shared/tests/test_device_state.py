@@ -7,6 +7,19 @@ fixture), so it exercises the storage devices run.
 
 from engine.log import Logger
 from hardware.shared.device_state import DeviceStateStore
+from hardware.shared.device_storage import DeviceStorage
+
+
+class RecordingStorage(DeviceStorage):
+    """A DeviceStorage that records the name of every JSON file it writes."""
+
+    def __init__(self, mount_root: str) -> None:
+        super().__init__(mount_root)
+        self.json_writes: list[str] = []
+
+    def write_json(self, name: str, mapping: dict) -> None:
+        self.json_writes.append(name)
+        super().write_json(name, mapping)
 
 
 def test_get_returns_none_for_a_never_written_key(device_storage):
@@ -182,6 +195,17 @@ def test_update_removing_an_absent_key_still_sets_the_others(device_storage):
     assert store.get("team") == "a1b2"
 
 
+def test_an_update_that_changes_nothing_writes_nothing(tmp_path):
+    storage = RecordingStorage(str(tmp_path))
+    store = DeviceStateStore(storage)
+    store.set("level", "tag")
+    storage.json_writes.clear()
+
+    store.update({"level": "tag"}, remove=("player_id",))
+
+    assert storage.json_writes == []
+
+
 def test_update_over_malformed_json_writes_a_fresh_object(device_storage):
     device_storage.write_bytes("aura-state.json", b"{not valid json")
     store = DeviceStateStore(device_storage)
@@ -215,3 +239,12 @@ def test_write_reports_that_it_wrote(device_storage):
 
 def test_write_reports_a_card_less_no_op():
     assert DeviceStateStore(None).write({"level": "tag"}) is False
+
+
+def test_changing_what_read_returned_leaves_the_persisted_state_unchanged(device_storage):
+    store = DeviceStateStore(device_storage)
+    store.set("level", "tag")
+
+    store.read()["level"] = "lobby"
+
+    assert store.get("level") == "tag"

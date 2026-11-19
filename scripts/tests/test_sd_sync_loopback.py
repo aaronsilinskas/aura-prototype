@@ -218,6 +218,18 @@ def test_pull_round_trips_a_large_payload_through_multiple_chunks(
     assert transport.sent_kind_counts["ack"] == expected_chunk_count
 
 
+def test_pull_of_an_empty_sd_file_writes_an_empty_host_file(
+    device_storage: DeviceStorage, tmp_path: Path
+):
+    device_storage.write_bytes("empty.log", b"")
+    client, _ = make_loopback_client(device_storage)
+    host_path = tmp_path / "empty.log"
+
+    client.pull("empty.log", str(host_path))
+
+    assert host_path.read_bytes() == b""
+
+
 def test_pull_of_a_small_payload_sends_exactly_one_ack(
     device_storage: DeviceStorage, tmp_path: Path
 ):
@@ -437,6 +449,18 @@ def test_push_round_trips_a_large_payload_through_multiple_chunks(
     assert transport.sent_kind_counts["chunk"] == expected_chunk_count
 
 
+def test_push_of_an_empty_host_file_writes_an_empty_sd_file(
+    device_storage: DeviceStorage, tmp_path: Path
+):
+    client, _ = make_loopback_client(device_storage, verb="push")
+    host_path = tmp_path / "empty.log"
+    host_path.write_bytes(b"")
+
+    client.push(str(host_path), "empty.log")
+
+    assert device_storage.read_bytes("empty.log") == b""
+
+
 def test_push_of_a_small_payload_sends_exactly_one_chunk(
     device_storage: DeviceStorage, tmp_path: Path
 ):
@@ -596,6 +620,18 @@ def test_list_files_of_an_empty_subpath_returns_no_entries(device_storage):
     client, _ = make_loopback_client(device_storage, verb="list")
 
     assert client.list_files("aura_packs/scenes") == []
+
+
+def test_list_files_of_a_card_with_many_files_returns_every_entry(device_storage):
+    names = [f"aura_packs/scenes/scene_{n:02d}/scene.json" for n in range(40)]
+    for name in names:
+        device_storage.write_bytes(name, b"{}")
+    client, _ = make_loopback_client(device_storage, verb="list")
+
+    listing = client.list_files()
+
+    assert len("\n".join(names)) > CHUNK_SIZE
+    assert listing == [(name, 2) for name in names]
 
 
 def test_list_files_with_no_sd_configured_raises_no_storage_error():

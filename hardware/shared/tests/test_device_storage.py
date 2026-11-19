@@ -4,6 +4,7 @@ import builtins
 import errno
 import json
 import os
+from collections.abc import Generator
 
 import pytest
 
@@ -91,6 +92,27 @@ def test_read_chunks_rejects_a_name_that_escapes_the_mount_root(tmp_path, escapi
 
     with pytest.raises(ValueError):
         storage.read_chunks(escaping_name, chunk_size=8)
+
+
+def test_read_chunks_closes_the_file_when_the_caller_stops_iterating_early(tmp_path, monkeypatch):
+    storage = DeviceStorage(str(tmp_path))
+    storage.write_bytes("log.txt", b"0123456789")
+    opened = []
+    real_open = builtins.open
+
+    def recording_open(*args, **kwargs):
+        f = real_open(*args, **kwargs)
+        opened.append(f)
+        return f
+
+    monkeypatch.setattr(builtins, "open", recording_open)
+    chunks = storage.read_chunks("log.txt", chunk_size=4)
+    assert isinstance(chunks, Generator)
+    next(chunks)
+
+    chunks.close()
+
+    assert [f.closed for f in opened] == [True]
 
 
 def test_write_chunks_concatenates_chunks_in_order(tmp_path):
@@ -236,6 +258,13 @@ def test_path_rejects_a_subpath_that_escapes_the_mount_root(tmp_path, escaping_s
 
     with pytest.raises(ValueError):
         storage.path(escaping_subpath)
+
+
+def test_a_dot_dot_segment_is_rejected_even_when_the_path_stays_under_the_mount_root(tmp_path):
+    storage = DeviceStorage(str(tmp_path))
+
+    with pytest.raises(ValueError):
+        storage.read_bytes("scenes/../state.json")
 
 
 def test_write_bytes_rejecting_an_escaping_name_leaves_no_file_written(tmp_path):

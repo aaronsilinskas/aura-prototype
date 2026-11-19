@@ -403,6 +403,18 @@ def test_packets_surfaced_counts_only_received_frames():
     assert telemetry_counters(transceiver)["packets_surfaced"] == 1
 
 
+def test_a_shot_completed_by_several_readers_counts_per_reader_but_surfaces_once():
+    transceiver, readers = _receiving(2)
+    transceiver.apply_codec(TagInfraredEncoder, TagInfraredDecoder)
+    readers[0].load(tag_pulses(b"\x2a"))
+    readers[1].load(tag_pulses(b"\x2a"))
+
+    transceiver.update(0.0)
+
+    counters = telemetry_counters(transceiver)
+    assert (counters["packets_completed"], counters["packets_surfaced"]) == (2, 1)
+
+
 def test_decoder_counters_are_summed_across_readers():
     bad_preamble = list(TAG_PREAMBLE)
     bad_preamble[1] = 4000  # invalid but below the inter-frame gap threshold
