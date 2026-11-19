@@ -23,12 +23,11 @@ def regen_fixture() -> RegenFixture:
     return RegenFixture()
 
 
-def test_magic_regen_over_time_max(regen_fixture: RegenFixture) -> None:
+def test_ambient_regen_adds_its_rate_times_the_elapsed_time(regen_fixture: RegenFixture) -> None:
     aura = regen_fixture.aura
-
     duration = aura.magic.max.value / 4 / regen_fixture.regen_per_second
-
     aura.add_spell(regen_fixture.regen_spell)
+
     aura.update(duration)
 
     assert aura.magic.value == regen_fixture.starting_magic + (
@@ -36,7 +35,7 @@ def test_magic_regen_over_time_max(regen_fixture: RegenFixture) -> None:
     )
 
 
-def test_ambient_magic_regen_level(regen_fixture: RegenFixture) -> None:
+def test_ambient_regen_rate_scales_with_spell_level(regen_fixture: RegenFixture) -> None:
     level = 3
     original_rate = regen_fixture.regen_per_second
 

@@ -26,7 +26,6 @@ def fixture() -> VulnerableFixture:
 
 def test_vulnerable_removes_existing_shields(fixture: VulnerableFixture) -> None:
     aura = fixture.aura
-
     shield_spell = EarthShieldSpell(2.0, 3, duration=10)
     shield_spell_2 = EarthShieldSpell(1.5, 2, duration=10)
     aura.add_spell(shield_spell)
@@ -90,7 +89,7 @@ def test_vulnerable_does_not_amplify_damage_when_shields_removed(
     assert aura.magic.value == initial_magic - fixture.damage_amount
 
 
-def test_vulnerable_not_applied_to_healing(fixture: VulnerableFixture) -> None:
+def test_vulnerable_does_not_amplify_healing(fixture: VulnerableFixture) -> None:
     aura = fixture.aura
     heal_amount = aura.magic.max.value / 4
     aura.magic.value = fixture.max_magic - heal_amount * 2
@@ -103,7 +102,7 @@ def test_vulnerable_not_applied_to_healing(fixture: VulnerableFixture) -> None:
     assert aura.magic.value == initial_magic + heal_amount
 
 
-def test_vulnerable_removed_after_expiry(fixture: VulnerableFixture) -> None:
+def test_vulnerable_expires_after_its_duration(fixture: VulnerableFixture) -> None:
     aura = fixture.aura
 
     aura.add_spell(fixture.vulnerable_spell)
@@ -112,7 +111,7 @@ def test_vulnerable_removed_after_expiry(fixture: VulnerableFixture) -> None:
     assert fixture.vulnerable_spell not in aura.spells
 
 
-def test_vulnerable_level(fixture: VulnerableFixture) -> None:
+def test_vulnerable_level_scales_damage_multiplier(fixture: VulnerableFixture) -> None:
     level = 2
     original_multiplier = fixture.damage_multiplier
 

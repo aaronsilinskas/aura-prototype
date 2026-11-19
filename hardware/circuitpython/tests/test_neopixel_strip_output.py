@@ -61,7 +61,7 @@ def test_create_buffer_for_segment_is_sized_to_segment_length() -> None:
     assert len(buf) == 10
 
 
-def test_create_buffer_for_larger_segment_returns_correct_size() -> None:
+def test_create_buffer_for_the_larger_segment_is_sized_to_that_segment() -> None:
     scope_pixels = {"personal": range(0, 10), "ambient": range(10, 30)}
     output, _ = _make_segmented_output(scope_pixels, count=30)
 
@@ -69,7 +69,7 @@ def test_create_buffer_for_larger_segment_returns_correct_size() -> None:
     assert len(buf) == 20
 
 
-def test_update_pixels_writes_buffer_to_correct_strip_offsets() -> None:
+def test_update_pixels_writes_each_pixel_at_its_segment_offset_in_the_strip() -> None:
     scope_pixels = {"personal": range(0, 3), "ambient": range(3, 6)}
     output, strip = _make_segmented_output(scope_pixels, count=6)
 
@@ -83,7 +83,7 @@ def test_update_pixels_writes_buffer_to_correct_strip_offsets() -> None:
     strip.__setitem__.assert_has_calls([call(0, 0xFF0000), call(1, 0x00FF00), call(2, 0x0000FF)])
 
 
-def test_update_pixels_for_second_segment_writes_at_correct_offset() -> None:
+def test_update_pixels_for_a_mid_strip_segment_starts_at_its_first_strip_index() -> None:
     scope_pixels = {"personal": range(0, 10), "ambient": range(10, 20)}
     output, strip = _make_segmented_output(scope_pixels, count=20)
 
@@ -96,7 +96,7 @@ def test_update_pixels_for_second_segment_writes_at_correct_offset() -> None:
     assert first_call == call(10, 0xAABBCC)
 
 
-def test_update_pixels_does_not_write_outside_segment_range() -> None:
+def test_update_pixels_leaves_other_segments_indices_untouched() -> None:
     scope_pixels = {"personal": range(0, 5), "ambient": range(5, 10)}
     output, strip = _make_segmented_output(scope_pixels, count=10)
 
@@ -118,7 +118,7 @@ def test_clear_pixels_zeros_the_named_segment() -> None:
     assert written_indices == {0, 1, 2}
 
 
-def test_clear_pixels_for_second_segment_writes_at_correct_offset() -> None:
+def test_clear_pixels_for_a_mid_strip_segment_clears_only_its_range() -> None:
     scope_pixels = {"personal": range(0, 5), "ambient": range(5, 10)}
     output, strip = _make_segmented_output(scope_pixels, count=10)
 

@@ -8,6 +8,7 @@ from magic.tests.helpers import AuraFixture
 class HealFixture(AuraFixture):
     def __init__(self) -> None:
         super().__init__()
+        # Below max, so a heal has room to raise magic.
         self.aura.magic.value = self.aura.magic.max.value // 4
         self.heal_amount: float = self.aura.magic.max.value // 3
         self.heal_spell: HealSpell = HealSpell(healing=self.heal_amount)
@@ -18,7 +19,9 @@ def heal_fixture() -> HealFixture:
     return HealFixture()
 
 
-def test_heal_instant_healing(heal_fixture: HealFixture) -> None:
+def test_heal_restores_its_healing_on_the_next_update_then_leaves_the_aura(
+    heal_fixture: HealFixture,
+) -> None:
     aura = heal_fixture.aura
     initial_magic = aura.magic.value
 
@@ -29,7 +32,7 @@ def test_heal_instant_healing(heal_fixture: HealFixture) -> None:
     assert heal_fixture.heal_spell not in aura.spells
 
 
-def test_heal_multiple_applications(heal_fixture: HealFixture) -> None:
+def test_two_heal_spells_each_restore_their_healing(heal_fixture: HealFixture) -> None:
     aura = heal_fixture.aura
     initial_magic = aura.magic.value
 
@@ -44,7 +47,7 @@ def test_heal_multiple_applications(heal_fixture: HealFixture) -> None:
     assert len(aura.spells) == 0
 
 
-def test_heal_level(heal_fixture: HealFixture) -> None:
+def test_heal_level_scales_healing(heal_fixture: HealFixture) -> None:
     level = 4
     original_healing = heal_fixture.heal_amount
 

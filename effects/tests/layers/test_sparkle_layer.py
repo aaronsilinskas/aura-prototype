@@ -45,4 +45,4 @@ def test_sparkle_layer_sample_peaks_at_sparkle_position() -> None:
     samples = [layer.sample(i / pixel_count, pixel_count) for i in range(pixel_count)]
     peak = max(samples)
     assert peak > 0.0
-    assert min(samples) < peak
+    assert min(samples) < peak, "samples away from the sparkle fall off below its peak"

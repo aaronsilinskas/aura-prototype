@@ -9,7 +9,7 @@ class HasteFixture(AuraFixture):
     def __init__(self) -> None:
         super().__init__()
 
-        self.haste_duration: float = 5.0  # seconds
+        self.haste_duration: float = 5.0
         self.cast_delay_percentage: float = 0.25
         self.haste_spell: HasteSpell = HasteSpell(
             duration=self.haste_duration,
@@ -38,13 +38,12 @@ def test_haste_spell_expires_and_restores_cast_delay(fixture: HasteFixture) -> N
     original_delay = aura.cast_delay
 
     aura.add_spell(fixture.haste_spell)
-
     aura.update(fixture.haste_duration + 1.0)
 
     assert aura.cast_delay == original_delay
 
 
-def test_haste_spell_removal_restores_cast_delay(fixture: HasteFixture) -> None:
+def test_removing_haste_before_it_expires_restores_cast_delay(fixture: HasteFixture) -> None:
     aura = fixture.aura
     original_delay = aura.cast_delay
 
@@ -56,7 +55,7 @@ def test_haste_spell_removal_restores_cast_delay(fixture: HasteFixture) -> None:
     assert aura.cast_delay == original_delay
 
 
-def test_haste_level(fixture: HasteFixture) -> None:
+def test_haste_level_scales_cast_delay_reduction(fixture: HasteFixture) -> None:
     level = 3
     original_percentage = fixture.cast_delay_percentage
 

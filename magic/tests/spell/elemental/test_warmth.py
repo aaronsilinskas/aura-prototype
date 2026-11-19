@@ -46,7 +46,6 @@ def test_warmth_removes_water_debuffs(fixture: AuraFixture) -> None:
 
     warmth = WarmthSpell()
     aura.add_spell(warmth)
-
     aura.update(0.1)
 
     assert water_debuff not in list(aura.spells)
@@ -64,7 +63,6 @@ def test_warmth_removes_ice_debuffs(fixture: AuraFixture) -> None:
 
     warmth = WarmthSpell()
     aura.add_spell(warmth)
-
     aura.update(0.1)
 
     assert ice_debuff not in list(aura.spells)
@@ -89,7 +87,6 @@ def test_warmth_removes_multiple_water_and_ice_debuffs(fixture: AuraFixture) -> 
 
     warmth = WarmthSpell()
     aura.add_spell(warmth)
-
     aura.update(0.1)
 
     assert len(list(aura.spells)) == 0
@@ -103,7 +100,6 @@ def test_warmth_does_not_remove_other_debuffs(fixture: AuraFixture) -> None:
 
     warmth = WarmthSpell()
     aura.add_spell(warmth)
-
     aura.update(0.1)
 
     assert fire_debuff in list(aura.spells)
@@ -121,7 +117,6 @@ def test_warmth_does_not_remove_water_or_ice_buffs(fixture: AuraFixture) -> None
 
     warmth = WarmthSpell()
     aura.add_spell(warmth)
-
     aura.update(0.1)
 
     assert water_buff in list(aura.spells)

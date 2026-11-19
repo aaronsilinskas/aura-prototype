@@ -38,7 +38,7 @@ def test_increment_to_max():
     assert counter.is_max is True
 
 
-def test_increment_beyond_max():
+def test_incrementing_past_max_stays_at_max():
     counter = Counter(max=3)
     counter.increment()
     counter.increment()
@@ -50,7 +50,7 @@ def test_increment_beyond_max():
     assert counter.is_max is True
 
 
-def test_increment_multiple_beyond_max():
+def test_repeated_increments_past_max_stay_at_max():
     counter = Counter(max=2)
     counter.increment()
     counter.increment()
@@ -111,7 +111,7 @@ def test_max_of_one():
     assert counter.is_max is True
 
 
-def test_max_of_zero():
+def test_a_counter_with_max_zero_starts_at_max():
     counter = Counter(max=0)
 
     assert counter.count == 0

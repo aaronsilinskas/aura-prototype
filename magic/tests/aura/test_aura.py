@@ -17,19 +17,19 @@ def test_aura_initialization(fixture: AuraFixture) -> None:
     assert len(aura.spells) == 0
 
 
-def test_magic_min_limit(fixture: AuraFixture) -> None:
+def test_damage_past_the_minimum_leaves_magic_at_the_minimum(fixture: AuraFixture) -> None:
     aura = fixture.aura
-
     damage_past_min = aura.magic.value - aura.magic.min + 50.0
+
     aura.process_event(DamageEvent(damage_past_min))
 
     assert aura.magic.value == aura.magic.min
 
 
-def test_magic_max_limit(fixture: AuraFixture) -> None:
+def test_healing_past_the_maximum_leaves_magic_at_the_maximum(fixture: AuraFixture) -> None:
     aura = fixture.aura
-
     heal_past_max = aura.magic.max.value * 10
+
     aura.process_event(HealEvent(heal_past_max))
 
     assert aura.magic.value == aura.magic.max.value
@@ -95,7 +95,7 @@ def test_handle_event_cancellation(fixture: AuraFixture) -> None:
     assert aura.magic.value == initial_magic
 
 
-def test_get_spells_by_name(fixture: AuraFixture) -> None:
+def test_get_by_name_returns_every_spell_with_that_name(fixture: AuraFixture) -> None:
     aura = fixture.aura
 
     class InexorableDoomSpell(Spell):
@@ -108,7 +108,6 @@ def test_get_spells_by_name(fixture: AuraFixture) -> None:
 
     test_spell = InexorableDoomSpell()
     test_spell_2 = InexorableDoomSpell()
-
     aura.add_spell(test_spell)
     aura.add_spell(test_spell_2)
     aura.add_spell(AnotherSpell())
@@ -185,10 +184,10 @@ def test_get_spells_by_tag_empty(fixture: AuraFixture) -> None:
     aura.add_spell(BuffSpell())
 
     spells = list(aura.spells.get_by_tag())
-    assert spells == []
+    assert spells == [], "no tags match no spell"
 
     spells = list(aura.spells.get_by_tag(SpellTags.DEBUFF))
-    assert spells == []
+    assert spells == [], "a tag no spell carries matches no spell"
 
 
 def test_get_spells_by_class(fixture: AuraFixture) -> None:

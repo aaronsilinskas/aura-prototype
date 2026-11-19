@@ -8,7 +8,7 @@ from magic.tests.helpers import AuraFixture
 class FlashFixture(AuraFixture):
     def __init__(self) -> None:
         super().__init__()
-        self.flash_duration: float = 3.0  # seconds
+        self.flash_duration: float = 3.0
         self.flash_spell: FlashSpell = FlashSpell(duration=self.flash_duration)
 
 
@@ -30,7 +30,6 @@ def test_flash_spell_expires_after_duration(fixture: FlashFixture) -> None:
     aura = fixture.aura
 
     aura.add_spell(fixture.flash_spell)
-
     aura.update(fixture.flash_duration + 1.0)
 
     assert fixture.flash_spell not in aura.spells

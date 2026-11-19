@@ -8,7 +8,7 @@ from magic.tests.helpers import AuraFixture
 class ShadowFixture(AuraFixture):
     def __init__(self) -> None:
         super().__init__()
-        self.shadow_duration: float = 3.0  # seconds
+        self.shadow_duration: float = 3.0
         self.shadow_spell: ShadowSpell = ShadowSpell(duration=self.shadow_duration)
 
 
@@ -30,7 +30,6 @@ def test_shadow_spell_expires_after_duration(fixture: ShadowFixture) -> None:
     aura = fixture.aura
 
     aura.add_spell(fixture.shadow_spell)
-
     aura.update(fixture.shadow_duration + 1.0)
 
     assert fixture.shadow_spell not in aura.spells

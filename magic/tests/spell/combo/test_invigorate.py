@@ -62,13 +62,12 @@ def test_invigorate_does_not_trigger_with_no_regen_spells(fixture: InvigorateFix
     assert aura.magic.max.value == pytest.approx(original_max_magic)
 
 
-def test_invigorate_modifier_expires_after_regen_and_duration(
+def test_invigorate_outlasts_its_regen_spells_then_expires_after_its_duration(
     fixture: InvigorateFixture,
 ):
     aura = fixture.aura
     original_max_magic = aura.magic.max.value
     regen_duration = 2.0
-
     regen1 = RegenSpell(regen_rate=5.0, duration=regen_duration)
     regen2 = RegenSpell(regen_rate=10.0, duration=regen_duration)
     regen3 = RegenSpell(regen_rate=8.0, duration=regen_duration)
@@ -76,18 +75,18 @@ def test_invigorate_modifier_expires_after_regen_and_duration(
     aura.add_spell(regen1)
     aura.add_spell(regen2)
     aura.add_spell(regen3)
-
     assert aura.magic.max.value == pytest.approx(original_max_magic * fixture.max_magic_multiplier)
 
     aura.update(regen_duration + 1.0)
-
-    assert len(aura.spells.get_by_class(RegenSpell)) == 0
-
-    assert aura.magic.max.value == pytest.approx(original_max_magic * fixture.max_magic_multiplier)
+    assert len(aura.spells.get_by_class(RegenSpell)) == 0, "the regen spells expire first"
+    assert aura.magic.max.value == pytest.approx(
+        original_max_magic * fixture.max_magic_multiplier
+    ), "invigorate outlasts the regen spells that triggered it"
 
     aura.update(fixture.duration)
-
-    assert aura.magic.max.value == pytest.approx(original_max_magic)
+    assert aura.magic.max.value == pytest.approx(original_max_magic), (
+        "max magic returns to its original value once invigorate's duration passes"
+    )
 
 
 def test_invigorate_refreshes_when_regen_spells_return_to_three(
@@ -99,12 +98,12 @@ def test_invigorate_refreshes_when_regen_spells_return_to_three(
     aura.add_spell(RegenSpell(regen_rate=5.0, duration=1))
     aura.add_spell(RegenSpell(regen_rate=5.0, duration=5))
     aura.add_spell(RegenSpell(regen_rate=8.0, duration=5))
-
     assert aura.magic.max.value == pytest.approx(original_max_magic * fixture.max_magic_multiplier)
 
     aura.update(4)
-
-    assert aura.magic.max.value == pytest.approx(original_max_magic * fixture.max_magic_multiplier)
+    assert aura.magic.max.value == pytest.approx(
+        original_max_magic * fixture.max_magic_multiplier
+    ), "invigorate stays applied when the first regen expires, leaving two"
 
     aura.add_spell(RegenSpell(regen_rate=12.0, duration=5))
     aura.update(8)
@@ -136,7 +135,6 @@ def test_invigorate_check_returns_false_when_already_applied(
     aura.add_spell(RegenSpell(regen_rate=8.0, duration=fixture.regen_duration))
 
     standalone_combo.check(aura)
-
     result = standalone_combo.check(aura)
 
     assert result is False

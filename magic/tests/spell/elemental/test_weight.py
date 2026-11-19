@@ -8,7 +8,7 @@ from magic.tests.helpers import AuraFixture
 class WeightFixture(AuraFixture):
     def __init__(self) -> None:
         super().__init__()
-        self.acceleration_threshold = 1.0  # m/s²
+        self.acceleration_threshold = 1.0
         self.accel_under_threshold_event = AccelerationEvent(
             x_accel=0.0, y_accel=-GRAVITY, z_accel=0.0, remove_gravity=True
         )
@@ -16,8 +16,8 @@ class WeightFixture(AuraFixture):
             x_accel=6.0, y_accel=0.0, z_accel=-GRAVITY, remove_gravity=True
         )
 
-        self.damage_per_second = 50.0  # damage per second
-        self.duration = 10.0  # seconds
+        self.damage_per_second = 50.0
+        self.duration = 10.0
 
         self.weight_spell = WeightSpell(
             acceleration_threshold=self.acceleration_threshold,
@@ -34,25 +34,24 @@ def fixture() -> WeightFixture:
 def test_weight_applies_damage_on_movement(fixture: WeightFixture) -> None:
     aura = fixture.aura
     initial_magic = aura.magic.value
+    moving_seconds = 0.5
 
     aura.add_spell(fixture.weight_spell)
-
     aura.process_event(fixture.accel_above_threshold_event)
+    aura.update(moving_seconds)
 
-    aura.update(0.5)
-
-    assert aura.magic.value == initial_magic - fixture.damage_per_second * 0.5
+    assert aura.magic.value == initial_magic - fixture.damage_per_second * moving_seconds
 
 
-def test_weight_no_damage_below_threshold(fixture: WeightFixture) -> None:
+def test_weight_deals_no_damage_once_acceleration_drops_below_threshold(
+    fixture: WeightFixture,
+) -> None:
     aura = fixture.aura
     initial_magic = aura.magic.value
 
     aura.add_spell(fixture.weight_spell)
-
     aura.process_event(fixture.accel_above_threshold_event)
     aura.process_event(fixture.accel_under_threshold_event)
-
     aura.update(1.0)
 
     assert aura.magic.value == initial_magic
@@ -62,15 +61,13 @@ def test_weight_expires_after_duration(fixture: WeightFixture) -> None:
     aura = fixture.aura
 
     aura.add_spell(fixture.weight_spell)
-
     aura.process_event(fixture.accel_above_threshold_event)
-
     aura.update(fixture.duration + 1)
 
     assert fixture.weight_spell not in aura.spells
 
 
-def test_weight_level(fixture: WeightFixture) -> None:
+def test_weight_level_scales_damage_per_second(fixture: WeightFixture) -> None:
     level = 3
     original_dps = fixture.damage_per_second
 

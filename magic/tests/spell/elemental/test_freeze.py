@@ -9,7 +9,7 @@ class FreezeFixture(AuraFixture):
     def __init__(self) -> None:
         super().__init__()
 
-        self.freeze_duration: float = 5.0  # seconds
+        self.freeze_duration: float = 5.0
         self.cast_delay_modifier: float = 2.0
         self.freeze_spell: FreezeSpell = FreezeSpell(
             duration=self.freeze_duration, cast_delay_modifier=self.cast_delay_modifier
@@ -36,13 +36,12 @@ def test_freeze_spell_expires_and_restores_cast_delay(fixture: FreezeFixture) ->
     original_delay = aura.cast_delay
 
     aura.add_spell(fixture.freeze_spell)
-
     aura.update(fixture.freeze_duration + 1.0)
 
     assert aura.cast_delay == original_delay
 
 
-def test_freeze_spell_removal_restores_cast_delay(fixture: FreezeFixture) -> None:
+def test_removing_freeze_before_it_expires_restores_cast_delay(fixture: FreezeFixture) -> None:
     aura = fixture.aura
     original_delay = aura.cast_delay
 
@@ -54,7 +53,7 @@ def test_freeze_spell_removal_restores_cast_delay(fixture: FreezeFixture) -> Non
     assert aura.cast_delay == original_delay
 
 
-def test_freeze_level(fixture: FreezeFixture) -> None:
+def test_freeze_level_scales_cast_delay_modifier(fixture: FreezeFixture) -> None:
     level = 2
     original_modifier = fixture.cast_delay_modifier
 
