@@ -1,4 +1,7 @@
-"""The Effect Level: an effect's build-time intensity in the range [1, 10]."""
+"""The Effect Level: an effect's build-time intensity in the range [1, 10].
+
+Builders interpolate across it with ``engine.lerp.level_lerp``, passing
+``EFFECT_TOP_LEVEL``."""
 
 from __future__ import annotations
 

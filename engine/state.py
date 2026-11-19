@@ -88,8 +88,8 @@ class Scope:
         DEBUFF: Final = ScopeValue("global.debuff")  # negative status effects
         ALL: Final = ScopeValue("global.all", [MAIN, BUFF, DEBUFF])
 
-    PERSONAL: Final = ScopeValue("personal")
-    DIRECTIONAL: Final = ScopeValue("directional")
+    PERSONAL: Final = ScopeValue("personal")  # only the local player's device
+    DIRECTIONAL: Final = ScopeValue("directional")  # the direction the player is pointing
     AMBIENT: Final = ScopeValue("ambient")
     NON_AMBIENT: Final = ScopeValue("non_ambient", [PERSONAL, DIRECTIONAL, Global.ALL])
     ALL: Final = ScopeValue("all", [PERSONAL, DIRECTIONAL, Global.ALL, AMBIENT])
@@ -98,9 +98,9 @@ class Scope:
 class SceneControls:
     """Abstract interface for scene transitions called from within game rules.
 
-    ``SceneManager`` injects itself as the live implementation; standalone callers (e.g. rule
-    unit tests) pass the base ``SceneControls()`` instance, which raises on
-    any call.
+    ``SceneManager`` injects itself as the live implementation; standalone
+    callers (e.g. rule unit tests) pass the base ``SceneControls()`` instance,
+    which raises on any call.
 
     There is no in-process scene switch: a rule changes scene by Reboot
     (ADR-0005). The boot scene is activated by ``SceneManager`` itself, off
@@ -156,25 +156,22 @@ class SceneControls:
 class SceneReboot:
     """Board-free port through which ``SceneManager`` persists-and-reboots.
 
-    ``SceneManager`` validates ``reboot_into``'s *target*
-    against its scene registry (a typo must never persist a name the next
-    boot would only skip), checks the target's Required capabilities (reading
-    ``reboot_to_previous``'s target from ``previous_scene``), and otherwise
-    delegates both reboots straight to this port. All the device work —
-    writing the scene switch to durable storage and physically resetting the
-    device — lives on the concrete implementation, since a reboot is
-    inherently a hardware operation the board-free engine cannot perform
-    itself.
+    ``SceneManager`` validates ``reboot_into``'s *target* against its scene
+    registry (a typo must never persist a name the next boot would only skip),
+    checks the target's Required capabilities (reading ``reboot_to_previous``'s
+    target from ``previous_scene``), and otherwise delegates both reboots
+    straight to this port. All the device work — writing the scene switch to
+    durable storage and physically resetting the device — lives on the concrete
+    implementation, since a reboot is inherently a hardware operation the
+    board-free engine cannot perform itself.
     """
 
     __slots__ = ()
 
     def reboot_into(self, target: str) -> None:
-        """Persist *target* as the next boot scene and reboot immediately."""
         raise NotImplementedError
 
     def reboot_to_previous(self) -> None:
-        """Persist the recorded ``return_to`` scene and reboot immediately."""
         raise NotImplementedError
 
     def previous_scene(self) -> str | None:
@@ -200,7 +197,6 @@ class NetworkControls:
         raise NotImplementedError
 
     def send_radio(self, data: bytes) -> None:
-        """Transmit a radio packet."""
         raise NotImplementedError
 
 
@@ -321,8 +317,8 @@ class EffectControls:
 class _StateSlotBase:
     """Callable accessor that owns the get-or-create-and-revalidate pattern for a GameState key.
 
-    Use it as ``StateSlot``; the checker sees a
-    generic subclass that types the result as *expected_class*.
+    Use it as ``StateSlot``; the checker sees a generic subclass that types the
+    result as *expected_class*.
     """
 
     __slots__ = ("_expected_class", "_factory", "key")
@@ -452,6 +448,12 @@ class GameState:
     def get_or_none(self, key: str, expected_class: type[T]) -> T | None:
         """Return the stored value for *key*, or ``None`` if absent.
 
+        For optional/absent lookups, where ``get``'s required *default*
+        is inconvenient. Mirrors ``SceneLocalRegistry.get``'s
+        ``expected_class: type[T]`` type-hint convention: the
+        ``isinstance`` check below lets the type checker narrow the
+        return value to ``T | None`` without ``# type: ignore``.
+
         Raises:
             ValueError: if *key* is present but the stored value is not
                 an instance of *expected_class*.
@@ -464,7 +466,6 @@ class GameState:
         return value
 
     def set(self, key: str, value: object) -> None:
-        """Store *value* under *key*."""
         self._data[key] = value
 
     def pop(self, key: str, type_: type[T]) -> T:
@@ -488,7 +489,6 @@ class GameState:
         self._data.pop(key, None)
 
     def has(self, key: str) -> bool:
-        """Return ``True`` if *key* is present in state."""
         return key in self._data
 
     def __contains__(self, key: object) -> bool:

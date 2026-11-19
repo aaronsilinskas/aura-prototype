@@ -35,7 +35,7 @@ class DriftNoiseLayer(Layer):
         self._offset %= self._buffer_count
 
     def sample(self, position: float, pixel_count: int) -> float:
-        """Return drift-noise value at ``position`` in ``[0.0, 1.0]``.
+        """Return drift-noise value at ``position``.
 
         Returns a value in ``[0.0, amplitude]``.
         """

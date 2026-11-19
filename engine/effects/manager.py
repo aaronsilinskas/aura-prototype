@@ -34,11 +34,11 @@ _DEFAULT_RESOLUTION = 16
 class VerbKeyError(ValueError):
     """A built effect keys ``clips`` or ``patterns`` on a verb it cannot use there.
 
-    Not a **Registry lookup error**: every name resolved, but
-    the key is not one of the verbs the effect can emit (``Effect.emitted_verbs``),
-    or it is a ``STOP`` clip. *effect_name* is qualified, *modality* is
-    ``"clips"`` or ``"patterns"``, *problem* says what is wrong with *verb*,
-    and *emitted* lists the verbs the effect can emit.
+    Not a **Registry lookup error**: every name resolved, but the key is not one
+    of the verbs the effect can emit (``Effect.emitted_verbs``), or it is a
+    ``STOP`` clip. *effect_name* is qualified, *modality* is ``"clips"`` or
+    ``"patterns"``, *problem* says what is wrong with *verb*, and *emitted*
+    lists the verbs the effect can emit.
     """
 
     def __init__(
@@ -436,7 +436,6 @@ class EffectManager(EffectControls, EffectAdmin):
         self._remove_effects_in_scope(set(scope.keys))
 
     def update(self, timer: Timer) -> None:
-        """Tick all active effects and deliver frames to every registered output."""
         # Deferred-stop: remove any effects whose receipt was marked stopped since
         # the last tick.  This runs before Pass 1 so that stop events and
         # clear_pixels fire before the new frame is rendered, and so that calling

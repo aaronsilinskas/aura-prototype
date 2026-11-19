@@ -163,9 +163,8 @@ class PhaseMachine:
     def take_enter_pending(self) -> bool:
         """Return ``True`` if the current phase's ``on_enter`` is pending, clearing the flag.
 
-        Combining the test and the clear into one
-        atomic call means the entry signal can be checked exactly once and
-        never left half-consumed.
+        Combining the test and the clear into one atomic call means the entry
+        signal can be checked exactly once and never left half-consumed.
         """
         was_pending = self._enter_pending
         self._enter_pending = False

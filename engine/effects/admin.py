@@ -13,12 +13,7 @@ if TYPE_CHECKING:
 
 
 class SceneView:
-    """What the Active scene namespace holds for one scene.
-
-    The scene's local effects (``None`` when it has none), its local sounds
-    as a bare ``{stem: path}`` map, and the names of the effect packs it
-    declares. Carried by every ``EffectAdmin`` step, which installs it.
-    """
+    """Carried by every ``EffectAdmin`` step, which installs it."""
 
     __slots__ = ("declared_packs", "local_effects", "local_sounds")
 

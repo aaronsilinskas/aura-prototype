@@ -241,11 +241,7 @@ class SceneRegistry:
         return sorted(self._scenes)
 
     def resolve_known(self, name: str) -> str:
-        """Return *name* if it is in the registry, else raise naming the known scenes.
-
-        The single known-scene check, so the check and its message have exactly
-        one implementation.
-        """
+        """Return *name* if it is in the registry, else raise naming the known scenes."""
         if name in self._scenes:
             return name
         raise ValueError(f"unknown scene {name!r}; known scenes: {', '.join(self.names())}")
@@ -304,6 +300,10 @@ class SceneManager(SceneControls):
     record a pending transition and the last call per tick wins.  The
     transition executes at the end of ``update()`` after the top
     ``SceneRun`` has dispatched all queued events.
+
+    Scene lookup delegates entirely to *scene_registry*:
+    ``activate_boot_scene`` and ``overlay`` call ``scene_registry.get(name)``,
+    which raises ``ValueError`` for unknown names.
 
     Starting a scene, as the boot scene or when a pending overlay applies,
     raises ``ValueError`` before it ticks if its rules leave out the owner
@@ -368,7 +368,6 @@ class SceneManager(SceneControls):
         self._stack: list[_SceneStackEntry] = []
         self._pending: tuple[Literal["overlay"], Scene] | tuple[Literal["pop"]] | None = None
 
-    # Not on SceneControls, so rules can't reach it.
     def activate_boot_scene(self, name: str) -> None:
         """Make *name* the active scene, at once, on Split for every scope.
 

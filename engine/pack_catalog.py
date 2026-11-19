@@ -89,8 +89,6 @@ class DuplicateNameError(PackScanError):
 
 
 class ReservedNameError(PackScanError):
-    """A pack is named ``scene``, the prefix reserved for scene-local names."""
-
     def __init__(self, path: str) -> None:
         self.path = path
         super().__init__(
@@ -121,8 +119,6 @@ class MalformedSceneError(PackScanError):
 
 
 class SceneDeclarationError(PackScanError):
-    """Scene *scene* declares *pack* in ``effect_packs`` or ``rule_packs`` and cannot have it."""
-
     def __init__(self, scene: str, pack: str, message: str) -> None:
         self.scene = scene
         self.pack = pack

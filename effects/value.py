@@ -18,10 +18,7 @@ def lerp(a: float, b: float, t: float) -> float:
 
 
 class ValueGenerator:
-    """Factory for ``DynamicValue`` callables that produce float values on demand.
-
-    Use ``resolve`` to evaluate either form uniformly.
-    """
+    """Factory for ``DynamicValue`` callables that produce float values on demand."""
 
     @staticmethod
     def resolve(value: DynamicValue) -> float:

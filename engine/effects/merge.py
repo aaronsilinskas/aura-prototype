@@ -67,7 +67,6 @@ class AdditiveMerge(MergeStrategy):
     def merge(
         self, buffers: list[PixelBuffer], receipts: list[EffectReceipt | None]
     ) -> PixelBuffer:
-        """Blend all (brightness-scaled) buffers per channel, clamped to 255, into buffers[0]."""
         dest = buffers[0]
         region = len(dest)
         dest_brightness = _brightness_of(receipts[0])
