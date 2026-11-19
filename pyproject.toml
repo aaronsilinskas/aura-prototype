@@ -73,6 +73,8 @@ allow-multiline = false  # mpy-cross rejects implicit concatenation even inside 
 [tool.importlinter]
 root_packages = ["effects", "engine", "magic", "packs", "hardware", "app", "scripts"]
 source_roots = ["."]
+# Lets a forbidden contract name a CircuitPython-only top-level module.
+include_external_packages = true
 
 [[tool.importlinter.contracts]]
 name = "engine must not import hardware or app"
@@ -108,9 +110,31 @@ allowed_importers = ["**.tests", "app.simulation"]
 [[tool.importlinter.contracts]]
 name = "the Scene boot must not import board-only hardware"
 type = "forbidden"
-# build_scene_boot also boots the Simulated device under CPython.
+# build_scene_boot also boots the Simulated device under CPython, so neither
+# board-only hardware nor the CircuitPython-only modules it imports may load.
 source_modules = ["app.scene_composition"]
-forbidden_modules = ["hardware.circuitpython"]
+forbidden_modules = [
+    "hardware.circuitpython",
+    "adafruit_drv2605",
+    "adafruit_is31fl3741",
+    "adafruit_lis3dh",
+    "adafruit_mmc56x3",
+    "adafruit_pioasm",
+    "adafruit_rfm69",
+    "audiobusio",
+    "audiocore",
+    "audiomixer",
+    "board",
+    "busio",
+    "digitalio",
+    "microcontroller",
+    "neopixel",
+    "pulseio",
+    "rp2pio",
+    "sdcardio",
+    "storage",
+    "usb_cdc",
+]
 
 [[tool.importlinter.contracts]]
 name = "device packages must not import host scripts"

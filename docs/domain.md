@@ -151,6 +151,10 @@ pre-commit hook on every commit):
   `hardware.simulated`; only `tests/` packages may. The **Ship list**
   (`scripts/ship_list.py`) leaves both directories out, so they never
   reach a device.
+- The Scene boot (`app.scene_composition`) must not import
+  `hardware.circuitpython` or the CircuitPython-only modules it uses
+  (`board`, `microcontroller`, the `adafruit_*` drivers and others), even
+  indirectly: it also boots the Simulated device under CPython.
 
 ---
 
