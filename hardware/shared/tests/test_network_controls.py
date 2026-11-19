@@ -56,9 +56,7 @@ def test_send_ir_on_an_unknown_emitter_raises_value_error_naming_it() -> None:
 
 
 class _RecordingRadioTransceiver(RadioTransceiver):
-    """Fake transceiver that just records send() calls -- isolates
-    HardwareNetworkControls.send_radio's delegation from RadioTransceiver's
-    own send() behaviour (covered separately in test_radio_transceiver.py)."""
+    """Fake transceiver that just records send() calls."""
 
     def __init__(self) -> None:
         self.sent: list[bytes] = []

@@ -13,7 +13,6 @@ from effects.effect import PixelBuffer
 
 
 def _make_strip(count: int) -> MagicMock:
-    """Return a mock NeoPixel strip with list-like pixel interface."""
     strip = MagicMock()
     strip.__len__ = MagicMock(return_value=count)
     return strip
@@ -32,7 +31,6 @@ def _make_segmented_output(
 
 
 def test_scopes_expose_all_configured_scope_keys() -> None:
-    """output.scopes has one ScopeValue per scope_pixels entry, exposing every key."""
     scope_pixels = {"personal": range(0, 10), "ambient": range(10, 30)}
     output, _ = _make_segmented_output(scope_pixels, count=30)
 
@@ -42,16 +40,13 @@ def test_scopes_expose_all_configured_scope_keys() -> None:
 
 
 def test_min_resolution_is_length_of_longest_segment() -> None:
-    """min_resolution is the length of the longest segment (not total strip count)."""
     scope_pixels = {"personal": range(0, 10), "ambient": range(10, 30)}
     output, _ = _make_segmented_output(scope_pixels, count=30)
 
-    # ambient is 20 pixels; personal is 10 pixels
     assert output.min_resolution == 20
 
 
 def test_single_full_strip_segment_min_resolution_equals_count() -> None:
-    """For a single segment covering the whole strip, min_resolution == count."""
     scope_pixels = {"personal": range(0, 10)}
     output, _ = _make_segmented_output(scope_pixels, count=10)
 
@@ -59,7 +54,6 @@ def test_single_full_strip_segment_min_resolution_equals_count() -> None:
 
 
 def test_create_buffer_for_segment_is_sized_to_segment_length() -> None:
-    """create_buffer returns a PixelBuffer sized to the segment, not the whole strip."""
     scope_pixels = {"personal": range(0, 10), "ambient": range(10, 30)}
     output, _ = _make_segmented_output(scope_pixels, count=30)
 
@@ -68,7 +62,6 @@ def test_create_buffer_for_segment_is_sized_to_segment_length() -> None:
 
 
 def test_create_buffer_for_larger_segment_returns_correct_size() -> None:
-    """create_buffer for the larger segment uses that segment's length."""
     scope_pixels = {"personal": range(0, 10), "ambient": range(10, 30)}
     output, _ = _make_segmented_output(scope_pixels, count=30)
 
@@ -77,7 +70,6 @@ def test_create_buffer_for_larger_segment_returns_correct_size() -> None:
 
 
 def test_update_pixels_writes_buffer_to_correct_strip_offsets() -> None:
-    """update_pixels writes each buffer pixel to the segment's offset in the strip."""
     scope_pixels = {"personal": range(0, 3), "ambient": range(3, 6)}
     output, strip = _make_segmented_output(scope_pixels, count=6)
 
@@ -92,7 +84,6 @@ def test_update_pixels_writes_buffer_to_correct_strip_offsets() -> None:
 
 
 def test_update_pixels_for_second_segment_writes_at_correct_offset() -> None:
-    """update_pixels for ambient segment writes at strip index 10, not 0."""
     scope_pixels = {"personal": range(0, 10), "ambient": range(10, 20)}
     output, strip = _make_segmented_output(scope_pixels, count=20)
 
@@ -106,7 +97,6 @@ def test_update_pixels_for_second_segment_writes_at_correct_offset() -> None:
 
 
 def test_update_pixels_does_not_write_outside_segment_range() -> None:
-    """update_pixels for personal segment does not write to ambient's indices."""
     scope_pixels = {"personal": range(0, 5), "ambient": range(5, 10)}
     output, strip = _make_segmented_output(scope_pixels, count=10)
 
@@ -114,12 +104,10 @@ def test_update_pixels_does_not_write_outside_segment_range() -> None:
     output.update_pixels("personal", buf)
 
     written_indices = {c.args[0] for c in strip.__setitem__.call_args_list}
-    # Must only write to 0..4 — not 5..9
     assert all(i < 5 for i in written_indices)
 
 
 def test_clear_pixels_zeros_the_named_segment() -> None:
-    """clear_pixels writes zero only to the segment's pixel range."""
     scope_pixels = {"personal": range(0, 3), "ambient": range(3, 6)}
     output, strip = _make_segmented_output(scope_pixels, count=6)
 
@@ -131,7 +119,6 @@ def test_clear_pixels_zeros_the_named_segment() -> None:
 
 
 def test_clear_pixels_for_second_segment_writes_at_correct_offset() -> None:
-    """clear_pixels for the ambient segment clears only indices in that range."""
     scope_pixels = {"personal": range(0, 5), "ambient": range(5, 10)}
     output, strip = _make_segmented_output(scope_pixels, count=10)
 
@@ -142,7 +129,6 @@ def test_clear_pixels_for_second_segment_writes_at_correct_offset() -> None:
 
 
 def test_flush_calls_show_on_the_strip() -> None:
-    """flush() calls show() on the strip."""
     scope_pixels = {"personal": range(0, 10)}
     output, strip = _make_segmented_output(scope_pixels, count=10)
 

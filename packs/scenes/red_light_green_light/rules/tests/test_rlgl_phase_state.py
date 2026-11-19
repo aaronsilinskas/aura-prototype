@@ -25,7 +25,6 @@ def test_new_phase_state_starts_at_level_one_with_no_music():
 
 
 def test_stop_music_stops_and_clears_the_receipt():
-    """stop_music() requests the effect stop and drops the reference."""
     phase_state = RlglPhaseState()
     receipt = EffectReceipt(1)
     phase_state.music_receipt = receipt
@@ -37,7 +36,6 @@ def test_stop_music_stops_and_clears_the_receipt():
 
 
 def test_stop_music_is_a_no_op_when_nothing_is_playing():
-    """stop_music() does nothing (and does not raise) when music_receipt is None."""
     phase_state = RlglPhaseState()
 
     phase_state.stop_music()

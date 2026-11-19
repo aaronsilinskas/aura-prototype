@@ -52,11 +52,7 @@ def _ffmpeg_available() -> bool:
 
 
 def _find_wav_files(root: Path) -> list[Path]:
-    """Return every ``*.wav`` file under any ``sounds/`` folder beneath *root*, sorted.
-
-    Recurses the distributed pack/scene layout so one call finds every
-    pack's and scene's ``sounds/`` folder, however deep *root* is.
-    """
+    """Return every ``*.wav`` file under any ``sounds/`` folder beneath *root*, sorted."""
     return sorted(root.rglob("sounds/*.wav"))
 
 

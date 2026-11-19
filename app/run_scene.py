@@ -1,9 +1,7 @@
 """Device-only scene entry point — brings hardware up and runs any standard-IR scene.
 
-Deploy-watch only: ``build_hardware`` imports board, busio, pulseio, digitalio.
-Imported on-device under CircuitPython, never exercised by CPython pytest. The
-board-free wiring lives in ``app.scene_composition`` so it can be
-unit-tested under CPython without the board imports this module pulls in.
+``build_hardware`` imports board, busio, pulseio and digitalio, so this module
+runs only on the device; the board-free boot lives in ``app.scene_composition``.
 """
 
 from __future__ import annotations
@@ -23,24 +21,8 @@ __all__ = ["run_scene"]
 def run_scene() -> None:
     """Bring hardware up via ``build_hardware`` and run the resolved boot scene forever.
 
-    Builds the hardware first, so that ``hw.storage`` reflects whatever SD
-    card is mounted, then boots through
-    :func:`app.scene_composition.build_scene_boot`, the board-free boot the
-    Simulated device shares, with the flash ``aura-boot.json`` as the
-    boot values and ``microcontroller.reset`` as the reset. That the card can
-    name the scene is why hardware always comes up before a scene name is
-    known to be valid.
-
-    Each tick runs the per-tick body that boot returns, the same tick the
-    Simulated device drives, then ``gc.collect()``. A live ``[hw]``-tagged
-    :class:`~engine.log.Logger` narrates hardware setup and the boot on
-    stdout.
-
-    This is the only scene path that names ``microcontroller.reset``. Not
-    unit-testable, since ``build_hardware`` needs CircuitPython board
-    imports; validate via deploy-watch. The boot itself is unit-tested in
-    ``app/tests/test_scene_composition.py`` and exercised by every Simulated
-    device.
+    Hardware comes up before the boot because the mounted SD card can name the
+    scene, so ``hw.storage`` must exist before a scene name is known to be valid.
     """
     hw_logger = Logger("[hw]")
     hw = build_hardware(load_device_config(), logger=hw_logger)

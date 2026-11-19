@@ -47,14 +47,12 @@ def _effect_with_sequence(verb: EffectVerb, sequence: list[int]) -> Effect:
 
 
 def test_construction_sets_min_resolution_to_one() -> None:
-    """Drv2605EffectOutput exposes min_resolution = 1 so it is compatible with all effects."""
     output, _ = _make_output()
 
     assert output.min_resolution == 1
 
 
 def test_construction_sets_scopes_to_all() -> None:
-    """Drv2605EffectOutput registers on Scope.ALL so it receives every game event."""
     output, _ = _make_output()
 
     assert output.scopes == [Scope.ALL]
@@ -203,7 +201,6 @@ def test_handle_event_ignores_unknown_verb() -> None:
 
 
 def test_sequence_longer_than_8_raises() -> None:
-    """Sequence with more than 8 steps raises ValueError — developer error."""
     output, _ = _make_output()
     effect = _effect_with_sequence(
         EffectVerb.START,
@@ -218,7 +215,6 @@ def test_sequence_longer_than_8_raises() -> None:
 
 
 def test_unknown_constant_in_sequence_raises() -> None:
-    """An unmapped constant in the sequence raises KeyError — developer error."""
     output, _ = _make_output()
     effect = _effect_with_sequence(EffectVerb.START, [999])
     receipt = _make_receipt()
@@ -244,7 +240,6 @@ def test_flush_calls_driver_stop_when_active_receipt_is_externally_stopped() -> 
 
 
 def test_flush_clears_receipt_after_stopping_driver() -> None:
-    """flush() clears the active receipt so a subsequent flush() does not call stop() again."""
     output, driver = _make_output()
     effect = _effect_with_sequence(EffectVerb.START, [HapticPattern.STRONG_CLICK])
     receipt = _make_receipt()

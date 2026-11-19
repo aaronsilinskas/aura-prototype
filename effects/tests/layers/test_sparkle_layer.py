@@ -30,7 +30,6 @@ def test_sparkle_layer_produces_nonzero_sample_after_spawn() -> None:
 
 
 def test_sparkle_layer_sample_peaks_at_sparkle_position() -> None:
-    # Use a single sparkle at a known position by driving it to guaranteed spawn
     layer = SparkleLayer(
         sparkle_count=1,
         spawn_delay_rate=0.0,  # zero delay → spawns immediately on first update
@@ -46,5 +45,4 @@ def test_sparkle_layer_sample_peaks_at_sparkle_position() -> None:
     samples = [layer.sample(i / pixel_count, pixel_count) for i in range(pixel_count)]
     peak = max(samples)
     assert peak > 0.0
-    # Falloff — sample far from the sparkle is lower than the peak
     assert min(samples) < peak

@@ -195,7 +195,6 @@ def test_build_returns_compiled_count(tmp_path: Path) -> None:
 def test_build_compiled_count_matches_py_files_processed(tmp_path: Path) -> None:
     source = tmp_path / "source"
     source.mkdir()
-    # Minimal tree: only effects/render.py
     (source / "effects").mkdir()
     (source / "effects" / "render.py").write_text("# render")
     staging = tmp_path / "build"

@@ -32,7 +32,6 @@ def test_first_update_seeds_gravity_and_reports_no_motion():
 
 
 def test_update_reports_motion_relative_to_seeded_gravity():
-    """Once gravity is seeded, a deviation from it reads as motion."""
     motion = RlglMotion()
     motion.update(_AT_REST, gravity_beta=0.0, motion_smoothing=1.0)
 
@@ -43,8 +42,6 @@ def test_update_reports_motion_relative_to_seeded_gravity():
 
 
 def test_reset_gravity_reseeds_from_the_next_sample_instead_of_carrying_over():
-    """After reset_gravity, the next update seeds gravity fresh from that
-    sample rather than carrying over the old orientation."""
     motion = RlglMotion()
     motion.update(_AT_REST, gravity_beta=0.0, motion_smoothing=1.0)
 
@@ -59,7 +56,6 @@ def test_reset_gravity_reseeds_from_the_next_sample_instead_of_carrying_over():
 
 
 def test_update_smooths_motion_with_the_given_factor():
-    """A lone spike is smoothed toward but not equal to the raw deviation."""
     motion = RlglMotion()
     motion.update(_AT_REST, gravity_beta=0.0, motion_smoothing=0.5)
 

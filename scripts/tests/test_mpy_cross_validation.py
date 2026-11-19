@@ -117,7 +117,6 @@ def test_version_error_message_includes_both_versions(tmp_path: Path) -> None:
 def test_missing_boot_out_txt_raises_version_error(tmp_path: Path) -> None:
     mount = tmp_path / "mount"
     mount.mkdir()
-    # No boot_out.txt
     with (
         patch("scripts.build.get_mpy_cross_major", return_value=10),
         pytest.raises(VersionError, match=r"boot_out\.txt"),

@@ -1,5 +1,3 @@
-"""Unit tests for packs.effects.basic.pulse."""
-
 from __future__ import annotations
 
 import pytest
@@ -30,7 +28,6 @@ def test_pulse_effect_name_is_basic_pulse() -> None:
 
 
 def test_pulse_stores_start_color_unscaled() -> None:
-    # start=0x7F3F1F stored raw (not brightness-scaled)
     effect = _build(
         options={
             "start_color": 0x7F3F1F,
@@ -47,7 +44,6 @@ def test_pulse_stores_start_color_unscaled() -> None:
 
 
 def test_pulse_stores_end_color_unscaled() -> None:
-    # end=0x7F3F1F stored raw (not brightness-scaled)
     effect = _build(
         options={
             "start_color": 0x000000,
@@ -62,7 +58,6 @@ def test_pulse_stores_end_color_unscaled() -> None:
 
 
 def test_pulse_ignores_brightness_option() -> None:
-    # brightness option is silently ignored; raw end_color is stored as-is
     effect_with_brightness = _build(
         options={
             "start_color": 0x000000,
@@ -82,7 +77,7 @@ def test_pulse_ignores_brightness_option() -> None:
     )
     effect_with_brightness.pixels.update(0.5)
     effect_without_brightness.pixels.update(0.5)
-    # both should produce full white since brightness is ignored
+
     assert _render(effect_with_brightness) == _render(effect_without_brightness)
     assert all(p == 0xFFFFFF for p in _render(effect_without_brightness))
 

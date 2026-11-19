@@ -7,8 +7,6 @@ from magic.tests.helpers import AuraFixture
 
 
 class UnpauseFixture(AuraFixture):
-    """Fixture for testing the UnpauseSpell."""
-
     def __init__(self) -> None:
         super().__init__()
         self.unpause_spell = UnpauseSpell()
@@ -30,22 +28,20 @@ def test_unpause_spell_removes_all_pauses(fixture: UnpauseFixture) -> None:
     assert pause_spell_2 in aura.spells
 
     aura.add_spell(fixture.unpause_spell)
-    aura.update(0.1)  # Trigger the UnpauseSpell
+    aura.update(0.1)
 
-    assert pause_spell_1 not in aura.spells  # PauseSpell should be removed
-    assert pause_spell_2 not in aura.spells  # PauseSpell should be removed
+    assert pause_spell_1 not in aura.spells
+    assert pause_spell_2 not in aura.spells
 
 
 def test_unpause_spell_no_pause_present(fixture: UnpauseFixture) -> None:
     aura = fixture.aura
 
-    # Ensure no PauseSpell is active
     assert all(not isinstance(spell, PauseSpell) for spell in aura.spells)
 
     aura.add_spell(fixture.unpause_spell)
-    aura.update(0.1)  # Trigger the UnpauseSpell
+    aura.update(0.1)
 
-    # Ensure no errors occur and no spells are removed
     assert all(not isinstance(spell, PauseSpell) for spell in aura.spells)
 
 
@@ -60,13 +56,11 @@ def test_unpause_spell_with_other_spells(fixture: UnpauseFixture) -> None:
     assert other_spell in aura.spells
 
     aura.add_spell(fixture.unpause_spell)
-    aura.update(0.1)  # Trigger the UnpauseSpell
+    aura.update(0.1)
 
-    assert pause_spell not in aura.spells  # PauseSpell should be removed
-    assert other_spell in aura.spells  # Other spell should remain
+    assert pause_spell not in aura.spells
+    assert other_spell in aura.spells
 
 
 def test_unpause_level(fixture: UnpauseFixture) -> None:
-    # UnpauseSpell has no level-dependent parameters, just verify it doesn't error
     fixture.unpause_spell.level = 2
-    # If we get here without exception, the test passes

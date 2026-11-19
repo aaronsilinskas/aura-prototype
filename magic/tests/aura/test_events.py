@@ -26,18 +26,13 @@ def fixture() -> EventsFixture:
     return EventsFixture()
 
 
-# AuraEvent Base Class Tests
-
-
 def test_aura_event_initialization():
-    """Test that AuraEvent initializes with is_canceled as False."""
     event = AuraEvent()
 
     assert event.is_canceled is False
 
 
 def test_aura_event_can_be_canceled():
-    """Test that an AuraEvent can be canceled."""
     event = AuraEvent()
 
     event.is_canceled = True
@@ -46,7 +41,6 @@ def test_aura_event_can_be_canceled():
 
 
 def test_aura_event_can_be_uncanceled():
-    """Test that a canceled AuraEvent can be uncanceled."""
     event = AuraEvent()
 
     event.is_canceled = True
@@ -55,11 +49,7 @@ def test_aura_event_can_be_uncanceled():
     assert event.is_canceled is False
 
 
-# DamageEvent Tests
-
-
 def test_damage_event_initialization():
-    """Test DamageEvent initialization with a positive amount."""
     event = DamageEvent(amount=50.0)
 
     assert event.amount == 50.0
@@ -67,21 +57,18 @@ def test_damage_event_initialization():
 
 
 def test_damage_event_negative_amount_clamped():
-    """Test that DamageEvent clamps negative amounts to zero."""
     event = DamageEvent(amount=-10.0)
 
     assert event.amount == 0.0
 
 
 def test_damage_event_zero_amount():
-    """Test DamageEvent with zero amount."""
     event = DamageEvent(amount=0.0)
 
     assert event.amount == 0.0
 
 
 def test_damage_event_can_be_modified():
-    """Test that DamageEvent amount can be modified after creation."""
     event = DamageEvent(amount=50.0)
 
     event.amount = 30.0
@@ -89,11 +76,7 @@ def test_damage_event_can_be_modified():
     assert event.amount == 30.0
 
 
-# EventListener Tests
-
-
 def test_event_listener_receives_damage_event(fixture):
-    """Test that event listener receives DamageEvent."""
     listener = fixture.listener
     event = DamageEvent(amount=10.0)
 
@@ -104,7 +87,6 @@ def test_event_listener_receives_damage_event(fixture):
 
 
 def test_event_listener_receives_heal_event(fixture):
-    """Test that event listener receives HealEvent."""
     listener = fixture.listener
     event = HealEvent(amount=15.0)
 
@@ -115,7 +97,6 @@ def test_event_listener_receives_heal_event(fixture):
 
 
 def test_event_listener_receives_add_spell_event(fixture):
-    """Test that event listener receives AddSpellEvent."""
     listener = fixture.listener
 
     fixture.aura.add_spell(fixture.dummy_spell)
@@ -127,10 +108,9 @@ def test_event_listener_receives_add_spell_event(fixture):
 
 
 def test_event_listener_receives_remove_spell_event(fixture):
-    """Test that event listener receives RemoveSpellEvent."""
     listener = fixture.listener
     fixture.aura.add_spell(fixture.dummy_spell)
-    listener.events.clear()  # Clear the AddSpellEvent
+    listener.events.clear()
 
     fixture.aura.remove_spell(fixture.dummy_spell)
 
@@ -141,7 +121,6 @@ def test_event_listener_receives_remove_spell_event(fixture):
 
 
 def test_event_listener_receives_cast_event(fixture):
-    """Test that event listener receives CastEvent."""
     listener = fixture.listener
 
     fixture.aura.cast_spell(fixture.dummy_spell)
@@ -153,7 +132,6 @@ def test_event_listener_receives_cast_event(fixture):
 
 
 def test_multiple_event_listeners(fixture):
-    """Test that multiple event listeners all receive events."""
     listener1 = MockEventListener()
     listener2 = MockEventListener()
     fixture.aura.event_listeners.append(listener1)
@@ -169,7 +147,6 @@ def test_multiple_event_listeners(fixture):
 
 
 def test_event_listener_not_called_if_event_canceled(fixture):
-    """Test that event listeners are not called if event is canceled."""
     listener = fixture.listener
 
     class CancelingSpell(Spell):
@@ -185,15 +162,13 @@ def test_event_listener_not_called_if_event_canceled(fixture):
     canceling_spell = CancelingSpell()
     fixture.aura.add_spell(canceling_spell)
 
-    listener.events.clear()  # Clear AddSpellEvent
+    listener.events.clear()
     fixture.aura.process_event(DamageEvent(amount=10.0))
 
-    # Event was canceled, so listener should not be notified
     assert len(listener.events) == 0
 
 
 def test_event_listener_receives_events_in_order(fixture):
-    """Test that event listeners receive multiple events in order."""
     listener = fixture.listener
 
     event1 = DamageEvent(amount=10.0)
@@ -211,19 +186,16 @@ def test_event_listener_receives_events_in_order(fixture):
 
 
 def test_event_listener_can_inspect_aura_state(fixture):
-    """Test that event listener can inspect aura state when event occurs."""
     initial_magic = fixture.aura.magic.value
     listener = fixture.listener
 
     fixture.aura.process_event(DamageEvent(amount=10.0))
 
-    # Listener receives aura reference and can check state
     aura_from_event = listener.events[0][0]
     assert aura_from_event.magic.value == initial_magic - 10.0
 
 
 def test_event_listeners_can_be_removed_from_list(fixture):
-    """Test that event listeners can be removed from the list."""
     listener = MockEventListener()
     fixture.aura.event_listeners.append(listener)
 

@@ -21,9 +21,8 @@ def test_flash_spell_is_active_during_duration(fixture: FlashFixture) -> None:
     aura = fixture.aura
 
     aura.add_spell(fixture.flash_spell)
-    aura.update(1.0)  # Update partway through duration
+    aura.update(1.0)
 
-    # Flash spell should still be active
     assert fixture.flash_spell in aura.spells
 
 
@@ -32,10 +31,8 @@ def test_flash_spell_expires_after_duration(fixture: FlashFixture) -> None:
 
     aura.add_spell(fixture.flash_spell)
 
-    # Simulate time passing until the spell expires
     aura.update(fixture.flash_duration + 1.0)
 
-    # The flash spell should be expired and removed
     assert fixture.flash_spell not in aura.spells
 
 

@@ -62,12 +62,7 @@ def parse_args(argv: "list[str] | None" = None) -> argparse.Namespace:
 
 
 def dispatch(args: argparse.Namespace, client: SdSyncClient, *, out: "IO[str]" = sys.stdout) -> int:
-    """Run *args*'s command against *client*, printing results to *out*; return the exit code.
-
-    Pure wiring: does not touch a transport itself, so it can be exercised
-    against any ``SdSyncClient`` -- including one driven by a fake in-memory
-    transport in tests, with no real device involved.
-    """
+    """Run *args*'s command against *client*, printing results to *out*; return the exit code."""
     if args.command == "list":
         for path, size in client.list_files(args.sd_subpath):
             print(f"{path}\t{size}", file=out)
@@ -79,7 +74,6 @@ def dispatch(args: argparse.Namespace, client: SdSyncClient, *, out: "IO[str]" =
 
 
 def build_client(transport: Transport) -> SdSyncClient:
-    """Construct the ``SdSyncClient`` this CLI drives over *transport*."""
     return SdSyncClient(transport)
 
 

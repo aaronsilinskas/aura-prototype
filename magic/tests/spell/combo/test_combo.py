@@ -12,8 +12,6 @@ def fixture() -> AuraFixture:
 
 
 class MockSpellCombination(SpellCombination):
-    """Mock implementation of SpellCombination for testing."""
-
     def __init__(self):
         self.check_called = False
         self.last_aura = None
@@ -26,7 +24,6 @@ class MockSpellCombination(SpellCombination):
 
 
 def test_add_combination():
-    """Test adding a spell combination to the manager."""
     combinations = SpellCombinations()
     mock_combo = MockSpellCombination()
 
@@ -37,7 +34,6 @@ def test_add_combination():
 
 
 def test_add_multiple_combinations():
-    """Test adding multiple spell combinations."""
     combinations = SpellCombinations()
     combo1 = MockSpellCombination()
     combo2 = MockSpellCombination()
@@ -54,7 +50,6 @@ def test_add_multiple_combinations():
 
 
 def test_remove_combination():
-    """Test removing a spell combination from the manager."""
     combinations = SpellCombinations()
     mock_combo = MockSpellCombination()
 
@@ -67,17 +62,14 @@ def test_remove_combination():
 
 
 def test_remove_nonexistent_combination():
-    """Test removing a combination that is not in the manager."""
     combinations = SpellCombinations()
 
-    # Should not raise an error
     combinations.remove(MockSpellCombination())
 
     assert len(combinations) == 0
 
 
 def test_remove_one_of_multiple():
-    """Test removing one combination when multiple are present."""
     combinations = SpellCombinations()
     combo1 = MockSpellCombination()
     combo2 = MockSpellCombination()
@@ -96,20 +88,17 @@ def test_remove_one_of_multiple():
 
 
 def test_len_empty():
-    """Test __len__ returns 0 for empty combinations."""
     combinations = SpellCombinations()
     assert len(combinations) == 0
 
 
 def test_iter_empty():
-    """Test iterating over empty combinations."""
     combinations = SpellCombinations()
     result = list(combinations)
     assert result == []
 
 
 def test_on_spell_event_with_add_spell_event(fixture: AuraFixture):
-    """Test that on_spell_event calls check on AddSpellEvent."""
     aura = fixture.aura
 
     combinations = SpellCombinations()
@@ -126,7 +115,6 @@ def test_on_spell_event_with_add_spell_event(fixture: AuraFixture):
 
 
 def test_on_spell_event_with_non_add_spell_event(fixture: AuraFixture):
-    """Test that on_spell_event does not call check on non-AddSpellEvent."""
     combinations = SpellCombinations()
     mock_combo = MockSpellCombination()
     combinations.add(mock_combo)
@@ -140,7 +128,6 @@ def test_on_spell_event_with_non_add_spell_event(fixture: AuraFixture):
 
 
 def test_on_spell_event_calls_all_combinations(fixture: AuraFixture):
-    """Test that on_spell_event calls check on all registered combinations."""
     combinations = SpellCombinations()
 
     combo1 = MockSpellCombination()
@@ -162,27 +149,22 @@ def test_on_spell_event_calls_all_combinations(fixture: AuraFixture):
 
 
 def test_on_spell_event_with_no_combinations(fixture: AuraFixture):
-    """Test that on_spell_event handles empty combinations list."""
     combinations = SpellCombinations()
     spell = IgniteSpell(damage_per_second=10.0, duration=5.0)
     event = AddSpellEvent(spell)
 
-    # Should not raise an error
     combinations.on_spell_event(fixture.aura, event)
 
 
 def test_as_event_listener_integration(fixture: AuraFixture):
-    """Test SpellCombinations as an event listener on an Aura."""
     aura = fixture.aura
 
     combinations = SpellCombinations()
     mock_combo = MockSpellCombination()
     combinations.add(mock_combo)
 
-    # Register as event listener
     aura.event_listeners.append(combinations)
 
-    # Add a spell, which should trigger the combination check
     spell = IgniteSpell(damage_per_second=10.0, duration=5.0)
     aura.add_spell(spell)
 

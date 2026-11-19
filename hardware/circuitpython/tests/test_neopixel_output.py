@@ -14,7 +14,6 @@ from effects.effect import PixelBuffer
 
 
 def _make_strip(count: int) -> MagicMock:
-    """Return a mock NeoPixel strip with a list-like pixel interface."""
     strip = MagicMock()
     strip.__len__ = MagicMock(return_value=count)
     return strip
@@ -37,7 +36,6 @@ def test_scopes_contains_the_configured_scope_key() -> None:
 
 
 def test_scope_is_a_leaf_with_one_routing_key() -> None:
-    """The scope ScopeValue has exactly one routing key so effects target one strip."""
     output, _ = _make_output()
     assert len(output.scopes[0].keys) == 1
 
@@ -54,7 +52,6 @@ def test_create_buffer_returns_pixel_buffer_sized_to_strip_count() -> None:
 
 
 def test_update_pixels_writes_the_single_buffer_verbatim() -> None:
-    """update_pixels writes the single already-composed buffer verbatim (no picking/scaling)."""
     output, strip = _make_output(count=2)
 
     buf = PixelBuffer(2)
@@ -67,7 +64,6 @@ def test_update_pixels_writes_the_single_buffer_verbatim() -> None:
 
 
 def test_update_pixels_routes_a_non_zero_start_segment_to_offset_indices() -> None:
-    """A segment starting past 0 writes at strip[start + j], not strip[j]."""
     from hardware.circuitpython.neopixel_output import NeoPixelEffectOutput
 
     strip = _make_strip(5)
@@ -84,7 +80,6 @@ def test_update_pixels_routes_a_non_zero_start_segment_to_offset_indices() -> No
 
 
 def test_update_pixels_on_one_scope_leaves_another_scope_segment_untouched() -> None:
-    """Two scopes share one strip; writing scope A must not touch scope B's indices."""
     from hardware.circuitpython.neopixel_output import NeoPixelEffectOutput
 
     strip = _make_strip(5)
@@ -96,7 +91,6 @@ def test_update_pixels_on_one_scope_leaves_another_scope_segment_untouched() -> 
 
     output.update_pixels("personal", buf)
 
-    # Only scope A's indices (0, 1) were written; scope B's (2, 3, 4) were left alone.
     written = {c.args[0] for c in strip.__setitem__.call_args_list}
     assert written == {0, 1}
 

@@ -201,7 +201,6 @@ def test_apply_codec_makes_every_emitter_send_in_the_new_wire_frame() -> None:
 
 
 def test_apply_codec_makes_the_readers_decode_the_new_wire_frame() -> None:
-    """A Tag frame only decodes once the Tag decoder is installed."""
     payload = bytearray([0x10])
     transceiver = _transceiver_over([ReplayingPulseReader(tag_pulses(payload))])
 

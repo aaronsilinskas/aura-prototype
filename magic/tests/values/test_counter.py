@@ -45,7 +45,7 @@ def test_increment_beyond_max():
     counter.increment()
     is_max = counter.increment()
 
-    assert counter.count == 3  # Should stay at max, not exceed
+    assert counter.count == 3
     assert is_max is True
     assert counter.is_max is True
 
@@ -58,7 +58,7 @@ def test_increment_multiple_beyond_max():
     counter.increment()
     counter.increment()
 
-    assert counter.count == 2  # Should be clamped at max
+    assert counter.count == 2
 
 
 def test_reset():
@@ -115,7 +115,7 @@ def test_max_of_zero():
     counter = Counter(max=0)
 
     assert counter.count == 0
-    assert counter.is_max is True  # Already at max
+    assert counter.is_max is True
 
 
 def test_max_of_zero_increment():

@@ -97,7 +97,6 @@ def test_padded_returns_zero_inside_trailing_padding_zone() -> None:
 
 
 def test_padded_delegates_to_inner_shape_inside_active_span() -> None:
-    # Inner shape is a flat 0.6; any position in the active region should return 0.6.
     shape = Shape.padded(0.25, lambda _: 0.6)
 
     assert shape(0.5) == pytest.approx(0.6)

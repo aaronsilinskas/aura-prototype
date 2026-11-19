@@ -6,17 +6,12 @@ the SD-sync protocol -- and their device names alone can't tell them apart.
 :func:`find_data_port` asks
 ``adafruit_board_toolkit.circuitpython_serial.data_comports()``, which
 distinguishes the two CDC interfaces (including a macOS composite-CDC
-workaround), mirroring how :func:`scripts.deploy_watch.find_console_port`
-resolves the console channel.
+workaround).
 
-:class:`SerialTransport` is the live SD-sync ``Transport`` adapter for that
-port: it reuses ``deploy_watch``'s ``SerialHandle``/``open_serial_with_retry``
-to open the connection, then frames protocol lines the same way
-:class:`~hardware.circuitpython.usb_cdc_transport.UsbCdcTransport` does on the
-device side -- a trailing newline delimiter, since ``encode_frame``'s base64
-output never contains one. Unlike ``deploy_watch``'s own
-:func:`~scripts.deploy_watch.iter_serial_lines`, there is no UTF-8 decoding
-here: SD-sync frames are protocol bytes, not REPL text.
+:class:`SerialTransport` frames protocol lines with a trailing newline, the
+same framing the device side uses, since ``encode_frame``'s base64 output
+never contains one. It decodes nothing: SD-sync frames are protocol bytes,
+not REPL text.
 """
 
 from collections.abc import Sequence
@@ -64,23 +59,12 @@ def select_data_port(
 
 
 def find_data_port(*, explicit_port: "str | None" = None) -> str:
-    """Resolve the data-channel serial port, auto-detecting via ``data_comports()``.
-
-    See :func:`select_data_port` for the selection rule; this wraps it with
-    the live comport scan (not itself unit-tested -- it is a thin call into
-    ``adafruit_board_toolkit``).
-    """
+    """Resolve the data-channel serial port, auto-detecting via ``data_comports()``."""
     return select_data_port(circuitpython_serial.data_comports(), explicit_port=explicit_port)
 
 
 class SerialTransport(Transport):
-    """Live SD-sync ``Transport`` framing protocol lines over a host serial port.
-
-    Args:
-        handle: The open connection, from ``deploy_watch``'s
-            ``SerialHandle``/``open_serial_with_retry`` (see
-            :func:`open_serial_transport`).
-    """
+    """Live SD-sync ``Transport`` framing protocol lines over a host serial port."""
 
     def __init__(self, handle: SerialHandle) -> None:
         self._handle = handle
@@ -93,9 +77,7 @@ class SerialTransport(Transport):
     def recv(self) -> bytes:
         """Return the next newline-terminated line, with the terminator stripped.
 
-        Reads in ``_READ_SIZE``-byte pieces, buffering across calls, until a
-        newline appears -- mirrors ``UsbCdcTransport.recv``'s framing so both
-        ends of the SD-sync link agree on message boundaries.
+        Bytes read past the newline are kept for the next call.
         """
         while b"\n" not in self._buffered:
             chunk = self._handle.ser.read(_READ_SIZE)

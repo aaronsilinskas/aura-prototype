@@ -72,9 +72,9 @@ def test_pulse_effect_no_listener_call_during_off() -> None:
 
 
 def test_pulse_effect_peak_with_no_listeners_is_silent() -> None:
-    effect = _build()  # no listeners
+    effect = _build()
+
     effect.pixels.update(0.6)  # crosses the end of brighten
-    # Should not raise
 
 
 def test_pulse_effect_emits_peak_once_on_the_second_cycle_peak() -> None:

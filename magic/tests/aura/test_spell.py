@@ -19,8 +19,6 @@ def test_spell_name_normalization(fixture: AuraFixture) -> None:
 
 
 class LifecycleTrackingSpell(Spell):
-    """Tracks spell updates for testing purposes."""
-
     def __init__(self) -> None:
         super().__init__(tags=[])
         self.started = False

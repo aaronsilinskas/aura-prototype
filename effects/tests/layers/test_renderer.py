@@ -64,6 +64,3 @@ def test_layer_renderer_update_passes_elapsed_to_layer() -> None:
 
     assert layer.update_count == 1
     assert abs(layer.last_elapsed - 0.25) < 1e-9
-
-
-# (name is now on Effect, not on LayerRenderer)

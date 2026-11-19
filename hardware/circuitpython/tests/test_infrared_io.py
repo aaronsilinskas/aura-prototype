@@ -104,8 +104,6 @@ def test_buffer_full_on_poll_does_not_increment_when_buffer_empty():
 
 
 def test_buffer_full_on_poll_counts_once_per_full_read_not_per_drain():
-    """Only the read that observes maxlen counts; later reads of the same
-    drain see a shorter buffer and do not increment further."""
     reader = PulseInReader(fake_pulse_in([500, 1000], maxlen=2))
 
     reader.read_pulse()  # buffer was at maxlen (2) -> counts
