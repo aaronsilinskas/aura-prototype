@@ -46,13 +46,13 @@ def _effect_with_sequence(verb: EffectVerb, sequence: list[int]) -> Effect:
     )
 
 
-def test_construction_sets_min_resolution_to_one() -> None:
+def test_min_resolution_is_one_so_the_output_suits_every_effect() -> None:
     output, _ = _make_output()
 
     assert output.min_resolution == 1
 
 
-def test_construction_sets_scopes_to_all() -> None:
+def test_output_registers_on_scope_all_to_receive_every_game_event() -> None:
     output, _ = _make_output()
 
     assert output.scopes == [Scope.ALL]
@@ -239,7 +239,7 @@ def test_flush_calls_driver_stop_when_active_receipt_is_externally_stopped() -> 
     assert driver.stop_calls == 1
 
 
-def test_flush_clears_receipt_after_stopping_driver() -> None:
+def test_a_second_flush_after_the_receipt_stops_does_not_stop_the_driver_again() -> None:
     output, driver = _make_output()
     effect = _effect_with_sequence(EffectVerb.START, [HapticPattern.STRONG_CLICK])
     receipt = _make_receipt()

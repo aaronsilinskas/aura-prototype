@@ -50,7 +50,9 @@ class _RecordingMatrix:
         self.shown = True
 
 
-def test_offset_table_places_red_at_the_base_register_for_a_bank0_even_column() -> None:
+def test_offset_table_places_red_at_the_base_register_for_an_even_column_below_the_bank_split() -> (
+    None
+):
     table = build_offset_table([0], cols=13)
 
     x = 2
@@ -59,7 +61,7 @@ def test_offset_table_places_red_at_the_base_register_for_a_bank0_even_column() 
     assert (b_off, g_off, r_off) == (8, 7, 6)
 
 
-def test_offset_table_swaps_red_and_blue_registers_for_a_bank0_odd_column() -> None:
+def test_offset_table_swaps_red_and_blue_registers_for_an_odd_column_below_the_bank_split() -> None:
     table = build_offset_table([0], cols=13)
 
     x = 3

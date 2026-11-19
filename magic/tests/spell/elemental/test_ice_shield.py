@@ -37,7 +37,7 @@ def shield_fixture() -> IceShieldFixture:
     return IceShieldFixture()
 
 
-def test_ice_shield_resistance(shield_fixture: IceShieldFixture) -> None:
+def test_ice_shield_reduces_each_hit_by_its_reduction(shield_fixture: IceShieldFixture) -> None:
     aura = shield_fixture.aura
 
     aura.add_spell(shield_fixture.shield_spell)
@@ -50,7 +50,7 @@ def test_ice_shield_resistance(shield_fixture: IceShieldFixture) -> None:
     )
 
 
-def test_ice_shield_expiry_by_hits(shield_fixture: IceShieldFixture) -> None:
+def test_ice_shield_expires_after_max_hits(shield_fixture: IceShieldFixture) -> None:
     aura = shield_fixture.aura
 
     aura.add_spell(shield_fixture.shield_spell)
@@ -65,19 +65,18 @@ def test_ice_shield_expiry_by_hits(shield_fixture: IceShieldFixture) -> None:
     assert shield_fixture.shield_spell not in aura.spells, "Ice Shield should expire after max_hits"
 
 
-def test_ice_shield_removed_after_expiry(
+def test_ice_shield_expires_after_its_duration(
     shield_fixture: IceShieldFixture,
 ) -> None:
     aura = shield_fixture.aura
 
     aura.add_spell(shield_fixture.shield_spell)
-
     aura.update(shield_fixture.duration + 1)
 
     assert shield_fixture.shield_spell not in aura.spells, "Ice Shield should expire after duration"
 
 
-def test_ice_shield_level(shield_fixture: IceShieldFixture) -> None:
+def test_ice_shield_level_scales_reduction(shield_fixture: IceShieldFixture) -> None:
     level = 2
     original_reduction = shield_fixture.damage_reduction
 
@@ -104,7 +103,7 @@ def test_ice_shield_casts_freeze_on_max_hits(shield_fixture: IceShieldFixture) -
     )
 
 
-def test_ice_shield_no_freeze_before_max_hits(shield_fixture: IceShieldFixture) -> None:
+def test_ice_shield_casts_no_freeze_before_max_hits(shield_fixture: IceShieldFixture) -> None:
     aura = shield_fixture.aura
 
     aura.add_spell(shield_fixture.shield_spell)
@@ -121,11 +120,10 @@ def test_ice_shield_no_freeze_before_max_hits(shield_fixture: IceShieldFixture) 
     )
 
 
-def test_ice_shield_no_freeze_after_expiry(shield_fixture: IceShieldFixture) -> None:
+def test_ice_shield_casts_no_freeze_after_it_expires(shield_fixture: IceShieldFixture) -> None:
     aura = shield_fixture.aura
 
     aura.add_spell(shield_fixture.shield_spell)
-
     aura.update(shield_fixture.duration + 1)
 
     for _ in range(shield_fixture.max_hits):

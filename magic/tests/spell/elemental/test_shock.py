@@ -51,13 +51,12 @@ def test_shock_expires_after_duration(fixture: ShockFixture) -> None:
     aura = fixture.aura
 
     aura.add_spell(fixture.shock_spell)
-
     aura.update(fixture.duration + 1)
 
     assert fixture.shock_spell not in aura.spells
 
 
-def test_shock_level(fixture: ShockFixture) -> None:
+def test_shock_level_scales_heal_reduction(fixture: ShockFixture) -> None:
     level = 2
     original_percentage = fixture.heal_reduction_percentage
 

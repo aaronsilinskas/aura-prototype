@@ -29,7 +29,7 @@ def shield_fixture() -> EarthShieldFixture:
     return EarthShieldFixture()
 
 
-def test_earth_shield_resistance(shield_fixture: EarthShieldFixture) -> None:
+def test_earth_shield_reduces_each_hit_by_its_reduction(shield_fixture: EarthShieldFixture) -> None:
     aura = shield_fixture.aura
 
     aura.add_spell(shield_fixture.shield_spell)
@@ -42,7 +42,7 @@ def test_earth_shield_resistance(shield_fixture: EarthShieldFixture) -> None:
     )
 
 
-def test_earth_shield_expiry_by_hits(shield_fixture: EarthShieldFixture) -> None:
+def test_earth_shield_expires_after_max_hits(shield_fixture: EarthShieldFixture) -> None:
     aura = shield_fixture.aura
 
     aura.add_spell(shield_fixture.shield_spell)
@@ -59,13 +59,12 @@ def test_earth_shield_expiry_by_hits(shield_fixture: EarthShieldFixture) -> None
     )
 
 
-def test_earth_shield_removed_after_expiry(
+def test_earth_shield_expires_after_its_duration(
     shield_fixture: EarthShieldFixture,
 ) -> None:
     aura = shield_fixture.aura
 
     aura.add_spell(shield_fixture.shield_spell)
-
     aura.update(shield_fixture.duration + 1)
 
     assert shield_fixture.shield_spell not in aura.spells, (
@@ -73,7 +72,9 @@ def test_earth_shield_removed_after_expiry(
     )
 
 
-def test_earth_shield_level(shield_fixture: EarthShieldFixture) -> None:
+def test_earth_shield_level_scales_reduction(
+    shield_fixture: EarthShieldFixture,
+) -> None:
     level = 2
     original_reduction = shield_fixture.damage_reduction
 

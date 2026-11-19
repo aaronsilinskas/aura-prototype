@@ -17,7 +17,9 @@ def rock_fixture() -> RockFixture:
     return RockFixture()
 
 
-def test_rock_instant_damage(rock_fixture: RockFixture) -> None:
+def test_rock_deals_its_damage_on_the_next_update_then_leaves_the_aura(
+    rock_fixture: RockFixture,
+) -> None:
     aura = rock_fixture.aura
 
     aura.add_spell(rock_fixture.rock_spell)
@@ -27,7 +29,7 @@ def test_rock_instant_damage(rock_fixture: RockFixture) -> None:
     assert rock_fixture.rock_spell not in aura.spells
 
 
-def test_rock_multiple_hits(rock_fixture: RockFixture) -> None:
+def test_two_rock_spells_each_deal_their_damage(rock_fixture: RockFixture) -> None:
     aura = rock_fixture.aura
 
     rock_spell_1 = RockSpell(damage=rock_fixture.rock_damage)
@@ -41,7 +43,7 @@ def test_rock_multiple_hits(rock_fixture: RockFixture) -> None:
     assert len(aura.spells) == 0
 
 
-def test_rock_level(rock_fixture: RockFixture) -> None:
+def test_rock_level_scales_damage(rock_fixture: RockFixture) -> None:
     level = 2
     original_damage = rock_fixture.rock_damage
 

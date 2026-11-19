@@ -11,7 +11,7 @@ def mock_callback(mocker: MockerFixture) -> Mock:
     return mocker.Mock()
 
 
-def test_initialization_default():
+def test_a_default_value_starts_at_zero_with_no_modifiers():
     val = ValueWithModifiers()
 
     assert val.base == 0.0
@@ -19,20 +19,20 @@ def test_initialization_default():
     assert len(val.modifiers) == 0
 
 
-def test_initialization_with_base_value():
+def test_a_value_starts_at_its_base_value():
     val = ValueWithModifiers(base_value=42.0)
 
     assert val.base == 42.0
     assert val.value == 42.0
 
 
-def test_initialization_with_callback(mock_callback):
+def test_constructing_a_value_does_not_call_its_callback(mock_callback):
     ValueWithModifiers(base_value=10.0, value_changed=mock_callback)
 
     mock_callback.assert_not_called()
 
 
-def test_base_setter_updates_value():
+def test_setting_the_base_updates_the_value():
     val = ValueWithModifiers(base_value=10.0)
 
     val.base = 20.0
@@ -41,7 +41,7 @@ def test_base_setter_updates_value():
     assert val.value == 20.0
 
 
-def test_base_setter_triggers_callback(mock_callback):
+def test_setting_the_base_calls_the_callback(mock_callback):
     val = ValueWithModifiers(base_value=10.0, value_changed=mock_callback)
 
     val.base = 20.0
@@ -49,7 +49,7 @@ def test_base_setter_triggers_callback(mock_callback):
     mock_callback.assert_called_once()
 
 
-def test_value_with_single_modifier():
+def test_value_applies_a_single_modifier():
     val = ValueWithModifiers(base_value=10.0)
     modifier = ValueModifier(multiplier=2.0, duration=1.0)
 
@@ -58,7 +58,7 @@ def test_value_with_single_modifier():
     assert val.value == 20.0
 
 
-def test_value_with_multiple_modifiers():
+def test_value_applies_every_modifier():
     val = ValueWithModifiers(base_value=10.0)
     modifier1 = ValueModifier(multiplier=2.0, duration=1.0)
     modifier2 = ValueModifier(multiplier=1.5, duration=1.0)
@@ -69,7 +69,7 @@ def test_value_with_multiple_modifiers():
     assert val.value == 30.0  # 10 * 2 * 1.5
 
 
-def test_adding_modifier_triggers_callback(mock_callback):
+def test_adding_a_modifier_calls_the_callback(mock_callback):
     val = ValueWithModifiers(base_value=10.0, value_changed=mock_callback)
     modifier = ValueModifier(multiplier=2.0, duration=1.0)
 
@@ -78,7 +78,7 @@ def test_adding_modifier_triggers_callback(mock_callback):
     mock_callback.assert_called_once()
 
 
-def test_removing_modifier_triggers_callback(mock_callback):
+def test_removing_a_modifier_calls_the_callback(mock_callback):
     val = ValueWithModifiers(base_value=10.0, value_changed=mock_callback)
     modifier = ValueModifier(multiplier=2.0, duration=1.0)
 
@@ -90,7 +90,7 @@ def test_removing_modifier_triggers_callback(mock_callback):
     mock_callback.assert_called_once()
 
 
-def test_removing_modifier_updates_value():
+def test_removing_a_modifier_restores_the_base_value():
     val = ValueWithModifiers(base_value=10.0)
     modifier = ValueModifier(multiplier=2.0, duration=1.0)
 
@@ -101,7 +101,7 @@ def test_removing_modifier_updates_value():
     assert val.value == 10.0
 
 
-def test_update_with_no_expiring_modifiers():
+def test_update_before_a_modifier_expires_keeps_the_value():
     val = ValueWithModifiers(base_value=10.0)
     modifier = ValueModifier(multiplier=2.0, duration=1.0)
 
@@ -113,7 +113,7 @@ def test_update_with_no_expiring_modifiers():
     assert val.value == initial_value
 
 
-def test_update_with_expiring_modifier(mock_callback):
+def test_update_drops_an_expired_modifier_and_calls_the_callback(mock_callback):
     val = ValueWithModifiers(base_value=10.0, value_changed=mock_callback)
     modifier = ValueModifier(multiplier=2.0, duration=1.0)
 
@@ -126,7 +126,7 @@ def test_update_with_expiring_modifier(mock_callback):
     mock_callback.assert_called_once()
 
 
-def test_update_propagates_to_modifiers():
+def test_update_expires_a_modifier_once_its_duration_has_elapsed():
     val = ValueWithModifiers(base_value=10.0)
     modifier = ValueModifier(multiplier=2.0, duration=1.0)
 
@@ -140,7 +140,7 @@ def test_update_propagates_to_modifiers():
     assert len(val.modifiers) == 0
 
 
-def test_base_change_with_active_modifiers():
+def test_changing_the_base_reapplies_active_modifiers():
     val = ValueWithModifiers(base_value=10.0)
     modifier = ValueModifier(multiplier=2.0, duration=1.0)
 
@@ -152,7 +152,7 @@ def test_base_change_with_active_modifiers():
     assert val.value == 30.0  # 15 * 2
 
 
-def test_zero_base_value_with_modifiers():
+def test_modifiers_leave_a_zero_base_at_zero():
     val = ValueWithModifiers(base_value=0.0)
     modifier = ValueModifier(multiplier=5.0, duration=1.0)
 
@@ -161,7 +161,7 @@ def test_zero_base_value_with_modifiers():
     assert val.value == 0.0  # 0 * 5 = 0
 
 
-def test_negative_base_value():
+def test_modifiers_scale_a_negative_base():
     val = ValueWithModifiers(base_value=-10.0)
     modifier = ValueModifier(multiplier=2.0, duration=1.0)
 
@@ -170,7 +170,7 @@ def test_negative_base_value():
     assert val.value == -20.0
 
 
-def test_modifier_with_fractional_multiplier():
+def test_a_fractional_multiplier_reduces_the_value():
     val = ValueWithModifiers(base_value=10.0)
     modifier = ValueModifier(multiplier=0.5, duration=1.0)
 
@@ -179,7 +179,7 @@ def test_modifier_with_fractional_multiplier():
     assert val.value == 5.0
 
 
-def test_multiple_updates_with_expiring_modifiers(mock_callback):
+def test_modifiers_expiring_at_different_times_each_drop_out_in_turn(mock_callback):
     val = ValueWithModifiers(base_value=10.0, value_changed=mock_callback)
     modifier1 = ValueModifier(multiplier=2.0, duration=1.0)
     modifier2 = ValueModifier(multiplier=1.5, duration=2.0)
@@ -201,7 +201,7 @@ def test_multiple_updates_with_expiring_modifiers(mock_callback):
     assert mock_callback.call_count == 2
 
 
-def test_callback_none_doesnt_error():
+def test_a_value_without_a_callback_supports_every_operation():
     val = ValueWithModifiers(base_value=10.0, value_changed=None)
     modifier = ValueModifier(multiplier=2.0, duration=0.5)
 

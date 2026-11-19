@@ -21,7 +21,7 @@ def pause_fixture() -> PauseFixture:
     return PauseFixture()
 
 
-def test_pause_spell_initialization():
+def test_new_pause_spell_has_its_duration_unelapsed_and_is_named_pause():
     pause_spell = PauseSpell(duration=3.0)
 
     assert pause_spell.duration.length == 3.0
@@ -71,7 +71,7 @@ def test_pause_spell_does_not_expire_before_duration(pause_fixture: PauseFixture
     assert pause_fixture.pause_spell in aura.spells
 
 
-def test_pause_level(pause_fixture: PauseFixture):
+def test_pause_level_scales_duration(pause_fixture: PauseFixture):
     level = 2
     original_duration = pause_fixture.pause_duration
     pause_spell = PauseSpell(duration=original_duration)
@@ -94,7 +94,7 @@ def test_pause_spell_prevents_other_spell_casts(pause_fixture: PauseFixture):
     assert len(pause_fixture.event_listener.events) == 0
 
 
-def test_pause_spell_cast_not_intercepted_when_no_pause_active(
+def test_cast_reaches_listeners_when_no_pause_is_active(
     pause_fixture: PauseFixture,
 ):
     aura = pause_fixture.aura
@@ -191,7 +191,7 @@ def test_pause_spell_does_not_add_when_already_paused(pause_fixture: PauseFixtur
     assert len(aura.spells.get_by_class(PauseSpell)) == initial_pause_count
 
 
-def test_pause_spell_zero_duration():
+def test_pause_spell_with_zero_duration_starts_expired():
     pause_spell = PauseSpell(duration=0.0)
 
     assert pause_spell.duration.length == 0.0

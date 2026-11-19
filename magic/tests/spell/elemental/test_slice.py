@@ -17,7 +17,9 @@ def slice_fixture() -> SliceFixture:
     return SliceFixture()
 
 
-def test_slice_instant_damage(slice_fixture: SliceFixture) -> None:
+def test_slice_deals_its_damage_on_the_next_update_then_leaves_the_aura(
+    slice_fixture: SliceFixture,
+) -> None:
     aura = slice_fixture.aura
 
     aura.add_spell(slice_fixture.slice_spell)
@@ -27,7 +29,7 @@ def test_slice_instant_damage(slice_fixture: SliceFixture) -> None:
     assert slice_fixture.slice_spell not in aura.spells
 
 
-def test_slice_multiple_hits(slice_fixture: SliceFixture) -> None:
+def test_two_slice_spells_each_deal_their_damage(slice_fixture: SliceFixture) -> None:
     aura = slice_fixture.aura
 
     slice_spell_1 = SliceSpell(damage=slice_fixture.slice_damage)
@@ -41,7 +43,7 @@ def test_slice_multiple_hits(slice_fixture: SliceFixture) -> None:
     assert len(aura.spells) == 0
 
 
-def test_slice_level(slice_fixture: SliceFixture) -> None:
+def test_slice_level_scales_damage(slice_fixture: SliceFixture) -> None:
     level = 2
     original_damage = slice_fixture.slice_damage
 

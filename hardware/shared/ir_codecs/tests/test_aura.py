@@ -213,11 +213,11 @@ def test_error_margin_reflects_worst_case_deviation_in_frame():
     decoder = AuraInfraredDecoder()
 
     pulses = list(encoder.encode(b"\xab\xcd"))
-    nudge = 50  # µs — shift a data bit space slightly
-    pulses[3] += nudge  # index 3 = first data bit space
+    nudge_us = 50
+    pulses[3] += nudge_us  # index 3 = first data bit space
 
     _feed_pulses(decoder, pulses)
-    assert decoder.last_error_margin == nudge
+    assert decoder.last_error_margin == nudge_us
 
 
 def test_error_margin_is_replaced_by_subsequent_packet():

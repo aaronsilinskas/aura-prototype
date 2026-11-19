@@ -42,7 +42,7 @@ def test_update_to_expiration():
     assert duration.is_expired is True
 
 
-def test_update_beyond_expiration():
+def test_updating_past_expiration_leaves_no_negative_remaining():
     duration = Duration(length=10.0)
     is_expired = duration.update(15.0)
 
@@ -66,7 +66,7 @@ def test_reset():
     assert duration.is_expired is False
 
 
-def test_zero_length_duration():
+def test_a_zero_length_duration_starts_expired():
     duration = Duration(length=0.0)
 
     assert duration.length == 0.0
@@ -82,7 +82,7 @@ def test_zero_length_duration_after_update():
     assert duration.remaining == 0.0
 
 
-def test_small_increments():
+def test_small_increments_expire_once_their_sum_passes_the_length():
     duration = Duration(length=1.0)
 
     for _ in range(9):
@@ -116,7 +116,7 @@ def test_length_setter():
     assert duration.remaining == 20.0
 
 
-def test_length_setter_changes_remaining():
+def test_lengthening_a_duration_adds_to_its_remaining_time():
     duration = Duration(length=10.0)
     duration.update(5.0)
     assert duration.elapsed == 5.0
@@ -127,7 +127,7 @@ def test_length_setter_changes_remaining():
     assert duration.is_expired is False
 
 
-def test_length_setter_can_cause_expiration():
+def test_shortening_length_below_elapsed_expires_the_duration():
     duration = Duration(length=10.0)
     duration.update(5.0)
     assert duration.is_expired is False
@@ -137,7 +137,7 @@ def test_length_setter_can_cause_expiration():
     assert duration.is_expired is True
 
 
-def test_length_setter_negative_remaining():
+def test_shortening_length_below_elapsed_leaves_no_negative_remaining():
     duration = Duration(length=10.0)
     duration.update(8.0)
 

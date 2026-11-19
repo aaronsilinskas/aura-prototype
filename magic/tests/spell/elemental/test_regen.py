@@ -24,9 +24,10 @@ def regen_fixture() -> RegenFixture:
     return RegenFixture()
 
 
-def test_regen_full_regeneration(regen_fixture: RegenFixture) -> None:
+def test_regen_restores_its_total_over_its_duration_then_leaves_the_aura(
+    regen_fixture: RegenFixture,
+) -> None:
     aura = regen_fixture.aura
-
     aura.magic.value = 0.0
 
     aura.add_spell(regen_fixture.regen_spell)
@@ -36,11 +37,12 @@ def test_regen_full_regeneration(regen_fixture: RegenFixture) -> None:
     assert regen_fixture.regen_spell not in aura.spells
 
 
-def test_regen_partial_regeneration(regen_fixture: RegenFixture) -> None:
+def test_regen_partway_through_restores_proportional_magic_and_stays_active(
+    regen_fixture: RegenFixture,
+) -> None:
     aura = regen_fixture.aura
     partial_duration = regen_fixture.regen_duration / 2
     partial_regen = regen_fixture.total_regen * partial_duration / regen_fixture.regen_duration
-
     aura.magic.value = 0.0
 
     aura.add_spell(regen_fixture.regen_spell)
@@ -52,7 +54,6 @@ def test_regen_partial_regeneration(regen_fixture: RegenFixture) -> None:
 
 def test_regen_caps_at_max_magic(regen_fixture: RegenFixture) -> None:
     aura = regen_fixture.aura
-
     near_max_magic = aura.magic.max.value - (regen_fixture.total_regen / 4)
     aura.magic.value = near_max_magic
 
@@ -63,28 +64,27 @@ def test_regen_caps_at_max_magic(regen_fixture: RegenFixture) -> None:
     assert regen_fixture.regen_spell not in aura.spells
 
 
-def test_regen_damage_during_spell_active(regen_fixture: RegenFixture) -> None:
+def test_regen_keeps_restoring_after_damage_mid_duration(regen_fixture: RegenFixture) -> None:
     aura = regen_fixture.aura
-
     half_of_duration = regen_fixture.regen_duration / 2
     damage_amount = regen_fixture.total_regen
+    # The first half regenerates nothing at max magic, so only the second half counts.
     regen_after_damage = regen_fixture.total_regen / 2
     expected_magic_after_regen = aura.magic.max.value - damage_amount + regen_after_damage
 
     aura.add_spell(regen_fixture.regen_spell)
     aura.update(half_of_duration)
-
     aura.magic.value -= damage_amount
-
     aura.update(regen_fixture.regen_duration + 1.0)
 
     assert aura.magic.value == pytest.approx(expected_magic_after_regen)
     assert regen_fixture.regen_spell not in aura.spells
 
 
-def test_regen_stays_after_max_magic(regen_fixture: RegenFixture) -> None:
+def test_regen_at_max_magic_holds_magic_at_max_and_stays_active(
+    regen_fixture: RegenFixture,
+) -> None:
     aura = regen_fixture.aura
-
     aura.magic.value = aura.magic.max.value
 
     aura.add_spell(regen_fixture.regen_spell)
@@ -94,7 +94,7 @@ def test_regen_stays_after_max_magic(regen_fixture: RegenFixture) -> None:
     assert regen_fixture.regen_spell in aura.spells
 
 
-def test_regen_level(regen_fixture: RegenFixture) -> None:
+def test_regen_level_scales_regen_rate(regen_fixture: RegenFixture) -> None:
     level = 2
     original_rate = regen_fixture.regen_rate
 

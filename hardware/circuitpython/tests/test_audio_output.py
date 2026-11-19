@@ -156,7 +156,7 @@ def test_a_stops_effect_clip_whose_file_cannot_be_opened_stops_the_receipt(tmp_p
     receipt.stop.assert_called_once()
 
 
-def test_the_resolved_clips_path_plays_on_an_idle_voice(tmp_path) -> None:
+def test_the_resolved_clips_path_plays_on_an_idle_voice_at_the_receipts_loudness(tmp_path) -> None:
     output, mixer = _make_output(max_volume=0.4)
     path = _wav(tmp_path, "music")
 
@@ -236,7 +236,7 @@ def test_restoring_an_effect_plays_its_held_loop_again(tmp_path) -> None:
     output.stop(0)
 
 
-def test_open_source_opens_file_and_wraps_wavefile(tmp_path) -> None:
+def test_open_source_wraps_the_opened_file_in_a_wavefile_and_leaves_it_open(tmp_path) -> None:
     wav = tmp_path / "clip.wav"
     wav.write_bytes(b"RIFF")
     output, _ = _make_output()
@@ -248,7 +248,7 @@ def test_open_source_opens_file_and_wraps_wavefile(tmp_path) -> None:
     wave_file_class = _installed_mock("audiocore", "WaveFile")
     wave_file_class.assert_called_once_with(f)
     assert wave is wave_file_class.return_value
-    assert not f.closed
+    assert not f.closed, "the file stays open while the clip plays"
     f.close()
 
 
@@ -258,7 +258,7 @@ def test_open_source_returns_none_on_oserror(tmp_path) -> None:
     assert output.open_source(str(tmp_path / "nope.wav")) is None
 
 
-def test_play_stores_source_and_plays_wave_with_loop(tmp_path) -> None:
+def test_play_hands_the_wavefile_to_the_slots_voice_with_the_loop_flag(tmp_path) -> None:
     wav = tmp_path / "clip.wav"
     wav.write_bytes(b"RIFF")
     output, mixer = _make_output()
@@ -295,7 +295,7 @@ def test_stop_on_idle_slot_stops_voice_without_error(tmp_path) -> None:
     mixer.voice[0].stop.assert_called_once()
 
 
-def test_set_loudness_applies_max_volume(tmp_path) -> None:
+def test_set_loudness_scales_the_voice_level_by_max_volume(tmp_path) -> None:
     output, mixer = _make_output(max_volume=0.4)
 
     output.set_loudness(0, 0.5)
@@ -303,7 +303,7 @@ def test_set_loudness_applies_max_volume(tmp_path) -> None:
     assert mixer.voice[0].level == pytest.approx(0.2)
 
 
-def test_is_playing_reads_voice_playing(tmp_path) -> None:
+def test_is_playing_reports_the_slot_voices_playing_flag(tmp_path) -> None:
     output, mixer = _make_output()
 
     mixer.voice[0].playing = True

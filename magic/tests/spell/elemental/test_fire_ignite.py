@@ -24,7 +24,9 @@ def ignite_fixture() -> IgniteFixture:
     return IgniteFixture()
 
 
-def test_fire_ignite_full_damage(ignite_fixture: IgniteFixture) -> None:
+def test_ignite_deals_its_total_damage_over_its_duration_then_leaves_the_aura(
+    ignite_fixture: IgniteFixture,
+) -> None:
     aura = ignite_fixture.aura
 
     aura.add_spell(ignite_fixture.ignite_spell)
@@ -34,7 +36,9 @@ def test_fire_ignite_full_damage(ignite_fixture: IgniteFixture) -> None:
     assert ignite_fixture.ignite_spell not in aura.spells
 
 
-def test_fire_ignite_partial_damage(ignite_fixture: IgniteFixture) -> None:
+def test_ignite_partway_through_deals_proportional_damage_and_stays_active(
+    ignite_fixture: IgniteFixture,
+) -> None:
     aura = ignite_fixture.aura
     partial_duration = ignite_fixture.ignite_duration / 2
     partial_damage = ignite_fixture.total_damage * partial_duration / ignite_fixture.ignite_duration
@@ -46,7 +50,7 @@ def test_fire_ignite_partial_damage(ignite_fixture: IgniteFixture) -> None:
     assert ignite_fixture.ignite_spell in aura.spells
 
 
-def test_fire_ignite_no_damage_after_duration(ignite_fixture: IgniteFixture) -> None:
+def test_ignite_deals_no_damage_past_its_duration(ignite_fixture: IgniteFixture) -> None:
     aura = ignite_fixture.aura
 
     aura.add_spell(ignite_fixture.ignite_spell)
@@ -55,7 +59,7 @@ def test_fire_ignite_no_damage_after_duration(ignite_fixture: IgniteFixture) -> 
     assert aura.magic.value == aura.magic.max.value - ignite_fixture.total_damage
 
 
-def test_fire_ignite_level(ignite_fixture: IgniteFixture) -> None:
+def test_ignite_level_scales_damage_per_second(ignite_fixture: IgniteFixture) -> None:
     level = 2
     original_dps = ignite_fixture.ignite_dps
 

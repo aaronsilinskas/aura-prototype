@@ -34,9 +34,8 @@ def test_unpause_spell_removes_all_pauses(fixture: UnpauseFixture) -> None:
     assert pause_spell_2 not in aura.spells
 
 
-def test_unpause_spell_no_pause_present(fixture: UnpauseFixture) -> None:
+def test_unpause_with_no_pause_active_updates_without_error(fixture: UnpauseFixture) -> None:
     aura = fixture.aura
-
     assert all(not isinstance(spell, PauseSpell) for spell in aura.spells)
 
     aura.add_spell(fixture.unpause_spell)
@@ -45,7 +44,7 @@ def test_unpause_spell_no_pause_present(fixture: UnpauseFixture) -> None:
     assert all(not isinstance(spell, PauseSpell) for spell in aura.spells)
 
 
-def test_unpause_spell_with_other_spells(fixture: UnpauseFixture) -> None:
+def test_unpause_removes_pauses_but_keeps_other_spells(fixture: UnpauseFixture) -> None:
     aura = fixture.aura
     pause_spell = PauseSpell(duration=10.0)
     other_spell = IgniteSpell(damage_per_second=5.0, duration=10.0)
@@ -62,5 +61,5 @@ def test_unpause_spell_with_other_spells(fixture: UnpauseFixture) -> None:
     assert other_spell in aura.spells
 
 
-def test_unpause_level(fixture: UnpauseFixture) -> None:
+def test_unpause_accepts_a_level_though_nothing_scales_with_it(fixture: UnpauseFixture) -> None:
     fixture.unpause_spell.level = 2

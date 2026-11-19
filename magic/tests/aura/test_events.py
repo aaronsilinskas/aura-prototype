@@ -26,7 +26,7 @@ def fixture() -> EventsFixture:
     return EventsFixture()
 
 
-def test_aura_event_initialization():
+def test_a_new_aura_event_is_not_canceled():
     event = AuraEvent()
 
     assert event.is_canceled is False
@@ -49,20 +49,20 @@ def test_aura_event_can_be_uncanceled():
     assert event.is_canceled is False
 
 
-def test_damage_event_initialization():
+def test_a_new_damage_event_keeps_its_positive_amount_uncanceled():
     event = DamageEvent(amount=50.0)
 
     assert event.amount == 50.0
     assert event.is_canceled is False
 
 
-def test_damage_event_negative_amount_clamped():
+def test_damage_event_clamps_a_negative_amount_to_zero():
     event = DamageEvent(amount=-10.0)
 
     assert event.amount == 0.0
 
 
-def test_damage_event_zero_amount():
+def test_damage_event_keeps_a_zero_amount():
     event = DamageEvent(amount=0.0)
 
     assert event.amount == 0.0
@@ -131,7 +131,7 @@ def test_event_listener_receives_cast_event(fixture):
     assert event.spell is fixture.dummy_spell
 
 
-def test_multiple_event_listeners(fixture):
+def test_every_event_listener_receives_each_event(fixture):
     listener1 = MockEventListener()
     listener2 = MockEventListener()
     fixture.aura.event_listeners.append(listener1)
@@ -163,6 +163,7 @@ def test_event_listener_not_called_if_event_canceled(fixture):
     fixture.aura.add_spell(canceling_spell)
 
     listener.events.clear()
+
     fixture.aura.process_event(DamageEvent(amount=10.0))
 
     assert len(listener.events) == 0
