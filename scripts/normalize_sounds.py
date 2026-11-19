@@ -144,7 +144,8 @@ def normalize(root: Path, dry_run: bool = False) -> int:
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Peak-normalize every distributed sounds/ folder's WAV files to "
-        f"{-_HEADROOM_DB} dBFS at {_SAMPLE_RATE} Hz, {_CHANNELS}-channel {_SAMPLE_FMT}."
+        f"{-_HEADROOM_DB} dBFS at {_SAMPLE_RATE} Hz, {_CHANNELS} channel(s), "
+        f"sample format {_SAMPLE_FMT}."
     )
     parser.add_argument(
         "--root",

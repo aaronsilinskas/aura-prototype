@@ -121,7 +121,6 @@ def test_invigorate_refreshes_when_regen_spells_return_to_three(
 
     aura.update(4)  # Let first regen expire leaving 2 active
 
-    # Max magic should still be increased
     assert aura.magic.max.value == pytest.approx(original_max_magic * fixture.max_magic_multiplier)
 
     # Increase to 3 regen spells again

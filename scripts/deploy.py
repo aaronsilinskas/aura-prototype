@@ -13,10 +13,9 @@ Usage
 
 mpy-cross
 ---------
-The PyPI ``mpy-cross`` package is MicroPython's and produces incompatible
-``.mpy`` files, so run ``scripts/setup_mpy_cross.sh`` to download the
-CircuitPython binary to ``tools/mpy-cross`` (or point ``MPY_CROSS`` at one).
-Its major version must match the device firmware.
+Compiling needs the CircuitPython ``mpy-cross`` binary that
+``scripts/setup_mpy_cross.sh`` downloads; ``scripts/build.py`` says where it
+is looked up.
 """
 
 from __future__ import annotations

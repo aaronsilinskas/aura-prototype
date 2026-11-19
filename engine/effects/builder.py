@@ -7,8 +7,7 @@ class EffectBuilder:
     """Factory interface for constructing ``Effect`` instances by name.
 
     Concrete implementations return the named effect configured for the given
-    ``EffectConfig``. ``ActiveSceneNamespace`` resolves the name to its builder
-    before the builder is called.
+    ``EffectConfig``.
     """
 
     def __call__(self, name: str, config: EffectConfig) -> Effect:
