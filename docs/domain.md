@@ -237,7 +237,7 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `LineFramer` | `hardware/shared/sd_sync_protocol.py` | Splits a byte stream into SD-sync frame lines at `FRAME_DELIMITER`; `delimit_line` terminates outgoing ones. Both live transports frame through it, and both ends check acks with `expect_ack` |
 | `UsbCdcTransport` | `hardware/circuitpython/usb_cdc_transport.py` | Live `Transport` framing SD-sync lines with `LineFramer` over any `read`/`write` stream (on-device, `usb_cdc.data`); needs no `usb_cdc` import itself, so it is CPython-testable against a fake stream |
 | `SerialTransport` | `scripts/sd_sync_transport.py` | Live host-side `Transport`, framing SD-sync lines with `LineFramer` like `UsbCdcTransport` but over a host serial port opened via `deploy_watch`'s `SerialHandle`/`open_serial_with_retry` |
-| `find_port` / `select_single_port` / `SerialChannel` | `scripts/port_auto_detect.py` | **Port auto-detect** for either channel: `deploy_watch` asks for the console channel, `scripts/sd_sync.py` for the data channel; `--port` overrides without scanning |
+| `find_port` / `SerialChannel` / `PortAutoDetectError` | `scripts/port_auto_detect.py` | **Port auto-detect** for either channel: `deploy_watch` asks for the console channel, `scripts/sd_sync.py` for the data channel; `--port` overrides without scanning |
 | `ship_list` / `ShipList` / `ShipEntry` / `governed_mount_files` | `scripts/ship_list.py` | The **Ship list**: which files land where on a device (`MODULE_DIRS`, exclusions, compiled or raw, `boot.py` placement). `scripts/build.py` stages it; `scripts/deploy.py` syncs it and prunes mount files it no longer names |
 
 ---

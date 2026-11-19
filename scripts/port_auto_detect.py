@@ -13,7 +13,7 @@ TYPE_CHECKING = False
 if TYPE_CHECKING:
     from serial.tools.list_ports_common import ListPortInfo
 
-__all__ = ["PortAutoDetectError", "SerialChannel", "find_port", "select_single_port"]
+__all__ = ["PortAutoDetectError", "SerialChannel", "find_port"]
 
 
 class SerialChannel(Enum):
