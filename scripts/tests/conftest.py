@@ -7,9 +7,8 @@ import pytest
 def _bypass_mpy_cross_version_check(request, monkeypatch):
     """Bypass the mpy-cross version validation for all deploy tests.
 
-    Tests that explicitly test version validation (in test_mpy_cross_validation.py
-    and the version-check section of test_deploy.py) opt out by using their own
-    ``patch`` calls which shadow this bypass.
+    Skipped for test_mpy_cross_validation.py and for tests named for
+    ``version``, so the validation tests run against the real check.
     """
     if "test_mpy_cross_validation" in request.fspath.basename:
         return
