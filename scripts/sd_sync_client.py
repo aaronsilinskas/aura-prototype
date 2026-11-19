@@ -28,7 +28,8 @@ so it carries no chunking or CRC verification of its own.
 
 import binascii
 import os
-from typing import Final
+import secrets
+from typing import BinaryIO, Final
 
 from hardware.shared.sd_sync_protocol import (
     CHUNK_SIZE,
@@ -93,9 +94,10 @@ class SdSyncClient:
         """Download *sd_path* from the SD card to *host_path*, preserving its bytes exactly.
 
         Creates any missing parent directories under *host_path* so a pull
-        into a not-yet-existing host subtree works. Nothing is written to
-        *host_path* unless the server confirms the file exists, so a "not
-        found" pull leaves no empty file behind.
+        into a not-yet-existing host subtree works. *host_path* is replaced
+        only once a transfer's CRC-32 matches: a pull that raises (Ctrl-C
+        included) leaves an existing *host_path* unchanged and no partial file
+        behind.
 
         Args:
             sd_path: The file's path, relative to the SD mount root.
@@ -119,7 +121,6 @@ class SdSyncClient:
             if self._receive_verified(host_path):
                 return
 
-        _remove_if_exists(host_path)
         raise SdSyncIntegrityError(
             f"CRC-32 mismatch pulling {sd_path!r} after {self._max_attempts} attempt(s)"
         )
@@ -144,30 +145,35 @@ class SdSyncClient:
         return decode_listing(response.payload)
 
     def _receive_verified(self, host_path: str) -> bool:
-        """Stream one pull response's chunks to *host_path*; return whether its CRC matched.
-
-        Runs after the server has already confirmed ``"ok"`` -- acknowledges
-        each chunk (stop-and-wait) and writes it immediately, so *host_path*
-        never holds more than one pending chunk in memory before it lands on
-        disk.
-        """
+        """Receive one pull response into *host_path*; return whether its CRC matched."""
         parent = os.path.dirname(host_path)
         if parent:
             os.makedirs(parent, exist_ok=True)
 
-        crc = 0
-        with open(host_path, "wb") as host_file:
-            while True:
-                frame = decode_frame(self._transport.recv())
-                if frame.kind == "chunk":
-                    crc = binascii.crc32(frame.payload, crc)
-                    host_file.write(frame.payload)
-                    self._transport.send(encode_frame(Frame("ack", frame.text)))
-                else:  # "done"
-                    server_crc = int(frame.text)
-                    break
+        # Beside host_path so os.replace stays on one filesystem and is atomic;
+        # opened like a normal file (not tempfile's 0600) so the result gets
+        # the umask's usual permissions.
+        temp_path = f"{host_path}.{secrets.token_hex(8)}.part"
+        try:
+            with open(temp_path, "xb") as temp_file:
+                crc_matched = self._receive_chunks(temp_file)
+            if crc_matched:
+                os.replace(temp_path, host_path)
+            return crc_matched
+        finally:
+            _remove_if_exists(temp_path)
 
-        return crc == server_crc
+    def _receive_chunks(self, dest: BinaryIO) -> bool:
+        """Write and ack each chunk to *dest* as it arrives; return whether the CRC matched."""
+        crc = 0
+        while True:
+            frame = decode_frame(self._transport.recv())
+            if frame.kind == "chunk":
+                crc = binascii.crc32(frame.payload, crc)
+                dest.write(frame.payload)
+                self._transport.send(encode_frame(Frame("ack", frame.text)))
+            else:  # "done"
+                return crc == int(frame.text)
 
     def push(self, host_path: str, sd_path: str) -> None:
         """Upload *host_path* to the SD card at *sd_path*, preserving its bytes exactly.
@@ -245,9 +251,9 @@ class SdSyncClient:
             )
 
 
-def _remove_if_exists(host_path: str) -> None:
-    """Remove *host_path* if present -- leaves no partial file after exhausted retries."""
+def _remove_if_exists(path: str) -> None:
+    """Remove *path* if it exists."""
     try:
-        os.remove(host_path)
+        os.remove(path)
     except FileNotFoundError:
         pass
