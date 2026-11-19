@@ -321,10 +321,10 @@ def test_magnetizing_again_changes_the_field(simulation):
     assert device.strip(Scope.PERSONAL).dark
 
 
-def test_forget_keeps_each_strip_showing_its_current_frame(simulation):
+def test_forget_leaves_a_lit_strip_showing_its_current_frame(simulation):
     device = simulation.add_device("red", scene="example_lobby")
     simulation.advance(TICK)
-    before = device.strip(Scope.AMBIENT).pixels
+    before = list(device.strip(Scope.AMBIENT).pixels)
 
     device.forget()
 

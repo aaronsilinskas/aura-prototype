@@ -7,19 +7,7 @@ fixture), so it exercises the storage devices run.
 
 from engine.log import Logger
 from hardware.shared.device_state import DeviceStateStore
-from hardware.shared.device_storage import DeviceStorage
-
-
-class RecordingStorage(DeviceStorage):
-    """A DeviceStorage that records the name of every JSON file it writes."""
-
-    def __init__(self, mount_root: str) -> None:
-        super().__init__(mount_root)
-        self.json_writes: list[str] = []
-
-    def write_json(self, name: str, mapping: dict) -> None:
-        self.json_writes.append(name)
-        super().write_json(name, mapping)
+from hardware.shared.tests.write_counting_storage import WriteCountingStorage
 
 
 def test_get_returns_none_for_a_never_written_key(device_storage):
@@ -195,15 +183,15 @@ def test_update_removing_an_absent_key_still_sets_the_others(device_storage):
     assert store.get("team") == "a1b2"
 
 
-def test_an_update_that_changes_nothing_writes_nothing(tmp_path):
-    storage = RecordingStorage(str(tmp_path))
+def test_an_update_that_changes_nothing_writes_nothing(device_storage):
+    storage = WriteCountingStorage(device_storage.mount_root)
     store = DeviceStateStore(storage)
     store.set("level", "tag")
-    storage.json_writes.clear()
+    storage.json_writes = 0
 
     store.update({"level": "tag"}, remove=("player_id",))
 
-    assert storage.json_writes == []
+    assert storage.json_writes == 0
 
 
 def test_update_over_malformed_json_writes_a_fresh_object(device_storage):

@@ -54,6 +54,17 @@ def wait_for_red_light_to_end(simulation: Simulation, player: SimulatedDevice) -
     simulation.run_until(lambda: not lit_in(player, RED))
 
 
+def red_light_ends_after() -> float:
+    """Seconds from switch-on to the tick Red Light ends, for a device held still throughout."""
+    with Simulation() as simulation:
+        player = simulation.add_device(
+            "p1", scene="red_light_green_light", setting_overrides=overrides(RED_LIGHT)
+        )
+        reach_red_light(simulation, player)
+        wait_for_red_light_to_end(simulation, player)
+        return simulation.now
+
+
 def test_red_light_shows_solid_red_on_every_light_strip(simulation):
     player = simulation.add_device(
         "p1", scene="red_light_green_light", setting_overrides=overrides(RED_LIGHT)
@@ -208,17 +219,6 @@ def test_a_tilt_between_rounds_is_not_caught_on_the_next_red_light(simulation):
     simulation.advance(0.5)
 
     assert not player.has_played(GAME_OVER_STING)
-
-
-def red_light_ends_after() -> float:
-    """Seconds from switch-on to the tick Red Light ends, for a device held still throughout."""
-    with Simulation() as simulation:
-        player = simulation.add_device(
-            "p1", scene="red_light_green_light", setting_overrides=overrides(RED_LIGHT)
-        )
-        reach_red_light(simulation, player)
-        wait_for_red_light_to_end(simulation, player)
-        return simulation.now
 
 
 def test_moving_on_the_tick_red_light_runs_out_reaches_the_green_warning_not_game_over(

@@ -622,15 +622,15 @@ def test_list_files_of_an_empty_subpath_returns_no_entries(device_storage):
     assert client.list_files("aura_packs/scenes") == []
 
 
-def test_list_files_of_a_card_with_many_files_returns_every_entry(device_storage):
+def test_list_files_returns_every_entry_of_a_listing_longer_than_one_chunk(device_storage):
     names = [f"aura_packs/scenes/scene_{n:02d}/scene.json" for n in range(40)]
+    assert len("\n".join(names)) > CHUNK_SIZE
     for name in names:
         device_storage.write_bytes(name, b"{}")
     client, _ = make_loopback_client(device_storage, verb="list")
 
     listing = client.list_files()
 
-    assert len("\n".join(names)) > CHUNK_SIZE
     assert listing == [(name, 2) for name in names]
 
 

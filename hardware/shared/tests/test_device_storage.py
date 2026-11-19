@@ -260,11 +260,21 @@ def test_path_rejects_a_subpath_that_escapes_the_mount_root(tmp_path, escaping_s
         storage.path(escaping_subpath)
 
 
-def test_a_dot_dot_segment_is_rejected_even_when_the_path_stays_under_the_mount_root(tmp_path):
+@pytest.mark.parametrize(
+    "use",
+    [
+        lambda storage, name: storage.read_bytes(name),
+        lambda storage, name: storage.read_chunks(name, chunk_size=8),
+        lambda storage, name: storage.write_bytes(name, b"data"),
+        lambda storage, name: storage.path(name),
+    ],
+    ids=["read_bytes", "read_chunks", "write_bytes", "path"],
+)
+def test_a_dot_dot_segment_is_rejected_even_when_the_path_stays_under_the_mount_root(tmp_path, use):
     storage = DeviceStorage(str(tmp_path))
 
     with pytest.raises(ValueError):
-        storage.read_bytes("scenes/../state.json")
+        use(storage, "scenes/../state.json")
 
 
 def test_write_bytes_rejecting_an_escaping_name_leaves_no_file_written(tmp_path):

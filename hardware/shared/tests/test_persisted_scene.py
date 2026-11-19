@@ -15,21 +15,10 @@ from hardware.shared.device_state import DeviceStateStore
 from hardware.shared.device_storage import DeviceStorage
 from hardware.shared.persisted_scene import PersistedScene
 from hardware.shared.scene_selection import with_scene_deploy
+from hardware.shared.tests.write_counting_storage import WriteCountingStorage
 
 _DEFAULT = {"default_scene": "red_light_green_light"}
 """A boot mapping with a flash ``default_scene`` and no Scene deploy token."""
-
-
-class WriteCountingStorage(DeviceStorage):
-    """A real ``DeviceStorage`` that counts ``write_json`` calls, so a test can see writes land."""
-
-    def __init__(self, mount_root: str) -> None:
-        super().__init__(mount_root)
-        self.json_writes = 0
-
-    def write_json(self, name: str, mapping: dict) -> None:
-        self.json_writes += 1
-        super().write_json(name, mapping)
 
 
 def _persisted_scene(storage: DeviceStorage | None, logger: Logger | None = None) -> PersistedScene:
