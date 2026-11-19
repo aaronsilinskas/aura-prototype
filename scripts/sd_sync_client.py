@@ -9,21 +9,9 @@ device's data channel) is one implementation -- this client only knows the
 ``Transport`` port, so it runs unchanged against that transport or an in-memory
 loopback.
 
-Each ``pull``/``push`` streams bytes chunk-by-chunk as they are read/received,
-so the host process never holds a whole file in memory either -- the same
-bounded-memory contract :class:`SdSyncServer` keeps on the device side.
-
-Every transfer carries a whole-file CRC-32, computed incrementally by whichever
-side is reading the source (the server for ``pull``, this client for ``push``)
-and verified by whichever side is writing the destination (this client for
-``pull``, the server for ``push``). A mismatch retries the whole transfer from
-scratch (a fresh request, a fresh read) up to ``max_attempts`` times; exhausting
-them raises :class:`SdSyncIntegrityError` rather than leaving a corrupt file
-with no indication anything went wrong.
-
-``list_files`` returns the server's enumeration of a subtree as ``(path, size)``
-pairs -- small enough to arrive in a single frame, unlike a pulled file's bytes,
-so it carries no chunking or CRC verification of its own.
+Each ``pull``/``push`` streams chunk by chunk and is checked by a whole-file
+CRC-32; a mismatch retries the whole transfer up to ``max_attempts`` times, then
+raises :class:`SdSyncIntegrityError`. See ADR-0011.
 """
 
 import binascii
@@ -213,10 +201,8 @@ class SdSyncClient:
         """Stream *host_path* to the server (stop-and-wait); return whether it committed.
 
         Runs after the server has already confirmed ``"ok"`` for the request.
-        Waits for each chunk's ack before sending the next, so at most one chunk
-        is held before the server acknowledges it. The server replies to the
-        closing ``done`` frame with ``"ok"`` (committed) or ``"crc_mismatch"``
-        (left on disk untouched).
+        The server replies to the closing ``done`` frame with ``"ok"``
+        (committed) or ``"crc_mismatch"`` (left on disk untouched).
 
         Raises:
             SdSyncProtocolError: A chunk's reply was not the ack carrying its

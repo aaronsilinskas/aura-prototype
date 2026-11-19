@@ -1,8 +1,7 @@
 """CircuitPythonParts — the Device assembly's ``DeviceParts`` adapter on a CircuitPython board.
 
 Deploy-watch only: imports board, busio, digitalio and microcontroller. Every
-per-part driver library is imported inside the part that builds it, so a
-config that doesn't need a part never requires its library to be installed.
+per-part driver library is imported inside the part that builds it (ADR-0013).
 """
 
 from __future__ import annotations

@@ -4,8 +4,7 @@ Provides the public ``PulseReader`` / ``PulseWriter`` ports the platform
 adapters implement, and the module-private transmitter, receiver and IR
 transmit gate that only ``InfraredTransceiver`` builds and drives.
 
-``PulseReader`` and ``PulseWriter`` are plain base classes (not
-``typing.Protocol``, which is unavailable on constrained runtimes).
+``PulseReader`` and ``PulseWriter`` are plain base classes (ADR-0012).
 """
 
 from array import array
@@ -279,9 +278,8 @@ class _InfraredReceiver:
     Each reader is paired with its own decoder, built fresh from
     *decoder_factory*. When more than one decoder completes a packet in the
     same tick, the reader with the **lowest error margin** wins (the first
-    such reader on a tie) — this improves reliability across a wide
-    reception area. Multiple readers do **not** derive direction. A device
-    with one ``rx`` pin runs the same loop as one with several.
+    such reader on a tie), for reliability, not direction (ADR-0016). A
+    device with one ``rx`` pin runs the same loop as one with several.
 
     ``receive()`` is polled every tick and must not allocate: CircuitPython's
     garbage collector would otherwise run mid-game.

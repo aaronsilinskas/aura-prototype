@@ -40,8 +40,7 @@ _DRIVER_LIBRARIES = (
 def test_importing_the_entry_point_imports_no_driver_library(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # A prop's boot imports this before knowing its config; each library
-    # is imported only by the part that needs it.
+    # A prop's boot imports this before knowing its config (ADR-0013).
     import hardware
 
     monkeypatch.setattr(hardware, "circuitpython", sys.modules["hardware.circuitpython"])

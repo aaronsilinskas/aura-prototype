@@ -34,8 +34,7 @@ def clip_stops_receipt(effect: Effect, clip: AudioPlaybackConfig) -> bool:
 class VoiceSink:
     """Port through which :class:`VoicePool` drives audio hardware.
 
-    A plain base class (not ``typing.Protocol``, which is unavailable on the
-    constrained runtimes).  The live adapter is ``AudioEffectOutput``; tests use
+    A plain base class (ADR-0012).  The live adapter is ``AudioEffectOutput``; tests use
     a recording fake.  Loudness crosses this seam as a ``0..1`` value — the
     adapter owns the ``max_volume`` calibration.
     """

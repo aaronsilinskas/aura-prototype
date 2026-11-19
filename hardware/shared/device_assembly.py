@@ -4,8 +4,7 @@ Decides what a config builds and reaches hardware only through a
 :class:`~hardware.shared.device_parts.DeviceParts` adapter, so the physical
 device and the Simulated device build, skip, reject and narrate a config alike.
 
-Every component is config-gated: built only when its section is declared *and*
-enabled, never probed by physical presence.
+Every component is config-gated, never probed (ADR-0014).
 """
 
 from __future__ import annotations

@@ -32,8 +32,7 @@ class NetworkEvents:
         """Event fired when an IR packet is received.
 
         Carries the raw payload, normalised signal quality and error margin.
-        It names no receiver: an IR multi-receiver picks
-        one for reliability only, never direction.
+        It names no receiver (ADR-0016).
         """
 
         __slots__ = ("data", "error_margin", "signal_strength")

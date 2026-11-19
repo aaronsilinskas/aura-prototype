@@ -1,17 +1,9 @@
 """SD-sync wire protocol — frame representation shared by client and server.
 
-Every request, response, and streamed file chunk is carried as one **frame**: a
-small ASCII header line (``kind`` plus a free-form ``text`` field) optionally
-followed by raw payload bytes, the whole thing base64-encoded as a single unit.
-Base64 keeps every frame plain-ASCII and line-safe -- no embedded newline or
-control byte can desync a line-oriented reader -- and carries an arbitrary
-binary payload (a file chunk) intact, since base64 has no notion of "binary"
-versus "text" content.
-
-``CHUNK_SIZE`` bounds how much of a file is ever in flight as a single frame:
-:func:`iter_chunks` slices a bytes object into pieces of at most this size, so a
-sender streams a file chunk-by-chunk rather than as one frame, and a receiver
-never has to hold more than one chunk's worth of un-acknowledged data.
+Every request, response, and streamed file chunk is one **frame**: a header of
+``kind`` and free-form ``text``, plus optional payload bytes, base64-encoded as
+a single line. ``CHUNK_SIZE`` bounds how much of a file one frame carries. See
+ADR-0011.
 """
 
 from __future__ import annotations
@@ -94,9 +86,8 @@ def decode_frame(line: bytes) -> Frame:
 def encode_listing(entries: list[tuple[str, int]]) -> bytes:
     """Serialize (path, size) pairs into a ``list`` response frame's payload.
 
-    One ``"path\\tsize"`` line per entry, newline-joined, UTF-8 encoded --
-    a listing is small enough (unlike a pulled file's contents) to send
-    whole in a single frame rather than chunked.
+    One ``"path\\tsize"`` line per entry, newline-joined, UTF-8 encoded,
+    sent whole rather than chunked (ADR-0011).
     """
     return "\n".join(f"{path}\t{size}" for path, size in entries).encode("utf-8")
 
