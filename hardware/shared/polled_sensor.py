@@ -1,4 +1,4 @@
-"""PolledSensor — the board-free owner of one sensor's reading. No board imports."""
+"""PolledSensor: the owner of one sensor's reading."""
 
 from __future__ import annotations
 

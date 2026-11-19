@@ -1,18 +1,10 @@
-"""RadioTransceiver — board-free single owner of a device's radio subsystem.
+"""RadioTransceiver — single owner of a device's radio subsystem.
 
-Mirrors :class:`~hardware.shared.ir_transceiver.InfraredTransceiver`'s
-ownership shape: constructed with a transport seam that may be absent, its
-``update`` polls that seam once per tick and exposes the result as attributes
-read afterwards rather than returned. The port is private — no call site
-reaches it through this class.
-
-Assembled by the Device assembly (``device_assembly``) and exposed as
-``DeviceHardware.radio``; ``HardwareNetworkControls.send_radio`` delegates to
-it. This class hands back the raw decoded payload and sender byte rather than
-building a ``NetworkEvents.RadioReceived`` itself — it imports no
-``engine.network`` vocabulary. The raw packet crosses into game vocabulary
-only later, in the Scene boot's tick (``app/scene_composition.py``), which
-builds the event next to the IR one.
+Exposed as ``DeviceHardware.radio``. This class hands back the raw decoded
+payload and sender byte rather than building a ``NetworkEvents.RadioReceived``
+itself — it imports no ``engine.network`` vocabulary. The raw packet crosses
+into game vocabulary only later, in the Scene boot's tick
+(``app/scene_composition.py``), which builds the event next to the IR one.
 """
 
 from hardware.shared.polled_part import PolledPart
@@ -44,14 +36,8 @@ class RadioTransceiver(PolledPart):
     def send(self, data: bytes) -> None:
         """Fire-and-forget *data* over the transport's single channel.
 
-        Unlike :meth:`InfraredTransceiver.send`, there is no emitter to
-        name — an RFM69-class radio chip has one channel, not a directed
-        set of transmitters. Silent no-op when no transport is wired, the
-        same way a device with no radio peripheral simply drops
-        game-triggered sends rather than raising.
-
-        Args:
-            data: Opaque payload bytes to transmit.
+        Silent no-op when no transport is wired, the same way a device with no
+        radio peripheral simply drops game-triggered sends rather than raising.
         """
         if self._transport is not None:
             self._transport.send(data)
@@ -61,9 +47,7 @@ class RadioTransceiver(PolledPart):
 
         Receive only. This does not pump or gate anything: the chip is
         half-duplex, and a fire-and-forget :meth:`send` leaves nothing to
-        pump and produces no self-echo to gate against — unlike
-        :meth:`InfraredTransceiver.update`, there is no transmit-pump step
-        to run here, and none should be added later.
+        pump and produces no self-echo to gate against.
 
         Sets :attr:`received` and :attr:`last_sender` together to this
         tick's decoded payload and RadioHead "From" byte, or both to

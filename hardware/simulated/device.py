@@ -4,9 +4,7 @@ It boots through the Device assembly, as a board does, with ``SimulatedParts``
 standing in for the hardware, so it builds, skips, rejects and narrates a
 ``DeviceConfig`` exactly as a board would: a section that needs a disabled bus
 is rejected, and so is an enabled matrix entry (there is no simulated matrix).
-Pin names and buses are otherwise ignored. It obeys the hardware import
-contract: it knows nothing about scenes, the engine loop, or time beyond the
-``now`` it is handed.
+Pin names and buses are otherwise ignored.
 
 What the assembly builds is real wherever it can be: a real ``DebouncedButtons``
 over scripted pins, a real ``VoicePool`` behind the recording audio, the real
@@ -203,7 +201,6 @@ class SimulatedHardware:
         self.played: list[Played] = []
         self.buzzed: list[Buzzed] = []
         self.buzz_held: list[BuzzHeld] = []
-        # Which button each pin is, so a scripted press of a label reaches its pin.
         self._button_of_pin = {pin.name: button_label(i) for i, pin in enumerate(config.buttons)}
         labels = self._button_of_pin.values()
         self._pressed = dict.fromkeys(labels, False)
@@ -338,10 +335,7 @@ class SimulatedHardware:
         self._parts = parts
         self.hw = assemble_device(self._config, parts, self._logger)
 
-    # -- what the device's parts report (see SimulatedParts) -------------------
-
     def on_ir_written(self, emitter: str, pulses: array | list[int]) -> None:
-        """Record what *emitter* carried, let the device's own readers see it, and hand it on."""
         self.ir_sent.append(IrSent(self.now(), emitter, self._decode_wire(pulses)))
         self.land_ir(pulses)
         if self._ir_sink is not None:
@@ -366,7 +360,6 @@ class SimulatedHardware:
         return not self._pressed[self._button_of_pin[pin]]
 
     def _decode_wire(self, pulses: array | list[int]) -> bytes:
-        """The payload *pulses* carry, read back through the installed codec."""
         ir = self.hw.ir
         assert ir is not None  # only an assembled transceiver's emitters emit
         _encoder_class, decoder_factory = ir.codec

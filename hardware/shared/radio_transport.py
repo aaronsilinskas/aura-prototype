@@ -1,27 +1,15 @@
-"""RadioTransport — the board-free half-duplex radio port.
+"""RadioTransport, the half-duplex radio port.
 
-Provides the ``RadioTransport`` port abstraction that ``RadioTransceiver``
-reaches the physical radio peripheral through for both send and per-tick
-receive. One port serves both directions because a single RFM69-class chip is
-half-duplex — there is no separate send/receive pair the way IR has
+One port serves both directions because a single RFM69-class chip is
+half-duplex; there is no separate send/receive pair the way IR has
 ``PulseWriter``/``PulseReader``.
-
-No ``adafruit_rfm69`` import — safe on CPython, CircuitPython 10.x, and
-MicroPython. The live CircuitPython adapter wrapping ``adafruit_rfm69.RFM69``
-is a separate, device-only module.
 """
 
 __all__ = ["RadioTransport"]
 
 
 class RadioTransport:
-    """Port through which :class:`RadioTransceiver` reaches a half-duplex radio chip.
-
-    A plain base class — the same substitute pattern as :class:`VoiceSink` and
-    :class:`PulseReader`/:class:`PulseWriter` (``typing.Protocol`` is unavailable
-    on the constrained runtimes). Subclass and override both methods to connect
-    to hardware (e.g. ``adafruit_rfm69.RFM69``) or a test fake.
-    """
+    """Port through which :class:`RadioTransceiver` reaches a half-duplex radio chip."""
 
     def send(self, data: bytes) -> None:
         """Transmit *data* as a radio packet.
@@ -31,9 +19,6 @@ class RadioTransport:
 
         Args:
             data: Opaque payload bytes to transmit.
-
-        Raises:
-            NotImplementedError: Always — subclasses must override.
         """
         raise NotImplementedError
 
@@ -46,8 +31,5 @@ class RadioTransport:
 
         Returns:
             ``(from_byte, data)`` when a packet is waiting, else ``None``.
-
-        Raises:
-            NotImplementedError: Always — subclasses must override.
         """
         raise NotImplementedError

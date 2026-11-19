@@ -1,11 +1,4 @@
-"""CircuitPython adapter mounting an SD card as a live DeviceStorage.
-
-The only module that imports ``sdcardio`` and ``storage`` -- ``CircuitPythonParts``
-reaches this module only through a deferred import inside its storage part
-(mirroring the radio path's ``rfm69_radio_transport`` deferral), so a
-config with no ``sdcard`` section never requires either library to be
-installed.
-"""
+"""CircuitPython adapter mounting an SD card as a live DeviceStorage."""
 
 import sdcardio
 import storage
@@ -24,9 +17,7 @@ __all__ = ["SdCardStorage"]
 class SdCardStorage(DeviceStorage):
     """Live ``DeviceStorage`` backed by a FAT-formatted SD card.
 
-    Mounts the card at construction time via ``sdcardio.SDCard`` +
-    ``storage.mount``, then behaves exactly like ``DeviceStorage`` for every
-    read/write against the mount point.
+    Mounts the card at construction.
 
     Args:
         spi: The shared SPI bus (see ``CircuitPythonParts.spi_bus``).
@@ -44,8 +35,7 @@ class SdCardStorage(DeviceStorage):
 
     def __init__(self, spi: "busio.SPI", cs: "microcontroller.Pin", mount: str) -> None:
         card = sdcardio.SDCard(spi, cs)
-        # readonly=False is VfsFat's own default, but is passed explicitly
-        # here to document that device-mutable state depends on the mount
-        # being writable.
+        # readonly=False is VfsFat's own default, passed explicitly: device-mutable
+        # state depends on the mount being writable.
         storage.mount(storage.VfsFat(card), mount, readonly=False)
         super().__init__(mount)

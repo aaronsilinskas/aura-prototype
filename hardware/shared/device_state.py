@@ -2,11 +2,7 @@
 
 Persists small key/value state a device writes about itself across a
 reboot. It stays general (ADR-0009): the Persisted scene record is one
-client, ``PersistedScene``, which alone names its keys. Built
-entirely on the DeviceStorage port's read_json/write_json convenience, so
-this module has no board/sdcardio/storage import and is CPython-testable
-like the rest of hardware/shared -- the live adapter is whatever DeviceStorage
-implementation DeviceHardware.storage holds (None on a card-less device).
+client, ``PersistedScene``, which alone names its keys.
 """
 
 from __future__ import annotations
@@ -30,7 +26,7 @@ class DeviceStateStore:
             reports empty state and every write is a silent no-op.
         logger: Where a fail-soft read (malformed or non-object file
             content) is logged. Omitted or None normalizes to
-            Logger.SILENT, matching the rest of hardware/shared.
+            Logger.SILENT.
     """
 
     def __init__(self, storage: DeviceStorage | None, logger: Logger | None = None) -> None:
@@ -41,8 +37,7 @@ class DeviceStateStore:
         """Return *key*'s persisted value, or None if it was never set.
 
         Never-written file, malformed JSON, non-object JSON, and a missing
-        *key* within an otherwise-valid object all report the same absent
-        result -- an unset key is an ordinary case, not an error.
+        *key* all report the same absent result.
         """
         return self.read().get(key)
 
@@ -66,19 +61,11 @@ class DeviceStateStore:
         return True
 
     def set(self, key: str, value: str) -> None:
-        """Durably persist *value* under *key*, leaving every other key untouched.
-
-        A no-op when *storage* is ``None`` -- the device has nowhere durable
-        to write, so the call is silently dropped rather than raising.
-        """
+        """Durably persist *value* under *key*, leaving every other key untouched."""
         self.update({key: value})
 
     def clear(self, key: str) -> None:
-        """Remove *key* from the persisted state, leaving every other key untouched.
-
-        A no-op when *storage* is ``None``, or when *key* is already absent --
-        clearing an unset key is an ordinary case, not an error.
-        """
+        """Remove *key* from the persisted state, leaving every other key untouched."""
         self.update({}, remove=(key,))
 
     def update(self, values: dict[str, str], remove: tuple[str, ...] = ()) -> None:
@@ -88,8 +75,7 @@ class DeviceStateStore:
         of the file (as atomic as :meth:`DeviceStorage.write_json` allows)
         rather than in separate writes a power loss could split. Absent keys
         in *remove* are skipped and every other key is left untouched; when
-        nothing changes, nothing is written. A no-op when *storage* is
-        ``None``.
+        nothing changes, nothing is written.
         """
         if self._storage is None:
             return

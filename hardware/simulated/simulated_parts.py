@@ -82,8 +82,6 @@ _STAND_IN_BUS = object()
 
 
 class SimulatedPulseReader(PulseReader):
-    """One IR receiver's pulse buffer: pulses queue up and are read oldest first."""
-
     def __init__(self) -> None:
         self._pulses: deque[int] = deque()
 
@@ -113,8 +111,6 @@ class _SimulatedPulseWriter(PulseWriter):
 
 
 class SimulatedRadioTransport(RadioTransport):
-    """The radio chip: a send goes to the device, and landed packets wait to be read."""
-
     def __init__(self, device: SimulatedHardware) -> None:
         self._device = device
         self.waiting: deque[tuple[int, bytes]] = deque()
@@ -183,7 +179,6 @@ class SimulatedAudio(EffectOutput, VoiceSink):
         self._pool.restore(self, receipt)
 
     def is_path_playing(self, path: str) -> bool:
-        """Whether the clip at *path* is sounding on any voice now."""
         return any(
             voice is not None and voice[0] == path and self.is_playing(slot)
             for slot, voice in enumerate(self._voices)
@@ -289,12 +284,11 @@ class SimulatedMagnetometer:
 def _kept_or_made(
     kept: ScriptedSensor | None, make: Callable[[], ScriptedSensor]
 ) -> ScriptedSensor:
-    """The scripted sensor ``kept`` from an earlier boot, or one ``make`` builds the first time."""
     return kept if kept is not None else make()
 
 
 class _KeptParts:
-    """The parts that outlive a reboot; each ``None`` until first asked for."""
+    """The parts that outlive a reboot."""
 
     def __init__(self) -> None:
         self.storage: DeviceStorage | None = None

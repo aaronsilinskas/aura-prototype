@@ -4,11 +4,6 @@ Frames :mod:`hardware.shared.sd_sync_protocol` lines with a trailing newline
 delimiter -- ``encode_frame`` output is plain base64 and so never contains one
 -- so a byte stream with no message boundaries of its own (like a serial port)
 can still exchange one frame per :meth:`~UsbCdcTransport.send`/:meth:`~UsbCdcTransport.recv`.
-
-Takes a ``usb_cdc.Serial`` -- on-device wiring passes ``usb_cdc.data``, the
-channel ``hardware/circuitpython/boot.py`` opens -- but imports ``usb_cdc``
-only for the checker. It touches just ``timeout``, ``read(size)`` and
-``write(data)``, so tests pass a fake stream with those three.
 """
 
 from __future__ import annotations
@@ -48,11 +43,10 @@ class UsbCdcTransport(Transport):
     def recv(self) -> bytes:
         """Return the next newline-terminated line, with the terminator stripped.
 
-        Reads in :data:`_READ_SIZE`-byte pieces, buffering across calls, until
-        a newline appears; a stream that returns no bytes yet (a non-blocking
-        ``read`` with nothing waiting) is retried in a tight loop -- acceptable
-        for this single-connection device-side loop, which has nothing else to
-        do while waiting for the next request.
+        A stream that returns no bytes yet (a non-blocking ``read`` with
+        nothing waiting) is retried in a tight loop -- acceptable for this
+        single-connection device-side loop, which has nothing else to do while
+        waiting for the next request.
         """
         while b"\n" not in self._buffered:
             chunk = self._serial.read(_READ_SIZE)

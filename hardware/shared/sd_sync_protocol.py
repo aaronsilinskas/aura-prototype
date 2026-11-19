@@ -1,4 +1,4 @@
-"""SD-sync wire protocol — board-free frame representation shared by client and server.
+"""SD-sync wire protocol — frame representation shared by client and server.
 
 Every request, response, and streamed file chunk is carried as one **frame**: a
 small ASCII header line (``kind`` plus a free-form ``text`` field) optionally
@@ -8,21 +8,10 @@ control byte can desync a line-oriented reader -- and carries an arbitrary
 binary payload (a file chunk) intact, since base64 has no notion of "binary"
 versus "text" content.
 
-``Transport`` is the port both :class:`hardware.shared.sd_sync_server.SdSyncServer`
-and ``scripts.sd_sync_client.SdSyncClient`` reach each other through --
-``send``/``recv`` of one already-encoded frame line at a time. The serial adapters
-(:class:`~hardware.circuitpython.usb_cdc_transport.UsbCdcTransport` on the device,
-:class:`~scripts.sd_sync_transport.SerialTransport` on the host) and the
-in-memory loopback used by tests are all thin implementations of this port;
-neither this module nor its callers know or care which one is underneath.
-
 ``CHUNK_SIZE`` bounds how much of a file is ever in flight as a single frame:
 :func:`iter_chunks` slices a bytes object into pieces of at most this size, so a
 sender streams a file chunk-by-chunk rather than as one frame, and a receiver
 never has to hold more than one chunk's worth of un-acknowledged data.
-
-No ``board``/``busio``/CircuitPython-only import -- safe on CPython,
-CircuitPython 10.x, and MicroPython.
 """
 
 from __future__ import annotations
@@ -70,28 +59,14 @@ class Frame:
 
 
 class Transport:
-    """Port through which the SD-sync client and server exchange encoded frame lines.
-
-    A plain base class -- the same substitute pattern as ``RadioTransport``
-    and ``PulseReader``/``PulseWriter`` (``typing.Protocol`` is unavailable on
-    the constrained runtimes). Subclass and override both methods to connect
-    to a real serial link or an in-memory test double.
-    """
+    """Port through which the SD-sync client and server exchange encoded frame lines."""
 
     def send(self, line: bytes) -> None:
-        """Send one already-encoded frame line.
-
-        Raises:
-            NotImplementedError: Always -- subclasses must override.
-        """
+        """Send one already-encoded frame line."""
         raise NotImplementedError
 
     def recv(self) -> bytes:
-        """Block until the next frame line arrives and return it.
-
-        Raises:
-            NotImplementedError: Always -- subclasses must override.
-        """
+        """Block until the next frame line arrives and return it."""
         raise NotImplementedError
 
 
@@ -121,9 +96,7 @@ def encode_listing(entries: list[tuple[str, int]]) -> bytes:
 
     One ``"path\\tsize"`` line per entry, newline-joined, UTF-8 encoded --
     a listing is small enough (unlike a pulled file's contents) to send
-    whole in a single frame rather than chunked. A free implementation
-    detail of the ``list`` verb, paired with :func:`decode_listing`; not
-    asserted directly by tests, only through the round trip it enables.
+    whole in a single frame rather than chunked.
     """
     return "\n".join(f"{path}\t{size}" for path, size in entries).encode("utf-8")
 

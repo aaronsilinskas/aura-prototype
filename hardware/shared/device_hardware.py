@@ -1,4 +1,4 @@
-"""DeviceHardware — the board-free bundle build_hardware returns. No board imports."""
+"""DeviceHardware: the bundle build_hardware returns."""
 
 from __future__ import annotations
 

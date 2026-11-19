@@ -1,15 +1,11 @@
-"""Hardware-agnostic IR transport layer for the Aura platform.
+"""IR transport layer.
 
 Provides the public ``PulseReader`` / ``PulseWriter`` ports the platform
 adapters implement, and the module-private transmitter, receiver and IR
 transmit gate that only ``InfraredTransceiver`` builds and drives.
 
-No ``pulseio`` import — safe on CPython, CircuitPython 10.x, and MicroPython.
-
-Design notes
-------------
-- ``PulseReader`` and ``PulseWriter`` are plain base classes (not
-  ``typing.Protocol``, which is unavailable on constrained runtimes).
+``PulseReader`` and ``PulseWriter`` are plain base classes (not
+``typing.Protocol``, which is unavailable on constrained runtimes).
 """
 
 from array import array
@@ -23,11 +19,7 @@ if TYPE_CHECKING:
 
 
 class PulseWriter:
-    """Port through which the IR subsystem sends one emitter's pulses.
-
-    A plain base class — subclass and override :meth:`write_pulses` to
-    connect to hardware (e.g. ``pulseio.PulseOut``) or a test fake.
-    """
+    """Port through which the IR subsystem sends one emitter's pulses."""
 
     def write_pulses(self, durations: "array[int]") -> None:
         """Transmit a sequence of pulse durations in microseconds.
@@ -37,9 +29,6 @@ class PulseWriter:
                 encoder returns them, alternating mark/space, starting and
                 ending with a mark, so odd-length. A writer may reject an
                 even-length frame with ``ValueError``.
-
-        Raises:
-            NotImplementedError: Always — subclasses must override.
         """
         raise NotImplementedError
 
@@ -51,18 +40,12 @@ class PulseWriter:
         single-core runtime) duration of its blocking send; a non-blocking
         (e.g. DMA-backed) writer reports ``True`` until the hardware signals
         completion.
-
-        Raises:
-            NotImplementedError: Always — subclasses must override.
         """
         raise NotImplementedError
 
 
 class PulseReader:
     """Port through which receivers consume IR pulses one at a time.
-
-    A plain base class — subclass and override :meth:`read_pulse` to
-    connect to hardware (e.g. ``pulseio.PulseIn``) or a test fake.
 
     Attributes:
         buffer_full_on_poll: Monotonic-since-boot count of reads that
@@ -85,9 +68,6 @@ class PulseReader:
 
         Returns:
             Pulse duration in µs, or ``None`` if no pulse is ready.
-
-        Raises:
-            NotImplementedError: Always — subclasses must override.
         """
         raise NotImplementedError
 
@@ -106,8 +86,7 @@ class _IrTransmitGate:
 
     Tracks an active-emission depth (not a bare boolean) so suppression stays
     armed across concurrent or back-to-back emissions, falling to "not
-    transmitting" only when the last active emission ends. ``__slots__`` —
-    no per-instance dict, safe to construct once per device.
+    transmitting" only when the last active emission ends.
     """
 
     __slots__ = ("_depth", "_flush_pending")
@@ -123,9 +102,8 @@ class _IrTransmitGate:
     def end_transmit(self) -> None:
         """Mark one emission as ending.
 
-        Decrements the active-emission depth and arms the one-shot flush
-        latch so the receiver performs exactly one more drain-and-discard on
-        its next poll.
+        Arms the one-shot flush latch so the receiver performs exactly one more
+        drain-and-discard on its next poll.
         """
         self._depth -= 1
         self._flush_pending = True
@@ -226,13 +204,9 @@ class _InfraredTransmitter:
     def send(self, data: bytes) -> None:
         """Start transmitting *data* if idle, else append it to the FIFO queue.
 
-        While a write is outstanding (``PulseWriter.is_busy()`` is ``True``),
-        *data* is appended to an unbounded FIFO queue of buffered payloads —
-        nothing already queued is overwritten. No encoding happens for a
-        queued payload until it is started (by :meth:`poll`, oldest first).
-
-        Args:
-            data: Opaque payload bytes to transmit.
+        While a write is outstanding, *data* is appended to an unbounded FIFO
+        queue of buffered payloads — nothing already queued is overwritten. No
+        encoding happens for a queued payload until it is started.
         """
         if self._writer.is_busy():
             self._pending_queue.append(data)
@@ -242,12 +216,7 @@ class _InfraredTransmitter:
     def poll(self) -> bool:
         """Per-tick pump: release a deferred gate and start the oldest queued send.
 
-        Must be called every tick. Does nothing while the writer reports
-        busy. Once the writer reports idle, calls
-        :meth:`_release_gate_when_idle` (fires the transmit gate's
-        ``end_transmit`` if it was left armed by a non-blocking write), then
-        pops and starts the oldest queued payload, if any (a no-op when the
-        queue is empty).
+        Must be called every tick.
 
         Returns:
             The writer's busy state evaluated at the end of the call — after
@@ -273,11 +242,7 @@ class _InfraredTransmitter:
         return writer.is_busy()
 
     def _start_write(self, data: bytes) -> None:
-        """Encode *data* and kick off the write, bracketing it with the gate.
-
-        Args:
-            data: Opaque payload bytes to transmit.
-        """
+        """Encode *data* and kick off the write, bracketing it with the gate."""
         self._release_gate_when_idle()
         gate = self._gate
         gate.begin_transmit()

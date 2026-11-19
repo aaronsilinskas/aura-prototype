@@ -1,4 +1,4 @@
-"""NeoPixel current-budget arithmetic -- no board imports, CPython-testable.
+"""NeoPixel current-budget arithmetic.
 
 Reached only through ``parse_device_config``, which parses the
 ``neopixel_current_budget`` block and calls :func:`tune_neopixel_brightness`

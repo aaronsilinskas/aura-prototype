@@ -1,7 +1,6 @@
 """The flash side of scene selection: ``aura-boot.json``'s ``default_scene`` and Scene deploy token.
 
-Pure and board-free. The card side, the Persisted scene record, is
-``hardware.shared.persisted_scene``.
+The card side, the Persisted scene record, is ``hardware.shared.persisted_scene``.
 """
 
 from __future__ import annotations
