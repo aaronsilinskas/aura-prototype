@@ -56,8 +56,6 @@ class TextSink(Protocol):
 
 
 class SplitWriter:
-    """Write to two streams simultaneously."""
-
     __slots__ = ("_primary", "_secondary")
 
     def __init__(self, primary: IO[str], secondary: IO[str]) -> None:
@@ -75,8 +73,6 @@ class SplitWriter:
 
 
 class WatchResult:
-    """Outcome of a watch_stream call."""
-
     __slots__ = ("reason",)
 
     def __init__(self, reason: str) -> None:
@@ -117,8 +113,7 @@ def watch_stream(
         until: Stop when any line contains this substring (plain substring, no
             regex). ``None`` disables marker matching.
         timeout: Maximum seconds to run. ``None`` means unlimited.
-        clock: Callable returning monotonic time in seconds. Injectable for
-            testing; defaults to ``time.monotonic``.
+        clock: Callable returning monotonic time in seconds.
         out: Output stream for echoing lines. Defaults to ``sys.stdout``.
 
     Returns:
@@ -211,8 +206,6 @@ def find_console_port(*, explicit_port: "str | None" = None) -> str:
     return select_console_port(list(circuitpython_serial.repl_comports()))
 
 
-# open_serial_with_retry, SerialHandle and iter_serial_lines are thin glue over
-# the serial port, not unit tested.
 def open_serial_with_retry(
     port: str,
     baud: int,
@@ -400,7 +393,6 @@ def parse_args(argv: "list[str] | None" = None) -> argparse.Namespace:
 
 
 def run_deploy(args: argparse.Namespace, *, deploy: "Callable[..., int]" = deploy) -> int:
-    """Run the deploy step for parsed *args*, returning ``deploy``'s exit code."""
     return deploy(args.example_file, args.mount, scene=args.scene, use_source=args.source)
 
 

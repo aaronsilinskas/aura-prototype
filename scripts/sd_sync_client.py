@@ -70,8 +70,7 @@ class SdSyncClient:
     """Pulls files from, and pushes files to, a device's SD card over an injected ``Transport``.
 
     Args:
-        transport: The port to reach the server through (real serial, or an
-            in-memory loopback for tests).
+        transport: The port to reach the server through.
         max_attempts: Total attempts (initial try plus retries) before a
             checksum-verified pull or push gives up and raises
             :class:`SdSyncIntegrityError`.
@@ -164,13 +163,6 @@ class SdSyncClient:
     def push(self, host_path: str, sd_path: str) -> None:
         """Upload *host_path* to the SD card at *sd_path*, preserving its bytes exactly.
 
-        Reads the host file chunk-by-chunk (never buffering the whole file)
-        and streams it to the server. The server accumulates its own CRC-32
-        of what it received and compares it against the one this method sends
-        on the closing frame, replying whether the new content committed; a
-        mismatch retries the whole upload (a fresh request, a fresh read) up
-        to ``max_attempts`` times.
-
         Args:
             host_path: The local file to upload.
             sd_path: Where to write it on the SD card, relative to the mount
@@ -200,13 +192,9 @@ class SdSyncClient:
     def _send_verified(self, host_path: str) -> bool:
         """Stream *host_path* to the server (stop-and-wait); return whether it committed.
 
-        Runs after the server has already confirmed ``"ok"`` for the request
-        -- sends each chunk and waits for its ack before sending the next, so
-        no more than one chunk plus whatever the OS keeps buffered is ever
-        held before the server acknowledges it, then a closing ``done`` frame
-        carrying the whole-file CRC-32 accumulated while reading. The
-        server's reply to that frame is ``"ok"`` (committed) or
-        ``"crc_mismatch"`` (left on disk untouched).
+        Runs after the server has already confirmed ``"ok"`` for the request.
+        The server replies to the closing ``done`` frame with ``"ok"``
+        (committed) or ``"crc_mismatch"`` (left on disk untouched).
         """
         crc = 0
         with open(host_path, "rb") as host_file:

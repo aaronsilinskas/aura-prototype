@@ -1,9 +1,9 @@
 """The Scene boot: ``build_scene_boot`` turns a device's hardware into a booted scene and its tick.
 
 Its interface is ``build_scene_boot`` and the ``SceneBoot`` it returns; every
-boot step below is private. CPython-testable: imports only ``engine`` and the
-board-free modules under ``hardware.shared``, so no ``TYPE_CHECKING`` guard
-is needed.
+boot step below is private. It imports only ``engine`` and the board-free
+modules under ``hardware.shared``, so it runs under CPython as well as on the
+device.
 """
 
 from __future__ import annotations
@@ -251,17 +251,12 @@ def build_scene_boot(
 def _build_scene_tick(hw: DeviceHardware, runtime: SceneRuntime) -> Callable[[], None]:
     """Return the per-tick body that drives *runtime* on *hw*; call it once per tick.
 
-    The one loop body shared by the device
-    (:func:`app.run_scene.run_scene`, which adds only ``while True:`` and
-    ``gc.collect()``) and the Simulated device, so neither copies it, as
-    both share the boot that builds it (:func:`build_scene_boot`). Each tick
-    first advances the runtime's clock, so the parts, rules and effects all
-    see this tick's elapsed time; then updates every Polled part in
-    ``hw.polled``, naming none, and builds the events from their state.
-    Build it once per runtime: the ``InputEvents.Sensors`` event and the
-    telemetry gate are allocated here (the button, acceleration and magnetic
-    buffers are each part's own ``reading``) and mutated in place every
-    tick, so the steady-state tick allocates nothing on-device.
+    Each tick advances the runtime's clock first, so the parts, rules and
+    effects all see this tick's elapsed time. Build it once per runtime: the
+    ``InputEvents.Sensors`` event and the telemetry gate are allocated here (the
+    button, acceleration and magnetic buffers are each part's own ``reading``)
+    and mutated in place every tick, so the steady-state tick allocates nothing
+    on-device.
     """
     polled = hw.polled
     accelerometer = hw.accelerometer

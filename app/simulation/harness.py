@@ -462,8 +462,6 @@ class SimulatedDevice:
         """
         return "".join(self._narration).splitlines()
 
-    # -- deploys ------------------------------------------------------------
-
     def redeploy(self, scene: str) -> None:
         """Redeploy with *scene* and reboot, as ``deploy.py --scene`` then a reset would.
 
@@ -484,8 +482,6 @@ class SimulatedDevice:
         self._narration.clear()
         self._sim_hw.power_on()
         self._boot()
-
-    # -- overlays -----------------------------------------------------------
 
     def overlay(self, scene: str) -> None:
         """Cover the running scene with *scene*, as a rule's ``overlay`` would.
@@ -512,8 +508,6 @@ class SimulatedDevice:
             ValueError: nothing covers the device's scene.
         """
         self._scene_controls.pop()
-
-    # -- inputs -------------------------------------------------------------
 
     def tap(self, button: str) -> None:
         """Press and release *button*, advancing the simulation until both register.
@@ -627,8 +621,6 @@ class SimulatedDevice:
         """
         self._sim_hw.land_radio(payload, sender)
 
-    # -- queries ------------------------------------------------------------
-
     @property
     def capabilities(self) -> frozenset[str]:
         """The Capabilities the Device assembly built for this device."""
@@ -681,8 +673,6 @@ class SimulatedDevice:
         Strips keep showing their current frame; only the event records clear.
         """
         self._sim_hw.forget()
-
-    # -- loop ---------------------------------------------------------------
 
     def _tick(self) -> None:
         self._sim_hw.settle_pins()

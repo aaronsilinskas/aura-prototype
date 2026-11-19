@@ -54,7 +54,6 @@ class BuildResult:
 
 
 def mpy_cross_compile(src: Path, dest: Path) -> None:
-    """Compile *src* to *dest* using the CircuitPython mpy-cross binary."""
     dest.parent.mkdir(parents=True, exist_ok=True)
     try:
         subprocess.run(
@@ -68,7 +67,6 @@ def mpy_cross_compile(src: Path, dest: Path) -> None:
 
 
 def get_mpy_cross_major(mpy_cross_bin: str) -> int:
-    """Return the major version integer from ``mpy-cross --version`` output."""
     try:
         result = subprocess.run(
             [mpy_cross_bin, "--version"],
@@ -100,7 +98,6 @@ def get_mpy_cross_major(mpy_cross_bin: str) -> int:
 
 
 def parse_circuitpython_major_from_boot_out(boot_out_text: str) -> int:
-    """Return the CircuitPython major version integer from *boot_out_text*."""
     match = _BOOT_OUT_VERSION_RE.search(boot_out_text)
     if not match:
         raise VersionError(

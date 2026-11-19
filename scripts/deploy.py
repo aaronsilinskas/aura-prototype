@@ -75,7 +75,6 @@ def _sync_file(
     dry_run: bool = False,
     force: bool = False,
 ) -> None:
-    """Copy src to dest unless it should be skipped."""
     if not force and _should_skip(src, dest):
         skipped.append(dest)
         print(f"SKIP  {label} (up to date)")
@@ -90,7 +89,6 @@ def _sync_file(
 
 
 def _remove_empty_dirs(dest_dir: Path) -> None:
-    """Remove every empty directory under *dest_dir*, then *dest_dir* itself if empty."""
     if not dest_dir.is_dir():
         return
     for d in sorted(dest_dir.rglob("*"), key=lambda p: len(p.parts), reverse=True):
@@ -103,10 +101,7 @@ def _remove_empty_dirs(dest_dir: Path) -> None:
 def _write_scene(mount: Path, scene: str) -> None:
     """Set ``default_scene`` and a fresh Scene deploy token in ``aura-boot.json``.
 
-    Merges with any existing keys. A board with no ``aura-boot.json`` gets
-    one created fresh holding only these two keys — unlike ``aura-device.json``,
-    there is no sample template to seed from (the boot file is trivially
-    authored).
+    Merges with any existing keys, creating the file when the board has none.
     """
     boot_path = mount / "aura-boot.json"
     boot_values = json.loads(boot_path.read_text()) if boot_path.exists() else {}
@@ -141,8 +136,7 @@ def deploy(
             beside a fresh ``scene_deploy_token``; omit to leave the file untouched.
         compile: Callable ``(src, dest) -> None`` used to compile each ``.py`` file
             to ``.mpy`` in a staging tree before syncing.  Defaults to the real
-            ``mpy_cross_compile`` (requires ``mpy-cross`` installed).  Pass a fake
-            for unit tests.  When ``None`` the real compiler is used.
+            ``mpy_cross_compile`` (requires ``mpy-cross`` installed).
         use_source: When True, skip compilation entirely and sync raw ``.py`` files
             directly from the source tree.  Requires no ``mpy-cross`` toolchain.
 
