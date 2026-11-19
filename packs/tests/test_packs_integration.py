@@ -36,9 +36,6 @@ def catalog() -> PackCatalog:
     return scan_pack_roots([_PACKS_ROOT])
 
 
-# --- Effects registry ---
-
-
 def test_fire_pack_exposes_valid_effect_builder(catalog: PackCatalog) -> None:
     registry = catalog.effect_registry
 
@@ -118,9 +115,6 @@ def test_red_light_green_light_scene_json_does_not_list_own_effect_or_rule_packs
     assert "red_light_green_light" not in rule_pack_names
 
 
-# --- Rules registry ---
-
-
 def test_event_logger_rule_is_a_game_rule(catalog: PackCatalog) -> None:
     registry = catalog.rule_registry
 
@@ -135,9 +129,6 @@ def test_debug_exposes_all_expected_rule_modules(catalog: PackCatalog) -> None:
     items = rule_registry.items("debug")
 
     assert "event_logger" in items
-
-
-# --- Return-to-lobby rule pack (issue #912) ---
 
 
 def test_return_to_lobby_rule_is_a_game_rule(catalog: PackCatalog) -> None:
@@ -171,9 +162,6 @@ def test_non_lobby_scene_holds_five_seconds_to_return_to_lobby(
     scene = catalog.scene_registry.get(scene_name)
 
     assert scene.settings.get("return_to_lobby", "hold_seconds") == 5.0
-
-
-# --- ir_range_receiver scene discovery (issue #918) ---
 
 
 def test_ir_range_receiver_scene_local_rule_is_discovered(catalog: PackCatalog) -> None:
@@ -292,9 +280,6 @@ def _resolve_every_local_clip(catalog: PackCatalog, scene_name: str) -> list[str
     return resolved_paths
 
 
-# --- Clip resolution through the Active scene namespace (issue #804) ---
-
-
 def test_effect_pack_sounds_resolve_qualified_by_their_pack_name(catalog: PackCatalog) -> None:
     namespace = _namespace_with_active(catalog, "hardware_test")
 
@@ -345,9 +330,6 @@ def test_a_device_with_no_audio_output_still_resolves_the_clip_of_an_effect_it_s
     assert start.clip.path == _under_packs("scenes/hardware_test/sounds/sfx_test_start.wav")
 
 
-# --- Tag scene audio discovery (issue #805) ---
-
-
 def test_tag_scenes_own_sounds_resolve_to_its_sounds_folder(catalog: PackCatalog) -> None:
     namespace = _namespace_with_active(catalog, "tag")
 
@@ -384,9 +366,6 @@ def test_tag_scene_every_audio_playing_effects_clip_name_resolves(catalog: PackC
     # so a future scan/discovery regression collapsing this to zero effects
     # doesn't pass silently.
     assert len(resolved_clip_names) == 9
-
-
-# --- Red Light Green Light scene audio discovery (issue #806) ---
 
 
 def test_red_light_green_light_scenes_own_sounds_resolve_to_its_sounds_folder(
@@ -429,9 +408,6 @@ def test_red_light_green_light_scene_every_audio_playing_effects_clip_name_resol
     # so a future scan/discovery regression collapsing this to zero effects
     # doesn't pass silently.
     assert len(resolved_clip_names) == 7
-
-
-# --- A scene running the debug rule pack ---
 
 
 def _debug_runtime(catalog: PackCatalog, settings: Settings | None = None) -> SceneRuntime:

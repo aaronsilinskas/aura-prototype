@@ -35,16 +35,8 @@ class ButtonData:
     def __init__(self, states: dict[str, int]) -> None:
         self._states = states
 
-    # ------------------------------------------------------------------
-    # Mutation
-    # ------------------------------------------------------------------
-
     def set(self, name: str, state: int) -> None:
         self._states[name] = state
-
-    # ------------------------------------------------------------------
-    # Query helpers
-    # ------------------------------------------------------------------
 
     def is_pressed(self, name: str) -> bool:
         """Return ``True`` if *name* transitioned to pressed this frame."""

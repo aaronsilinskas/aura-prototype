@@ -15,9 +15,6 @@ def _build(options: dict | None = None, listeners: list | None = None):
     return BUILD("basic.pulse", _config(options, listeners))
 
 
-# --- PulseEffect emits PEAK when the brighten phase ends ---
-
-
 def test_pulse_effect_declares_peak_as_its_only_custom_verb() -> None:
     from packs.effects.basic.helpers.pulse_effect import PulseEffect
 
@@ -33,9 +30,6 @@ def test_pulse_effect_emits_peak_when_the_brighten_phase_ends() -> None:
     effect.pixels.update(0.6)  # past the default 0.5 s brighten phase → crosses the end of brighten
 
     assert events == [PulseEffect.PEAK]
-
-
-# --- PulseEffect does NOT call listener when not at peak ---
 
 
 def test_pulse_effect_no_listener_call_during_brighten() -> None:
@@ -77,16 +71,10 @@ def test_pulse_effect_no_listener_call_during_off() -> None:
     assert events == []
 
 
-# --- PulseEffect with no listeners fires without error ---
-
-
 def test_pulse_effect_peak_with_no_listeners_is_silent() -> None:
     effect = _build()  # no listeners
     effect.pixels.update(0.6)  # crosses the end of brighten
     # Should not raise
-
-
-# --- Listener called on second cycle peak ---
 
 
 def test_pulse_effect_emits_peak_once_on_the_second_cycle_peak() -> None:

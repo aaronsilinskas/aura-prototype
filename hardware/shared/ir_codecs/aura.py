@@ -23,10 +23,8 @@ TYPE_CHECKING = False
 if TYPE_CHECKING:
     from typing import Final
 
-# ---------------------------------------------------------------------------
-# Wire-frame timing constants (µs)
-# ---------------------------------------------------------------------------
 
+# Wire-frame timings are in µs, each a multiple of IR_UNIT.
 IR_UNIT: Final = 500
 
 IR_HEADER_MARK: Final = IR_UNIT * 8  # 4000 µs
@@ -44,11 +42,7 @@ _IR_ERROR_MARGIN: Final = IR_UNIT // 2  # 250 µs — internal tolerance thresho
 _CRC_GENERATOR: Final = 0x1D
 
 
-# ---------------------------------------------------------------------------
-# CRC-8 helper (no allocation — pure integer arithmetic)
-# ---------------------------------------------------------------------------
-
-
+# Pure integer arithmetic: it allocates nothing.
 def _calculate_crc(data: bytes | bytearray, length: int = -1) -> int:
     """Return the CRC-8 (generator ``0x1D``) of the first *length* bytes of *data*.
 
@@ -63,10 +57,6 @@ def _calculate_crc(data: bytes | bytearray, length: int = -1) -> int:
             crc = ((crc << 1) & 0xFF) ^ (_CRC_GENERATOR if crc & 0x80 else 0)
     return crc
 
-
-# ---------------------------------------------------------------------------
-# Aura concrete encoder
-# ---------------------------------------------------------------------------
 
 # Decoder state constants
 _STATE_IDLE: Final = 0
@@ -128,11 +118,6 @@ class AuraInfraredEncoder(InfraredEncoder):
             value = (value << 1) & 0xFF
             idx += 2
         return idx
-
-
-# ---------------------------------------------------------------------------
-# Aura concrete decoder
-# ---------------------------------------------------------------------------
 
 
 class AuraInfraredDecoder(InfraredDecoder):
@@ -220,10 +205,6 @@ class AuraInfraredDecoder(InfraredDecoder):
         self.reset(self._error_threshold)
         return None
 
-
-# ---------------------------------------------------------------------------
-# Resolution convention: module-level ENCODER / DECODER
-# ---------------------------------------------------------------------------
 
 ENCODER = AuraInfraredEncoder
 DECODER = AuraInfraredDecoder

@@ -49,11 +49,6 @@ _DEFAULT_REBOOT_TIMEOUT: Final = 5.0
 _CIRCUITPYTHON_BANNER: Final = "soft reboot"
 
 
-# ---------------------------------------------------------------------------
-# SplitWriter
-# ---------------------------------------------------------------------------
-
-
 class TextSink(Protocol):
     """A text stream ``watch_stream`` echoes to: a file, ``sys.stdout`` or a ``SplitWriter``."""
 
@@ -79,11 +74,6 @@ class SplitWriter:
         self._secondary.flush()
 
 
-# ---------------------------------------------------------------------------
-# Result type
-# ---------------------------------------------------------------------------
-
-
 class WatchResult:
     """Outcome of a watch_stream call."""
 
@@ -91,11 +81,6 @@ class WatchResult:
 
     def __init__(self, reason: str) -> None:
         self.reason = reason
-
-
-# ---------------------------------------------------------------------------
-# Core pure functions
-# ---------------------------------------------------------------------------
 
 
 def discard_until(
@@ -165,11 +150,6 @@ def watch_stream(
     return WatchResult("stream_ended")
 
 
-# ---------------------------------------------------------------------------
-# Exit-code mapping
-# ---------------------------------------------------------------------------
-
-
 def exit_code_for(reason: str, *, until: str | None) -> int:
     """Map a WatchResult reason to a process exit code.
 
@@ -189,11 +169,6 @@ def exit_code_for(reason: str, *, until: str | None) -> int:
     if until is None:
         return 0
     return 2
-
-
-# ---------------------------------------------------------------------------
-# Port discovery
-# ---------------------------------------------------------------------------
 
 
 class ConsolePortError(Exception):
@@ -236,11 +211,8 @@ def find_console_port(*, explicit_port: "str | None" = None) -> str:
     return select_console_port(list(circuitpython_serial.repl_comports()))
 
 
-# ---------------------------------------------------------------------------
-# Serial adapter (thin glue — not unit tested)
-# ---------------------------------------------------------------------------
-
-
+# open_serial_with_retry, SerialHandle and iter_serial_lines are thin glue over
+# the serial port, not unit tested.
 def open_serial_with_retry(
     port: str,
     baud: int,
@@ -334,11 +306,6 @@ def iter_serial_lines(
             raw, _, rest = buffer.partition(b"\n")
             buffer = bytearray(rest)
             yield raw.decode("utf-8", errors="replace").rstrip("\r")
-
-
-# ---------------------------------------------------------------------------
-# CLI
-# ---------------------------------------------------------------------------
 
 
 def parse_args(argv: "list[str] | None" = None) -> argparse.Namespace:
@@ -440,7 +407,6 @@ def run_deploy(args: argparse.Namespace, *, deploy: "Callable[..., int]" = deplo
 def main() -> None:
     args = parse_args()
 
-    # --- port discovery ---
     try:
         port = find_console_port(explicit_port=args.port)
     except ConsolePortError as exc:

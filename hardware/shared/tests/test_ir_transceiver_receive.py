@@ -29,10 +29,6 @@ from hardware.shared.tests.ir_fakes import (
     telemetry_counters,
 )
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 
 def _receiving(reader_count: int) -> tuple[InfraredTransceiver, list[ReplayingPulseReader]]:
     """A transceiver with *reader_count* fake readers and no emitter."""
@@ -53,11 +49,6 @@ def _emitting(
     factory = EmitterWriterFactory(blocking=not holds)
     transceiver = InfraredTransceiver(list(readers), {LINE: "GP1"}, factory)
     return transceiver, readers, factory.writers[LINE]
-
-
-# ---------------------------------------------------------------------------
-# Receiving frames
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize("reader_count", [1, 3])
@@ -129,11 +120,6 @@ def test_back_to_back_frames_on_one_reader_are_received_one_update_apart():
     assert transceiver.received == bytearray(b"\x02")
 
 
-# ---------------------------------------------------------------------------
-# IR multi-receiver — lowest error margin wins
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.parametrize("clean_index", [0, 1])
 def test_the_frame_with_the_lowest_error_margin_wins_and_its_reader_is_named(clean_index):
     noisy = aura_pulses(b"\xab")
@@ -189,11 +175,6 @@ def test_no_signal_or_best_receiver_is_reported_before_the_first_frame():
     assert transceiver.last_signal_strength is None
     assert transceiver.last_error_margin is None
     assert transceiver.last_best_receiver is None
-
-
-# ---------------------------------------------------------------------------
-# Drain-but-discard while emitting
-# ---------------------------------------------------------------------------
 
 
 def test_frames_read_on_any_reader_while_emitting_are_never_received():
@@ -276,11 +257,6 @@ def test_a_decode_in_progress_when_emission_ends_does_not_survive_the_post_emiss
     assert transceiver.received is None
 
 
-# ---------------------------------------------------------------------------
-# Codec swaps
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.parametrize("reader_count", [1, 2])
 def test_after_apply_codec_frames_decode_with_the_new_wire_frame(reader_count):
     transceiver, readers = _receiving(reader_count)
@@ -333,11 +309,6 @@ def test_after_apply_codec_telemetry_reports_the_new_decoders_counters():
     assert telemetry_counters(transceiver)["preamble_reject"] == 1
 
 
-# ---------------------------------------------------------------------------
-# Inter-frame gap
-# ---------------------------------------------------------------------------
-
-
 def test_an_inter_frame_gap_abandons_a_stalled_partial_frame_so_the_next_decodes():
     stalled = tag_pulses(b"\x55")[: len(TAG_PREAMBLE) + 2]
     transceiver, readers = _receiving(1)
@@ -347,11 +318,6 @@ def test_an_inter_frame_gap_abandons_a_stalled_partial_frame_so_the_next_decodes
     transceiver.update(0.0)
 
     assert transceiver.received == bytearray(b"\x2a")
-
-
-# ---------------------------------------------------------------------------
-# IR receive-path telemetry
-# ---------------------------------------------------------------------------
 
 
 def test_telemetry_line_reports_on_its_first_call():
@@ -527,11 +493,6 @@ def test_update_allocates_nothing_while_draining_during_emission():
     diff = _ir_allocations_over_100_updates(transceiver)
 
     assert not diff, f"Unexpected per-tick allocations: {diff}"
-
-
-# ---------------------------------------------------------------------------
-# No readers
-# ---------------------------------------------------------------------------
 
 
 def test_a_transceiver_with_no_readers_receives_nothing_and_reports_no_receive_values():

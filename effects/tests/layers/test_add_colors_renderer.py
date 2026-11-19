@@ -18,11 +18,6 @@ class _ConstantLayer(Layer):
         return self._value
 
 
-# ---------------------------------------------------------------------------
-# AddColorsRenderer — single layer (no blending path)
-# ---------------------------------------------------------------------------
-
-
 def test_add_colors_renderer_with_one_layer_matches_layer_renderer_output() -> None:
     palette = PaletteLUT256(_BLACK_TO_WHITE)
     layer = _ConstantLayer(0.5)
@@ -34,11 +29,6 @@ def test_add_colors_renderer_with_one_layer_matches_layer_renderer_output() -> N
     expected = palette.lookup(0.5)
     for i in range(4):
         assert output[i] == expected
-
-
-# ---------------------------------------------------------------------------
-# AddColorsRenderer — additive blending
-# ---------------------------------------------------------------------------
 
 
 def test_add_colors_renderer_two_layers_are_brighter_than_one() -> None:
@@ -88,11 +78,6 @@ def test_add_colors_renderer_clamps_channels_at_255() -> None:
     renderer.render(output)
 
     assert output[0] == Palette.pack_rgb(255, 255, 255)
-
-
-# ---------------------------------------------------------------------------
-# AddColorsRenderer — update advances all layers
-# ---------------------------------------------------------------------------
 
 
 def test_add_colors_renderer_update_advances_all_layers() -> None:

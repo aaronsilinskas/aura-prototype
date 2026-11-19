@@ -17,11 +17,6 @@ TWO_ROUNDS = {"max_ammo": 2, "shot_cooldown": 0.3, "reload_duration": 1.0}
 """A short magazine and reload, so running dry and reloading stay quick."""
 
 
-# ---------------------------------------------------------------------------
-# Firing
-# ---------------------------------------------------------------------------
-
-
 def test_pressing_a_fires_the_players_own_tag_on_the_line_emitter(simulation):
     player = simulation.add_device("red", scene="tag", setting_overrides=tag_settings(SHOOTER))
     start_game(simulation, player)
@@ -103,11 +98,6 @@ def test_pressing_a_before_the_game_starts_counts_down_instead_of_firing(simulat
     assert player.has_played("scene.warning_pulse_peak")
 
 
-# ---------------------------------------------------------------------------
-# Cooldown
-# ---------------------------------------------------------------------------
-
-
 def test_a_second_press_inside_the_cooldown_is_swallowed(simulation):
     player = simulation.add_device(
         "red", scene="tag", setting_overrides=tag_settings({"shot_cooldown": 1.0})
@@ -131,11 +121,6 @@ def test_a_press_after_the_cooldown_fires_again(simulation):
     player.tap("A")
 
     assert len(shots(player)) == 2
-
-
-# ---------------------------------------------------------------------------
-# Running dry and reloading
-# ---------------------------------------------------------------------------
 
 
 def empty_the_magazine(simulation: Simulation, player: SimulatedDevice) -> None:
@@ -326,11 +311,6 @@ def test_a_press_after_an_abandoned_reload_dry_fires(simulation):
 
     assert shots(player) == []
     assert player.has_played("scene.dry_fire_start")
-
-
-# ---------------------------------------------------------------------------
-# More than one device
-# ---------------------------------------------------------------------------
 
 
 def test_one_players_trigger_never_fires_another_players_blaster(simulation):

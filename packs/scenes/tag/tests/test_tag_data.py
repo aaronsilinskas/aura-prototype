@@ -9,10 +9,6 @@ import pytest
 
 from packs.scenes.tag.tag_data import TagData, decode_tag_data, encode_tag_data
 
-# ---------------------------------------------------------------------------
-# TagData value object
-# ---------------------------------------------------------------------------
-
 
 def test_tag_data_stores_team_player_and_damage():
     tag = TagData(team=2, player=5, damage=3)
@@ -26,11 +22,6 @@ def test_tag_data_uses_slots_with_no_instance_dict():
     tag = TagData(team=0, player=1, damage=1)
 
     assert not hasattr(tag, "__dict__")
-
-
-# ---------------------------------------------------------------------------
-# encode_tag_data / decode_tag_data
-# ---------------------------------------------------------------------------
 
 
 def test_minimum_tag_data_encodes_to_zero_byte():

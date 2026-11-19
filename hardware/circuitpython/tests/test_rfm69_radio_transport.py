@@ -7,10 +7,6 @@ substituted per test via ``patch``.
 
 from unittest.mock import MagicMock, patch
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 
 def _build_transport(mock_radio: MagicMock):
     """Return an Rfm69RadioTransport whose underlying RFM69 is *mock_radio*."""
@@ -26,11 +22,6 @@ def _build_transport(mock_radio: MagicMock):
             frequency=915.0,
             node=1,
         )
-
-
-# ---------------------------------------------------------------------------
-# construction — configures the driver for non-blocking reads
-# ---------------------------------------------------------------------------
 
 
 def test_construction_disables_receive_timeout_so_driver_reads_never_block() -> None:
@@ -51,11 +42,6 @@ def test_construction_starts_the_chip_listening_so_packets_arrive_before_the_fir
     mock_radio.listen.assert_called_once_with()
 
 
-# ---------------------------------------------------------------------------
-# send() — transmits with keep_listening=True
-# ---------------------------------------------------------------------------
-
-
 def test_send_transmits_payload_with_keep_listening_so_chip_returns_to_rx() -> None:
     mock_radio = MagicMock(name="radio")
     transport = _build_transport(mock_radio)
@@ -65,13 +51,9 @@ def test_send_transmits_payload_with_keep_listening_so_chip_returns_to_rx() -> N
     mock_radio.send.assert_called_once_with(b"\xab\xcd", keep_listening=True)
 
 
-# ---------------------------------------------------------------------------
-# receive() — non-blocking, gated on payload_ready
-#
 # ``payload_ready`` is a method on adafruit_rfm69.RFM69, not a property; the
 # mocks set its return value so a gate that tests the bound method itself
 # (always truthy) fails these tests.
-# ---------------------------------------------------------------------------
 
 
 def test_receive_returns_none_without_calling_receive_when_nothing_is_waiting() -> None:

@@ -31,11 +31,6 @@ def _record(device_storage) -> PersistedScene:
     return PersistedScene(DeviceStateStore(device_storage))
 
 
-# ---------------------------------------------------------------------------
-# reboot_into — records the target and the scene being left, then resets
-# ---------------------------------------------------------------------------
-
-
 def test_reboot_into_records_the_target_and_the_booted_scene_then_resets(device_storage):
     record = _record(device_storage)
     reset = RecordingReset(record)
@@ -64,11 +59,6 @@ def test_reboot_into_on_a_card_less_device_logs():
     reboot.reboot_into("tag")
 
     assert lines
-
-
-# ---------------------------------------------------------------------------
-# reboot_to_previous — records the return, then resets
-# ---------------------------------------------------------------------------
 
 
 def test_reboot_to_previous_records_the_return_then_resets(device_storage):
@@ -124,11 +114,6 @@ def test_reboot_to_previous_on_a_card_less_device_logs():
     reboot.reboot_to_previous()
 
     assert lines
-
-
-# ---------------------------------------------------------------------------
-# previous_scene — the scene reboot_to_previous would boot
-# ---------------------------------------------------------------------------
 
 
 def test_previous_scene_is_the_recorded_return_to(device_storage):

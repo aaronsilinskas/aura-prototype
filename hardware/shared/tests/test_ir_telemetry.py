@@ -25,11 +25,6 @@ def _snapshot(**overrides) -> IrTelemetrySnapshot:
     return IrTelemetrySnapshot(**fields)
 
 
-# ---------------------------------------------------------------------------
-# format_ir_telemetry_line
-# ---------------------------------------------------------------------------
-
-
 def test_format_line_matches_the_exact_serial_summary_string():
     """Regression pin: this is the exact line ``run_scene`` prints to the
     serial console, asserted byte-for-byte so a refactor cannot silently
@@ -53,11 +48,6 @@ def test_format_line_matches_the_exact_serial_summary_string():
         "preamble_reject=3 mark_reject=4 space_reject=5 packets_completed=6 "
         "packets_surfaced=7 pulses_dropped_transmitting=9"
     )
-
-
-# ---------------------------------------------------------------------------
-# IrTelemetryGate — change detection
-# ---------------------------------------------------------------------------
 
 
 def test_gate_returns_line_on_first_poll():
@@ -92,11 +82,6 @@ def test_gate_does_not_report_again_until_another_change():
     gate.poll(_snapshot(packets_surfaced=1))
 
     assert gate.poll(_snapshot(packets_surfaced=1)) is None
-
-
-# ---------------------------------------------------------------------------
-# IrTelemetryGate — no per-call allocation when nothing changed
-# ---------------------------------------------------------------------------
 
 
 def test_gate_poll_allocates_nothing_when_unchanged():

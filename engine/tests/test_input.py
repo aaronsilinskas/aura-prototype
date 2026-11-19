@@ -7,11 +7,6 @@ def _make(states: dict[str, int]) -> ButtonData:
     return ButtonData(states=states)
 
 
-# ---------------------------------------------------------------------------
-# is_pressed
-# ---------------------------------------------------------------------------
-
-
 def test_is_pressed_returns_true_when_state_is_pressed():
     bd = _make({"A": ButtonData.PRESSED})
     assert bd.is_pressed("A") is True
@@ -35,11 +30,6 @@ def test_is_pressed_returns_false_when_state_is_released():
 def test_is_pressed_returns_false_for_unknown_button():
     bd = _make({})
     assert bd.is_pressed("X") is False
-
-
-# ---------------------------------------------------------------------------
-# is_released
-# ---------------------------------------------------------------------------
 
 
 def test_is_released_returns_true_when_state_is_released():
@@ -67,11 +57,6 @@ def test_is_released_returns_false_for_unknown_button():
     assert bd.is_released("X") is False
 
 
-# ---------------------------------------------------------------------------
-# is_down  (PRESSED or DOWN)
-# ---------------------------------------------------------------------------
-
-
 def test_is_down_returns_true_when_state_is_down():
     bd = _make({"A": ButtonData.DOWN})
     assert bd.is_down("A") is True
@@ -95,11 +80,6 @@ def test_is_down_returns_false_when_state_is_released():
 def test_is_down_returns_false_for_unknown_button():
     bd = _make({})
     assert bd.is_down("X") is False
-
-
-# ---------------------------------------------------------------------------
-# is_up  (UP or RELEASED)
-# ---------------------------------------------------------------------------
 
 
 def test_is_up_returns_true_when_state_is_up():
@@ -127,11 +107,6 @@ def test_is_up_returns_false_for_unknown_button():
     assert bd.is_up("X") is False
 
 
-# ---------------------------------------------------------------------------
-# get
-# ---------------------------------------------------------------------------
-
-
 def test_get_returns_raw_state_constant_for_known_button():
     bd = _make({"A": ButtonData.DOWN})
     assert bd.get("A") == ButtonData.DOWN
@@ -142,11 +117,6 @@ def test_get_returns_none_for_unknown_button():
     assert bd.get("X") is None
 
 
-# ---------------------------------------------------------------------------
-# items
-# ---------------------------------------------------------------------------
-
-
 def test_items_returns_all_button_state_pairs():
     bd = _make({"A": ButtonData.PRESSED, "B": ButtonData.UP})
     assert set(bd.items()) == {("A", ButtonData.PRESSED), ("B", ButtonData.UP)}
@@ -155,11 +125,6 @@ def test_items_returns_all_button_state_pairs():
 def test_items_is_empty_when_no_buttons():
     bd = _make({})
     assert list(bd.items()) == []
-
-
-# ---------------------------------------------------------------------------
-# set
-# ---------------------------------------------------------------------------
 
 
 def test_set_stores_state_for_new_button():
@@ -182,11 +147,6 @@ def test_set_multiple_buttons_independently():
     assert bd.is_up("B") is True
 
 
-# ---------------------------------------------------------------------------
-# MagneticData
-# ---------------------------------------------------------------------------
-
-
 def test_magnetic_data_defaults_all_axes_to_zero():
     magnetic = MagneticData()
 
@@ -203,11 +163,6 @@ def test_magnetic_data_str_reports_all_axes():
     magnetic = MagneticData(x=1.0, y=2.0, z=3.0)
 
     assert str(magnetic) == "MagneticData(x=1.0, y=2.0, z=3.0)"
-
-
-# ---------------------------------------------------------------------------
-# InputEvents.Sensors
-# ---------------------------------------------------------------------------
 
 
 def test_sensors_event_carries_buttons_acceleration_and_magnetic():

@@ -41,10 +41,8 @@ TYPE_CHECKING = False
 if TYPE_CHECKING:
     from typing import Final
 
-# ---------------------------------------------------------------------------
-# Wire-frame timing constants (µs)
-# ---------------------------------------------------------------------------
 
+# Wire-frame timings are in µs.
 TAG_ERROR_MARGIN: Final = 500  # Maximum allowed timing deviation
 TAG_PREAMBLE_ERROR_MARGIN: Final = 1000  # Maximum timing deviation for preamble
 TAG_PREAMBLE: Final = [3000, 6000, 3000]  # Infrared tag start sequence
@@ -65,11 +63,6 @@ TAG_PLAYER_BITS: Final = 3  # 3 bits = 8 players (1-8)
 TAG_DAMAGE_BITS: Final = 2  # 2 bits = 4 damage levels (1-4)
 TAG_DATA_BITS: Final = TAG_TEAM_BITS + TAG_PLAYER_BITS + TAG_DAMAGE_BITS
 TAG_TOTAL_PULSES: Final = len(TAG_PREAMBLE) + TAG_DATA_BITS * 2
-
-
-# ---------------------------------------------------------------------------
-# Wire layer: TagInfraredEncoder / TagInfraredDecoder
-# ---------------------------------------------------------------------------
 
 
 class TagInfraredEncoder(InfraredEncoder):
@@ -198,10 +191,6 @@ class TagInfraredDecoder(InfraredDecoder):
 
         return None
 
-
-# ---------------------------------------------------------------------------
-# Resolution convention: module-level ENCODER / DECODER
-# ---------------------------------------------------------------------------
 
 ENCODER = TagInfraredEncoder
 DECODER = TagInfraredDecoder

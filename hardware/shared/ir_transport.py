@@ -21,10 +21,6 @@ TYPE_CHECKING = False
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-# ---------------------------------------------------------------------------
-# Port abstractions
-# ---------------------------------------------------------------------------
-
 
 class PulseWriter:
     """Port through which the IR subsystem sends one emitter's pulses.
@@ -95,11 +91,6 @@ class PulseReader:
         raise NotImplementedError
 
 
-# ---------------------------------------------------------------------------
-# IR transmit gate
-# ---------------------------------------------------------------------------
-
-
 class _IrTransmitGate:
     """Coordinates transmit and receive so a device never decodes its own
     **self-echo** — the IR pulses its own receiver captures while its own
@@ -158,11 +149,6 @@ class _IrTransmitGate:
             self._flush_pending = False
             return True
         return False
-
-
-# ---------------------------------------------------------------------------
-# Transmitter
-# ---------------------------------------------------------------------------
 
 
 class _InfraredTransmitter:
@@ -319,11 +305,6 @@ class _InfraredTransmitter:
             return
         self._gate_armed = False
         self._gate.end_transmit()
-
-
-# ---------------------------------------------------------------------------
-# Receiver
-# ---------------------------------------------------------------------------
 
 
 class _InfraredReceiver:

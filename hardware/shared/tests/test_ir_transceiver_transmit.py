@@ -37,11 +37,6 @@ def _build(
     return transceiver, factory.writers, reader
 
 
-# ---------------------------------------------------------------------------
-# send() — each emitter writes its own encoded pulses
-# ---------------------------------------------------------------------------
-
-
 def test_send_writes_each_payload_only_on_its_own_emitters_writer() -> None:
     transceiver, writers, _ = _build(LINE, CONE, AREA_OF_EFFECT)
 
@@ -60,11 +55,6 @@ def test_every_send_to_an_idle_writer_is_written_once_in_order() -> None:
     transceiver.send(b"\x02", LINE)
 
     assert writers[LINE].calls == [aura_pulses(b"\x01"), aura_pulses(b"\x02")]
-
-
-# ---------------------------------------------------------------------------
-# Queuing behind a busy writer
-# ---------------------------------------------------------------------------
 
 
 def test_a_send_while_the_writer_is_busy_writes_nothing_yet() -> None:
@@ -164,11 +154,6 @@ def test_update_starts_queued_sends_on_every_emitter_even_with_no_receiver() -> 
         assert factory.writers[emitter].calls == [aura_pulses(b"\x01"), aura_pulses(b"\x02")]
 
 
-# ---------------------------------------------------------------------------
-# busy() — reports one emitter and pumps only that emitter
-# ---------------------------------------------------------------------------
-
-
 def test_busy_is_false_for_an_emitter_that_has_sent_nothing() -> None:
     transceiver, _, _ = _build(blocking=False)
 
@@ -207,11 +192,6 @@ def test_busy_starts_queued_sends_only_on_the_emitter_it_names() -> None:
 
     assert writers[LINE].calls == [aura_pulses(b"\x01"), aura_pulses(b"\x02")]
     assert writers[CONE].calls == [aura_pulses(b"\x01")]
-
-
-# ---------------------------------------------------------------------------
-# Gate release ordering within a tick
-# ---------------------------------------------------------------------------
 
 
 def test_a_write_finished_before_update_releases_the_gate_so_the_next_frame_decodes() -> None:
@@ -281,11 +261,6 @@ def test_a_writer_failing_mid_send_raises_and_does_not_leave_reception_blocked()
     assert transceiver.received == bytearray(b"\x2a")
 
 
-# ---------------------------------------------------------------------------
-# apply_codec() — later sends use the new wire-frame
-# ---------------------------------------------------------------------------
-
-
 def test_apply_codec_encodes_later_sends_in_the_new_wire_frame_on_every_emitter() -> None:
     transceiver, writers, _ = _build(LINE, CONE)
 
@@ -307,11 +282,6 @@ def test_apply_codec_encodes_a_send_already_queued_in_the_new_wire_frame() -> No
     transceiver.update(0.0)
 
     assert writers[LINE].calls == [aura_pulses(b"\x01"), tag_pulses(b"\x10")]
-
-
-# ---------------------------------------------------------------------------
-# Self-echo — drained but never decoded while transmitting, and once more after
-# ---------------------------------------------------------------------------
 
 
 def test_a_sends_self_echo_is_never_received_and_the_next_frame_is() -> None:

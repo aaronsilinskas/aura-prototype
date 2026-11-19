@@ -65,11 +65,6 @@ def add_in_order(
     return red, blue
 
 
-# ---------------------------------------------------------------------------
-# Delivery
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.parametrize("receiver_first", [False, True], ids=["sender-first", "receiver-first"])
 def test_a_shot_is_decoded_on_the_tick_after_it_was_sent_whatever_the_add_order(
     simulation, receiver_first
@@ -182,11 +177,6 @@ def test_a_shot_in_another_wire_frame_codec_is_not_decoded(simulation):
 
     assert blue.has_played("scene.hit_start")
     assert receiver.strip(Scope.PERSONAL).all_lit(RED)
-
-
-# ---------------------------------------------------------------------------
-# Raises
-# ---------------------------------------------------------------------------
 
 
 def test_a_device_cannot_aim_at_itself(simulation):

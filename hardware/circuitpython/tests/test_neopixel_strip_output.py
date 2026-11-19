@@ -11,10 +11,6 @@ from unittest.mock import MagicMock, call
 
 from effects.effect import PixelBuffer
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 
 def _make_strip(count: int) -> MagicMock:
     """Return a mock NeoPixel strip with list-like pixel interface."""
@@ -33,11 +29,6 @@ def _make_segmented_output(
     strip = _make_strip(count)
     output = NeoPixelEffectOutput(strip, scope_pixels)
     return output, strip
-
-
-# ---------------------------------------------------------------------------
-# Construction: scopes and min_resolution
-# ---------------------------------------------------------------------------
 
 
 def test_scopes_expose_all_configured_scope_keys() -> None:
@@ -67,11 +58,6 @@ def test_single_full_strip_segment_min_resolution_equals_count() -> None:
     assert output.min_resolution == 10
 
 
-# ---------------------------------------------------------------------------
-# create_buffer: sized to segment length, not strip length
-# ---------------------------------------------------------------------------
-
-
 def test_create_buffer_for_segment_is_sized_to_segment_length() -> None:
     """create_buffer returns a PixelBuffer sized to the segment, not the whole strip."""
     scope_pixels = {"personal": range(0, 10), "ambient": range(10, 30)}
@@ -88,11 +74,6 @@ def test_create_buffer_for_larger_segment_returns_correct_size() -> None:
 
     buf = output.create_buffer("ambient")
     assert len(buf) == 20
-
-
-# ---------------------------------------------------------------------------
-# update_pixels: writes only the named segment's pixel range
-# ---------------------------------------------------------------------------
 
 
 def test_update_pixels_writes_buffer_to_correct_strip_offsets() -> None:
@@ -137,11 +118,6 @@ def test_update_pixels_does_not_write_outside_segment_range() -> None:
     assert all(i < 5 for i in written_indices)
 
 
-# ---------------------------------------------------------------------------
-# clear_pixels: zeros only the named segment
-# ---------------------------------------------------------------------------
-
-
 def test_clear_pixels_zeros_the_named_segment() -> None:
     """clear_pixels writes zero only to the segment's pixel range."""
     scope_pixels = {"personal": range(0, 3), "ambient": range(3, 6)}
@@ -163,11 +139,6 @@ def test_clear_pixels_for_second_segment_writes_at_correct_offset() -> None:
 
     written_indices = {c.args[0] for c in strip.__setitem__.call_args_list}
     assert written_indices == {5, 6, 7, 8, 9}
-
-
-# ---------------------------------------------------------------------------
-# flush: calls strip.show() once
-# ---------------------------------------------------------------------------
 
 
 def test_flush_calls_show_on_the_strip() -> None:

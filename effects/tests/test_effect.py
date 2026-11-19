@@ -12,20 +12,11 @@ from effects.effect import (
     PixelBuffer,
 )
 
-# ---------------------------------------------------------------------------
-# EffectConfig — resolution clamping
-# ---------------------------------------------------------------------------
-
 
 def test_config_clamps_resolution_below_one_to_one() -> None:
     config = EffectConfig(resolution=0)
 
     assert config.resolution == 1
-
-
-# ---------------------------------------------------------------------------
-# EffectConfig — get_option
-# ---------------------------------------------------------------------------
 
 
 def test_get_option_returns_stored_value_for_present_key() -> None:
@@ -44,11 +35,6 @@ def test_get_option_returns_default_when_no_options_were_provided() -> None:
     config = EffectConfig(resolution=10)
 
     assert config.get_option("color", "blue") == "blue"
-
-
-# ---------------------------------------------------------------------------
-# EffectConfig — with_options
-# ---------------------------------------------------------------------------
 
 
 def test_with_options_replaces_the_given_keys_and_keeps_the_others() -> None:
@@ -78,11 +64,6 @@ def test_with_options_leaves_the_original_config_unchanged() -> None:
 
     assert config.get_option("color", "") == "red"
     assert config.get_option("speed", 0) == 0
-
-
-# ---------------------------------------------------------------------------
-# EffectConfig — listeners
-# ---------------------------------------------------------------------------
 
 
 def test_notify_listeners_is_silent_when_no_listeners_are_registered() -> None:
@@ -118,11 +99,6 @@ def test_all_registered_listeners_are_notified_in_registration_order() -> None:
     assert received == [("a", EffectVerb.START), ("b", EffectVerb.START)]
 
 
-# ---------------------------------------------------------------------------
-# EffectVerb
-# ---------------------------------------------------------------------------
-
-
 def test_effect_verbs_with_the_same_name_are_distinct() -> None:
     assert EffectVerb("strike") != EffectVerb("strike")
 
@@ -149,11 +125,6 @@ def test_notify_listeners_delivers_the_verb_object_it_was_given() -> None:
 
 def test_pixels_declare_no_custom_verbs_by_default() -> None:
     assert EffectPixels.VERBS == ()
-
-
-# ---------------------------------------------------------------------------
-# PixelBuffer
-# ---------------------------------------------------------------------------
 
 
 def test_pixel_buffer_count_matches_size_at_construction() -> None:
@@ -183,11 +154,6 @@ def test_pixel_buffer_iterates_pixels_in_index_order() -> None:
     buf[2] = 0x0000FF
 
     assert list(buf) == [0xFF0000, 0x00FF00, 0x0000FF]
-
-
-# ---------------------------------------------------------------------------
-# PixelBuffer — capacity vs. logical length
-# ---------------------------------------------------------------------------
 
 
 def test_pixel_buffer_capacity_matches_count_at_construction() -> None:
@@ -264,11 +230,6 @@ def test_indexing_still_reaches_positions_beyond_shrunken_logical_length() -> No
     assert buf[4] == 0xABCDEF
 
 
-# ---------------------------------------------------------------------------
-# Effect — modality container
-# ---------------------------------------------------------------------------
-
-
 def test_effect_stores_name_passed_at_construction() -> None:
     effect = Effect(name="elements.fire")
 
@@ -332,11 +293,6 @@ def test_effect_emits_start_stop_and_the_custom_verbs_its_pixels_declare() -> No
     assert effect.emitted_verbs() == (EffectVerb.START, EffectVerb.STOP, _PeakingPixels.PEAK)
 
 
-# ---------------------------------------------------------------------------
-# EffectPixels — abstract base class protocol
-# ---------------------------------------------------------------------------
-
-
 def test_effect_pixels_update_raises_not_implemented() -> None:
     pixels = EffectPixels()
     with pytest.raises(NotImplementedError):
@@ -347,11 +303,6 @@ def test_effect_pixels_render_raises_not_implemented() -> None:
     pixels = EffectPixels()
     with pytest.raises(NotImplementedError):
         pixels.render(PixelBuffer(1))
-
-
-# ---------------------------------------------------------------------------
-# AudioPlaybackConfig — fields
-# ---------------------------------------------------------------------------
 
 
 def test_audio_playback_config_stores_name_and_loop() -> None:
@@ -384,11 +335,6 @@ def test_audio_playback_config_raises_when_loop_and_stops_effect_both_true() -> 
         AudioPlaybackConfig(name="bg", loop=True, stops_effect=True)
 
 
-# ---------------------------------------------------------------------------
-# EffectAudio — clips
-# ---------------------------------------------------------------------------
-
-
 def test_effect_audio_stores_clips_dict() -> None:
     clip = AudioPlaybackConfig(name="bg", loop=True)
     audio = EffectAudio(clips={EffectVerb.START: clip})
@@ -403,16 +349,6 @@ def test_effect_audio_rejects_a_string_clips_key() -> None:
         EffectAudio(clips={"start": clip})  # type: ignore[dict-item]  # wrong key type must raise
 
 
-# ---------------------------------------------------------------------------
-# EffectHaptic — patterns
-# ---------------------------------------------------------------------------
-
-
-# ---------------------------------------------------------------------------
-# HapticPattern — sequence field
-# ---------------------------------------------------------------------------
-
-
 def test_haptic_pattern_stores_sequence_passed_at_construction() -> None:
     cfg = HapticPattern(sequence=[HapticPattern.STRONG_CLICK])
 
@@ -425,10 +361,6 @@ def test_haptic_pattern_preserves_multi_step_sequence_in_order() -> None:
 
     assert cfg.sequence == steps
 
-
-# ---------------------------------------------------------------------------
-# HapticPattern — constants do not overlap with DRV2605L hardware IDs
-# ---------------------------------------------------------------------------
 
 _DRV2605L_HARDWARE_IDS = {1, 4, 7, 10, 12, 14}
 _ALL_HAPTIC_CONSTANTS = [
@@ -449,11 +381,6 @@ def test_no_haptic_constant_overlaps_with_drv2605l_hardware_waveform_ids() -> No
         assert constant not in _DRV2605L_HARDWARE_IDS, (
             f"HapticPattern constant {constant} collides with a DRV2605L hardware waveform ID"
         )
-
-
-# ---------------------------------------------------------------------------
-# EffectHaptic — typed patterns dict
-# ---------------------------------------------------------------------------
 
 
 def test_effect_haptic_accepts_haptic_pattern_as_pattern_value() -> None:

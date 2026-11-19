@@ -1,9 +1,5 @@
 from effects.layers.shape_layer import ShapeLayer
 
-# ---------------------------------------------------------------------------
-# ShapeLayer — delegates to shape function
-# ---------------------------------------------------------------------------
-
 
 def test_shape_layer_sample_returns_shape_function_value() -> None:
     # lambda returns position directly — no gamma correction
@@ -38,11 +34,6 @@ def test_shape_layer_sample_passes_position_to_shape_function() -> None:
     layer.sample(0.75, 10)
 
     assert recorded == [0.75]
-
-
-# ---------------------------------------------------------------------------
-# ShapeLayer — update is a no-op
-# ---------------------------------------------------------------------------
 
 
 def test_shape_layer_update_does_not_change_sample_result() -> None:

@@ -2,10 +2,6 @@ import pytest
 
 from effects.value import ValueGenerator, lerp
 
-# ---------------------------------------------------------------------------
-# lerp
-# ---------------------------------------------------------------------------
-
 
 def test_lerp_returns_start_value_when_t_is_zero() -> None:
     assert lerp(10.0, 20.0, 0.0) == pytest.approx(10.0)
@@ -29,22 +25,12 @@ def test_lerp_works_with_negative_range() -> None:
     assert lerp(-10.0, 10.0, 0.75) == pytest.approx(5.0)
 
 
-# ---------------------------------------------------------------------------
-# ValueGenerator.resolve
-# ---------------------------------------------------------------------------
-
-
 def test_resolve_returns_float_unchanged() -> None:
     assert ValueGenerator.resolve(0.75) == pytest.approx(0.75)
 
 
 def test_resolve_calls_callable_and_returns_its_result() -> None:
     assert ValueGenerator.resolve(lambda: 3.14) == pytest.approx(3.14)
-
-
-# ---------------------------------------------------------------------------
-# ValueGenerator.random
-# ---------------------------------------------------------------------------
 
 
 def test_random_produces_values_within_specified_range() -> None:
@@ -71,11 +57,6 @@ def test_random_produces_varying_values_across_calls() -> None:
 
     values = {gen() for _ in range(20)}
     assert len(values) > 1
-
-
-# ---------------------------------------------------------------------------
-# ValueGenerator.random_choice
-# ---------------------------------------------------------------------------
 
 
 def test_random_choice_only_returns_values_from_the_provided_list() -> None:

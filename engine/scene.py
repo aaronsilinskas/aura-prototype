@@ -402,10 +402,7 @@ class SceneManager(SceneControls):
         self._stack: list[_SceneStackEntry] = []
         self._pending: tuple[Literal["overlay"], Scene] | tuple[Literal["pop"]] | None = None
 
-    # ------------------------------------------------------------------
-    # Boot — not on SceneControls, so rules can't reach it
-    # ------------------------------------------------------------------
-
+    # Not on SceneControls, so rules can't reach it.
     def activate_boot_scene(self, name: str) -> None:
         """Make *name* the active scene, at once, on Split for every scope.
 
@@ -425,10 +422,6 @@ class SceneManager(SceneControls):
         entry = _SceneStackEntry(scene, self._new_run(scene), _scene_view(scene), held=None)
         self._stack.append(entry)
         self._effect_admin.enter_boot_scene(entry.view)
-
-    # ------------------------------------------------------------------
-    # SceneControls interface — deferred transitions
-    # ------------------------------------------------------------------
 
     def overlay(self, name: str) -> None:
         """Record an overlay transition for *name*; raises immediately if invalid.
@@ -470,10 +463,6 @@ class SceneManager(SceneControls):
             raise ValueError(f"Cannot pop: stack has {n} entr{'y' if n == 1 else 'ies'}")
         self._pending = ("pop",)
 
-    # ------------------------------------------------------------------
-    # SceneControls interface — immediate reboot (not deferred)
-    # ------------------------------------------------------------------
-
     def reboot_into(self, target: str) -> None:
         """Validate *target*, then delegate to the injected ``SceneReboot`` port.
 
@@ -512,10 +501,6 @@ class SceneManager(SceneControls):
             self._require_runnable(previous)
         self._scene_reboot.reboot_to_previous()
 
-    # ------------------------------------------------------------------
-    # Main loop driver
-    # ------------------------------------------------------------------
-
     def update(self, elapsed: float) -> None:
         """Tick the top ``SceneRun`` by *elapsed* seconds, then apply any pending transition.
 
@@ -534,10 +519,6 @@ class SceneManager(SceneControls):
                 self._do_overlay(pending[1])
             else:
                 self._do_pop()
-
-    # ------------------------------------------------------------------
-    # Internal transition helpers
-    # ------------------------------------------------------------------
 
     def _resolve_rules(self, scene: Scene) -> list[GameRule]:
         """Return combined rules: shared-pack items first, scene-local items after."""

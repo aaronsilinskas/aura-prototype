@@ -61,11 +61,6 @@ def win_the_only_round(simulation: Simulation, player: SimulatedDevice) -> None:
     survive_round(simulation, player)
 
 
-# ---------------------------------------------------------------------------
-# Level Up
-# ---------------------------------------------------------------------------
-
-
 def test_surviving_green_light_below_the_top_level_levels_up(simulation):
     player = simulation.add_device(
         "p1", scene="red_light_green_light", setting_overrides=overrides(FIVE_LEVELS)
@@ -162,11 +157,6 @@ def test_moving_during_a_level_up_is_not_caught(simulation):
     wait_for(simulation, player, RED_MUSIC)
 
     assert not player.has_played(GAME_OVER_STING)
-
-
-# ---------------------------------------------------------------------------
-# Win
-# ---------------------------------------------------------------------------
 
 
 def test_surviving_green_light_at_the_top_level_wins(simulation):

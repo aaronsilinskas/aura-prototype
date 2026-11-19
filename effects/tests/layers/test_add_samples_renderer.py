@@ -18,11 +18,6 @@ class _ConstantLayer(Layer):
         return self._value
 
 
-# ---------------------------------------------------------------------------
-# AddSamplesRenderer — render output
-# ---------------------------------------------------------------------------
-
-
 def test_add_samples_renderer_single_layer_maps_sample_through_palette() -> None:
     palette = PaletteLUT256(_BLACK_TO_WHITE)
     renderer = AddSamplesRenderer([_ConstantLayer(0.5)], palette)
@@ -69,11 +64,6 @@ def test_add_samples_renderer_two_layers_produce_brighter_output_than_one() -> N
     renderer_one.render(out_one)
 
     assert out_two[0] > out_one[0]
-
-
-# ---------------------------------------------------------------------------
-# AddSamplesRenderer — update advances all layers
-# ---------------------------------------------------------------------------
 
 
 def test_add_samples_renderer_update_advances_all_layers() -> None:

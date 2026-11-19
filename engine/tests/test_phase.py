@@ -41,11 +41,6 @@ _PHASE_B = PhaseKey("b")
 _MACHINE_KEY = "test_machine"
 
 
-# ---------------------------------------------------------------------------
-# Throwaway rules: each emits a uniquely-named effect per lifecycle point
-# ---------------------------------------------------------------------------
-
-
 class _LifecycleRule(PhaseRule):
     """PhaseRule that emits ``enter:``/``tick:``/``exit:`` effects, optionally transitioning."""
 
@@ -184,11 +179,6 @@ def _rule_machine(rule: PhaseRule | InPhaseRule, state: GameState) -> PhaseMachi
     return rule._machine(state)
 
 
-# ---------------------------------------------------------------------------
-# PhaseKey — identity typing
-# ---------------------------------------------------------------------------
-
-
 def test_phase_key_never_equals_a_bare_string() -> None:
     machine = PhaseMachine(_PHASE_A)
 
@@ -198,11 +188,6 @@ def test_phase_key_never_equals_a_bare_string() -> None:
 
 def test_distinct_phase_keys_with_the_same_name_are_not_equal() -> None:
     assert PhaseKey("ready") != PhaseKey("ready")
-
-
-# ---------------------------------------------------------------------------
-# PhaseMachine — enter / elapsed
-# ---------------------------------------------------------------------------
 
 
 def test_enter_sets_phase_and_phase_start_and_raises_the_entry_flag() -> None:
@@ -230,11 +215,6 @@ def test_take_enter_pending_returns_true_once_then_false() -> None:
     assert machine.take_enter_pending() is False
 
 
-# ---------------------------------------------------------------------------
-# PhaseSlot — lazy get-or-create accessor, shared by construction
-# ---------------------------------------------------------------------------
-
-
 def test_phase_slot_creates_a_machine_at_the_initial_phase_on_first_call() -> None:
     slot = PhaseSlot("some_machine", _PHASE_A)
     state = GameState(SpyEffectControls(), SceneControls())
@@ -258,11 +238,6 @@ def test_phase_slot_exposes_its_key() -> None:
     slot = PhaseSlot("some_machine", _PHASE_A)
 
     assert slot.key == "some_machine"
-
-
-# ---------------------------------------------------------------------------
-# PhaseRule lifecycle through the engine seam
-# ---------------------------------------------------------------------------
 
 
 def test_the_initial_phases_on_enter_runs_once_on_the_first_dispatch() -> None:
@@ -399,11 +374,6 @@ def test_on_enter_fires_exactly_once_regardless_of_dispatch_order(
     assert names.count("enter:b") == 1
 
 
-# ---------------------------------------------------------------------------
-# InPhaseRule — phase-gated, no lifecycle, shareable
-# ---------------------------------------------------------------------------
-
-
 def test_in_phase_rule_handler_fires_only_while_its_phase_is_active() -> None:
     # bystander registered first so it dispatches before the transition each
     # tick: it must not catch the same-tick switch into B on the transition tick.
@@ -483,11 +453,6 @@ def test_in_phase_rule_and_phase_rule_coexist_on_one_phase() -> None:
     assert names == ["enter:owner", "tick:owner", "in:bystander"]
 
 
-# ---------------------------------------------------------------------------
-# PhaseSlot ownership — each PhaseRule registers as its phase's owner
-# ---------------------------------------------------------------------------
-
-
 def test_phase_slot_reports_the_phase_rule_constructed_for_each_phase() -> None:
     slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
     a = _LifecycleRule(_PHASE_A, "a", phase_slot=slot)
@@ -531,11 +496,6 @@ def test_in_phase_rules_sharing_a_phase_leave_its_owner_in_place() -> None:
     assert slot.owner_of(_PHASE_A) is owner
 
 
-# ---------------------------------------------------------------------------
-# Shared PhaseSlot — every rule resolves the one machine
-# ---------------------------------------------------------------------------
-
-
 def test_shared_phase_slot_resolves_the_same_machine_for_phase_rule_and_in_phase_rule() -> None:
     # A scene constructs exactly one PhaseSlot per machine (e.g. tag_phase) and
     # passes that same instance to every PhaseRule/InPhaseRule plus its own
@@ -553,11 +513,6 @@ def test_shared_phase_slot_resolves_the_same_machine_for_phase_rule_and_in_phase
 
     assert via_module_level_reference is via_phase_rule
     assert via_module_level_reference is via_in_phase_rule
-
-
-# ---------------------------------------------------------------------------
-# Phase elapsed — each rule reads how long its own phase has run
-# ---------------------------------------------------------------------------
 
 
 def test_a_phase_rule_reads_how_long_its_phase_has_run() -> None:
@@ -603,11 +558,6 @@ def test_an_in_phase_rules_reading_restarts_from_zero_when_its_phase_is_re_enter
     _run_timed([bystander, owner, bouncer], ticks=4, step=0.5)
 
     assert bystander.readings == pytest.approx([0.5, 1.0, 0.5])
-
-
-# ---------------------------------------------------------------------------
-# Declared ends — a PhaseRule declares in on_enter how its phase ends
-# ---------------------------------------------------------------------------
 
 
 _PHASE_C = PhaseKey("c")

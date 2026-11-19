@@ -7,10 +7,6 @@ tests run without radio hardware.
 from hardware.shared.radio_transceiver import RadioTransceiver
 from hardware.shared.radio_transport import RadioTransport
 
-# ---------------------------------------------------------------------------
-# Fakes
-# ---------------------------------------------------------------------------
-
 
 class _RecordingTransport(RadioTransport):
     """In-memory RadioTransport fake that records sends and replays queued receives FIFO."""
@@ -31,11 +27,6 @@ class _RecordingTransport(RadioTransport):
         return self._receive_queue.pop(0) if self._receive_queue else None
 
 
-# ---------------------------------------------------------------------------
-# update() with no transport
-# ---------------------------------------------------------------------------
-
-
 def test_update_with_no_transport_is_a_noop():
     transceiver = RadioTransceiver(None)
 
@@ -43,11 +34,6 @@ def test_update_with_no_transport_is_a_noop():
 
     assert transceiver.received is None
     assert transceiver.last_sender is None
-
-
-# ---------------------------------------------------------------------------
-# received / last_sender — set together only on a receiving tick
-# ---------------------------------------------------------------------------
 
 
 def test_received_and_last_sender_are_none_when_the_transport_has_nothing_waiting():
@@ -78,11 +64,6 @@ def test_received_and_last_sender_reset_to_none_on_the_tick_after_a_receive():
     assert transceiver.last_sender is None
 
 
-# ---------------------------------------------------------------------------
-# Payload and From byte survive untouched
-# ---------------------------------------------------------------------------
-
-
 def test_received_payload_passes_through_untouched():
     payload = b"\xab\xcd\xef"
     transceiver = RadioTransceiver(_RecordingTransport([(3, payload)]))
@@ -108,11 +89,6 @@ def test_last_sender_holds_the_from_byte_at_its_lower_boundary():
     assert transceiver.last_sender == 0
 
 
-# ---------------------------------------------------------------------------
-# Polling discipline
-# ---------------------------------------------------------------------------
-
-
 def test_update_polls_the_transport_receive_exactly_once_per_tick():
     transport = _RecordingTransport([None, None])
     transceiver = RadioTransceiver(transport)
@@ -121,11 +97,6 @@ def test_update_polls_the_transport_receive_exactly_once_per_tick():
     transceiver.update(0.0)
 
     assert transport.receive_calls == 2
-
-
-# ---------------------------------------------------------------------------
-# send() — fire-and-forget delegation, no emitter argument
-# ---------------------------------------------------------------------------
 
 
 def test_send_routes_the_payload_to_the_transport():
@@ -141,11 +112,6 @@ def test_send_is_a_noop_with_no_transport_wired():
     transceiver = RadioTransceiver(None)
 
     transceiver.send(b"\xab")  # must not raise
-
-
-# ---------------------------------------------------------------------------
-# No-event guarantee — this module builds no game event
-# ---------------------------------------------------------------------------
 
 
 def test_received_is_the_raw_payload_not_a_network_event():

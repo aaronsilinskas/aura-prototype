@@ -13,10 +13,6 @@ from scripts.build import (
     validate_mpy_cross_version,
 )
 
-# ---------------------------------------------------------------------------
-# parse_circuitpython_major_from_boot_out
-# ---------------------------------------------------------------------------
-
 
 def test_parses_major_version_from_standard_boot_out() -> None:
     boot_out = "Adafruit CircuitPython 10.2.1 on 2025-01-15; Adafruit Feather RP2040"
@@ -39,11 +35,6 @@ def test_raises_version_error_when_boot_out_has_no_circuitpython_line() -> None:
     boot_out = "something unexpected"
     with pytest.raises(VersionError, match=r"boot_out\.txt"):
         parse_circuitpython_major_from_boot_out(boot_out)
-
-
-# ---------------------------------------------------------------------------
-# get_mpy_cross_major
-# ---------------------------------------------------------------------------
 
 
 def test_returns_major_version_from_mpy_cross_output() -> None:
@@ -85,11 +76,6 @@ def test_raises_version_error_when_mpy_cross_exits_nonzero() -> None:
         mock_run.return_value.stderr = b"some error\n"
         with pytest.raises(VersionError, match="mpy-cross"):
             get_mpy_cross_major("mpy-cross")
-
-
-# ---------------------------------------------------------------------------
-# validate_mpy_cross_version — with device (boot_out.txt present)
-# ---------------------------------------------------------------------------
 
 
 def test_matching_mpy_cross_and_device_version_does_not_raise(tmp_path: Path) -> None:
@@ -139,11 +125,6 @@ def test_missing_boot_out_txt_raises_version_error(tmp_path: Path) -> None:
         validate_mpy_cross_version(mount=mount, mpy_cross_bin="mpy-cross")
 
 
-# ---------------------------------------------------------------------------
-# validate_mpy_cross_version — dry-run / CI (no device, mount=None)
-# ---------------------------------------------------------------------------
-
-
 def test_dry_run_matching_mpy_cross_and_expected_version_does_not_raise() -> None:
     with patch("scripts.build.get_mpy_cross_major", return_value=EXPECTED_CIRCUITPYTHON_MAJOR):
         validate_mpy_cross_version(mount=None, mpy_cross_bin="mpy-cross")
@@ -164,11 +145,6 @@ def test_dry_run_version_error_message_mentions_expected_version() -> None:
         with pytest.raises(VersionError) as exc_info:
             validate_mpy_cross_version(mount=None, mpy_cross_bin="mpy-cross")
         assert str(EXPECTED_CIRCUITPYTHON_MAJOR) in str(exc_info.value)
-
-
-# ---------------------------------------------------------------------------
-# EXPECTED_CIRCUITPYTHON_MAJOR constant
-# ---------------------------------------------------------------------------
 
 
 def test_expected_circuitpython_major_matches_setup_script_default() -> None:

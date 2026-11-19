@@ -212,11 +212,6 @@ def test_no_active_scene_error_is_worded_from_the_name_and_kind(pack_tree) -> No
     assert str(exc_info.value) == "Cannot resolve effect 'elements.fire': no scene is active"
 
 
-# ---------------------------------------------------------------------------
-# Clip lookups
-# ---------------------------------------------------------------------------
-
-
 def _clip_catalog(pack_tree) -> PackCatalog:
     """Scan pack ``elements`` (sound ``crackle``), pack ``basic`` (no sounds) and two scenes.
 

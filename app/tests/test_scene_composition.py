@@ -93,11 +93,6 @@ class _CodecRecordingIr:
         return None
 
 
-# ---------------------------------------------------------------------------
-# Which scene boots
-# ---------------------------------------------------------------------------
-
-
 def test_the_cards_persisted_scene_boots_over_the_flash_default_scene(probe):
     _persist(probe.storage, PROBE_SCENE)
 
@@ -211,11 +206,6 @@ def test_boot_raises_missing_capability_when_no_candidate_fits_the_device(probe)
         )
 
 
-# ---------------------------------------------------------------------------
-# Scene deploy token
-# ---------------------------------------------------------------------------
-
-
 def test_a_pending_scene_deploy_token_boots_the_deployed_scene_over_a_stale_persisted_one(probe):
     _persist(probe.storage, _FLASH_SCENE)
 
@@ -236,11 +226,6 @@ def test_an_applied_scene_deploy_token_no_longer_overrides_the_persisted_scene(p
     boot = probe.boot(_hw(probe.storage), boot_mapping=boot_mapping)
 
     assert boot.scene_name == _FLASH_SCENE
-
-
-# ---------------------------------------------------------------------------
-# Which pack roots boot scans
-# ---------------------------------------------------------------------------
 
 
 def test_a_device_without_the_card_cannot_boot_a_scene_only_that_card_carries(probe):
@@ -271,11 +256,6 @@ def test_a_misconfigured_card_scene_stops_boot_with_a_pack_scan_error(probe):
         probe.boot(_hw(probe.storage), scene_json={"version": "1"})
 
 
-# ---------------------------------------------------------------------------
-# Wire-frame codec
-# ---------------------------------------------------------------------------
-
-
 def test_boot_applies_the_booted_scenes_declared_codec_to_the_ir_before_the_first_tick(probe):
     ir = _CodecRecordingIr()
     tick = probe.boot(_hw(probe.storage, ir=ir), scene_json={"ir_codec": "tag"}).tick
@@ -300,11 +280,6 @@ def test_a_scene_declaring_an_unknown_codec_fails_boot_naming_it(probe):
         probe.boot(_hw(probe.storage, ir=_CodecRecordingIr()), scene_json={"ir_codec": "tv_remote"})
 
 
-# ---------------------------------------------------------------------------
-# What the booted scene's rules see
-# ---------------------------------------------------------------------------
-
-
 def test_setting_overrides_reach_the_booted_scenes_settings(probe):
     tick = probe.boot(
         _hw(probe.storage),
@@ -326,11 +301,6 @@ def test_the_booted_scenes_rules_see_the_devices_capabilities(probe):
 
     state = probe.state()
     assert (state.capabilities.has("radio"), state.capabilities.has("ir.line")) == (True, False)
-
-
-# ---------------------------------------------------------------------------
-# Reboots
-# ---------------------------------------------------------------------------
 
 
 def test_a_reboot_the_booted_scene_asks_for_persists_its_target_then_resets(probe):

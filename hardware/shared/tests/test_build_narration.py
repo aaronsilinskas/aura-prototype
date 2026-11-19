@@ -11,11 +11,6 @@ def _recording_logger(tag: str = "[hw]") -> tuple[Logger, list[str]]:
     return Logger(tag=tag, sink=fragments.append), fragments
 
 
-# ---------------------------------------------------------------------------
-# narrate_step — success path
-# ---------------------------------------------------------------------------
-
-
 def test_narrate_step_opens_and_closes_the_line_around_a_successful_build():
     logger, fragments = _recording_logger()
 
@@ -38,11 +33,6 @@ def test_narrate_step_closes_with_the_builds_own_success_suffix():
     narrate_step(logger, "ir rx=A0", lambda: (object(), "writer=pio ok"))
 
     assert "".join(fragments) == "[hw] ir rx=A0 writer=pio ok\n"
-
-
-# ---------------------------------------------------------------------------
-# narrate_step — failure path
-# ---------------------------------------------------------------------------
 
 
 def test_narrate_step_closes_the_line_failed_when_the_build_thunk_raises():
@@ -68,11 +58,6 @@ def test_narrate_step_reraises_the_build_thunks_exception_unchanged():
         narrate_step(logger, "widget", _boom)
 
     assert excinfo.value is original
-
-
-# ---------------------------------------------------------------------------
-# narrate_skip — no-build path
-# ---------------------------------------------------------------------------
 
 
 def test_narrate_skip_emits_begin_then_end_with_no_build_step():

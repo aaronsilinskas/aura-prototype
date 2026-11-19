@@ -16,11 +16,6 @@ from packs.scenes.red_light_green_light.rules.helpers.motion_detector import (
 _G = AccelerationData.GRAVITY
 
 
-# ---------------------------------------------------------------------------
-# linear_magnitude() — gravity removed as a vector
-# ---------------------------------------------------------------------------
-
-
 def test_linear_magnitude_is_zero_when_acceleration_matches_gravity():
     """A device at rest (reading only the gravity vector) shows no motion."""
     accel = AccelerationData(x=0.0, y=0.0, z=_G)
@@ -44,11 +39,6 @@ def test_linear_magnitude_is_orientation_independent():
 
     assert pytest.approx(1.0) == parallel
     assert pytest.approx(1.0) == perpendicular
-
-
-# ---------------------------------------------------------------------------
-# low_pass() — one-pole filter shared by gravity tracking and motion smoothing
-# ---------------------------------------------------------------------------
 
 
 def test_low_pass_eases_toward_the_sample_by_the_factor():
@@ -75,11 +65,6 @@ def test_low_pass_decays_toward_zero_when_the_sample_stops():
     for _ in range(100):
         value = low_pass(value, 0.0, 0.1)
     assert pytest.approx(0.0, abs=0.01) == value
-
-
-# ---------------------------------------------------------------------------
-# Tuned constants
-# ---------------------------------------------------------------------------
 
 
 def test_red_threshold_is_stricter_than_green_move_threshold():

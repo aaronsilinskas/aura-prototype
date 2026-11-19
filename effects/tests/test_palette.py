@@ -2,10 +2,6 @@ import pytest
 
 from effects.palette import Palette, PaletteLUT256
 
-# ---------------------------------------------------------------------------
-# Palette.pack_rgb
-# ---------------------------------------------------------------------------
-
 
 def test_pack_rgb_places_each_channel_in_correct_byte_position() -> None:
     assert Palette.pack_rgb(0x11, 0x22, 0x33) == 0x112233
@@ -17,11 +13,6 @@ def test_pack_rgb_produces_zero_when_all_channels_are_zero() -> None:
 
 def test_pack_rgb_produces_full_white_when_all_channels_are_max() -> None:
     assert Palette.pack_rgb(255, 255, 255) == 0xFFFFFF
-
-
-# ---------------------------------------------------------------------------
-# PaletteLUT256 — boundary lookups
-# ---------------------------------------------------------------------------
 
 
 def test_lut_lookup_returns_first_stop_color_at_zero() -> None:
@@ -48,11 +39,6 @@ def test_lut_lookup_clamps_above_one_to_last_entry() -> None:
     assert palette.lookup(1.5) == palette.lookup(1.0)
 
 
-# ---------------------------------------------------------------------------
-# PaletteLUT256 — interpolation
-# ---------------------------------------------------------------------------
-
-
 def test_lut_lookup_interpolates_linearly_between_stops() -> None:
     # black (0,0,0) → white (255,255,255): each channel should track the LUT index
     palette = PaletteLUT256(bytes([0, 0, 0, 0, 255, 255, 255, 255]))
@@ -76,11 +62,6 @@ def test_lut_with_three_stops_each_segment_has_correct_endpoint_colors() -> None
 
     assert palette.lookup(0.0) == Palette.pack_rgb(0, 0, 0)
     assert palette.lookup(1.0) == Palette.pack_rgb(0, 0, 255)
-
-
-# ---------------------------------------------------------------------------
-# PaletteLUT256 — edge cases
-# ---------------------------------------------------------------------------
 
 
 def test_lut_with_no_stops_returns_black_for_any_value() -> None:

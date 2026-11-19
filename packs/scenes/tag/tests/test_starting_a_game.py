@@ -34,22 +34,12 @@ def peaks_before_go(clips: list[str]) -> int:
     return clips[: clips.index("scene.go_start")].count("scene.warning_pulse_peak")
 
 
-# ---------------------------------------------------------------------------
-# Booting
-# ---------------------------------------------------------------------------
-
-
 def test_a_misspelled_tag_setting_fails_the_boot(simulation):
     with pytest.raises(SettingOverrideError) as excinfo:
         simulation.add_device("red", scene="tag", setting_overrides=tag_settings({"max_amo": 1}))
 
     error = excinfo.value
     assert (error.scene, error.pack, error.setting) == ("tag", "scene", "max_amo")
-
-
-# ---------------------------------------------------------------------------
-# Ready
-# ---------------------------------------------------------------------------
 
 
 def test_a_booted_device_sweeps_red_across_every_strip(simulation):
@@ -88,11 +78,6 @@ def test_pressing_either_button_in_ready_starts_the_countdown(simulation, button
     simulation.advance(ONE_PULSE["warning_pulse_duration"])
 
     assert player.has_played("scene.warning_pulse_peak")
-
-
-# ---------------------------------------------------------------------------
-# Countdown
-# ---------------------------------------------------------------------------
 
 
 def test_each_countdown_pulse_clicks_the_haptic(simulation):
@@ -135,11 +120,6 @@ def test_pressing_during_the_countdown_does_not_restart_it(simulation):
     simulation.run_until(lambda: player.has_played("scene.go_start"))
 
     assert peaks_before_go([p.clip for p in player.played]) == 3
-
-
-# ---------------------------------------------------------------------------
-# Playing begins
-# ---------------------------------------------------------------------------
 
 
 def test_the_game_starts_with_the_go_sound_and_a_strong_buzz(simulation):

@@ -23,10 +23,6 @@ from scripts.sd_sync_client import SdSyncNotFoundError
 from scripts.sd_sync_transport import SdSyncPortError, select_data_port
 from scripts.tests.fake_comport import fake_comport
 
-# ---------------------------------------------------------------------------
-# select_data_port
-# ---------------------------------------------------------------------------
-
 
 def test_select_data_port_auto_selects_the_single_match() -> None:
     port = select_data_port([fake_comport("/dev/tty.usbmodem1")])
@@ -57,11 +53,6 @@ def test_select_data_port_explicit_port_wins_over_ambiguous_auto_detection() -> 
     )
 
     assert port == "/dev/tty.explicit"
-
-
-# ---------------------------------------------------------------------------
-# parse_args
-# ---------------------------------------------------------------------------
 
 
 def test_parse_args_list_defaults_sd_subpath_to_the_card_root() -> None:
@@ -103,11 +94,6 @@ def test_parse_args_port_override_is_captured() -> None:
     args = parse_args(["pull", "a", "b", "--port", "/dev/tty.usbmodem9"])
 
     assert args.port == "/dev/tty.usbmodem9"
-
-
-# ---------------------------------------------------------------------------
-# dispatch -- wired to a real SdSyncClient over an in-memory loopback Transport
-# ---------------------------------------------------------------------------
 
 
 class _QueueTransport(Transport):

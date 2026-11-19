@@ -9,21 +9,14 @@ from hardware.shared.ir_codecs.aura import (
     AuraInfraredEncoder,
 )
 
-# ---------------------------------------------------------------------------
 # Local copies of wire-frame constants used by tests to corrupt pulses.
 # Redefined here so tests do not silently pass when the source constants change.
-# ---------------------------------------------------------------------------
 
 _IR_HEADER_MARK = 4000
 _IR_HEADER_SPACE = 3000
 _IR_LEAD_OUT = 5000
 _IR_UNIT = 500
 _IR_ERROR_THRESHOLD = _IR_UNIT // 2  # 250 µs — tolerance window
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 
 def _feed_pulses(decoder: AuraInfraredDecoder, pulses) -> "bytearray | None":
@@ -53,11 +46,6 @@ def _corrupt_last_crc_space(pulses: list) -> list:
     return corrupted
 
 
-# ---------------------------------------------------------------------------
-# Round-trip: several payload lengths and boundary values
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.parametrize(
     "payload",
     [
@@ -72,11 +60,6 @@ def _corrupt_last_crc_space(pulses: list) -> list:
 )
 def test_decoded_payload_matches_encoded_input(payload: bytes):
     assert _encode_decode(payload) == bytearray(payload)
-
-
-# ---------------------------------------------------------------------------
-# Encoder: wire-frame structure
-# ---------------------------------------------------------------------------
 
 
 def test_encoder_frame_begins_with_header_mark():
@@ -115,11 +98,6 @@ def test_encoder_encodes_one_bit_as_long_space():
     assert pulses[3] == 1500
 
 
-# ---------------------------------------------------------------------------
-# CRC rejection
-# ---------------------------------------------------------------------------
-
-
 def test_corrupted_crc_byte_produces_no_output():
     encoder = AuraInfraredEncoder()
     corrupted = _corrupt_last_crc_space(list(encoder.encode(b"\xab\xcd")))
@@ -138,11 +116,6 @@ def test_corrupted_packet_is_discarded_and_next_valid_packet_decodes():
     payload = b"\xcd"
     result = _feed_pulses(decoder, encoder.encode(payload))
     assert result == bytearray(payload)
-
-
-# ---------------------------------------------------------------------------
-# Malformed / short frame rejection
-# ---------------------------------------------------------------------------
 
 
 def test_frame_with_only_header_and_lead_out_is_rejected():
@@ -171,11 +144,6 @@ def test_invalid_header_space_causes_frame_to_be_dropped():
 
     result = _feed_pulses(AuraInfraredDecoder(), pulses)
     assert result is None
-
-
-# ---------------------------------------------------------------------------
-# Signal strength heuristic
-# ---------------------------------------------------------------------------
 
 
 def test_signal_strength_is_none_before_first_packet():
@@ -229,11 +197,6 @@ def test_signal_strength_below_forty_percent_at_worst_accepted_error():
     assert 0.0 <= strength < 0.4
 
 
-# ---------------------------------------------------------------------------
-# last_error_margin
-# ---------------------------------------------------------------------------
-
-
 def test_error_margin_is_none_before_first_packet():
     assert AuraInfraredDecoder().last_error_margin is None
 
@@ -272,11 +235,6 @@ def test_error_margin_is_replaced_by_subsequent_packet():
     assert decoder.last_error_margin == nudge
 
 
-# ---------------------------------------------------------------------------
-# reset()
-# ---------------------------------------------------------------------------
-
-
 def test_reset_aborts_in_progress_decode():
     encoder = AuraInfraredEncoder()
     decoder = AuraInfraredDecoder()
@@ -302,11 +260,6 @@ def test_reset_allows_fresh_packet_to_decode_after_partial_header():
     payload = b"\x42"
     result = _feed_pulses(decoder, encoder.encode(payload))
     assert result == bytearray(payload)
-
-
-# ---------------------------------------------------------------------------
-# Decoder: noise tolerance
-# ---------------------------------------------------------------------------
 
 
 def test_decoder_discards_unrecognised_pulses_before_header_mark():

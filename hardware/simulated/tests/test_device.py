@@ -160,10 +160,6 @@ def test_a_matrix_pixel_entry_is_rejected():
         SimulatedHardware(now=lambda: 0.0, config=config)
 
 
-# ---------------------------------------------------------------------------
-# IR
-# ---------------------------------------------------------------------------
-
 LINE_ONLY_IR = {"rx": "GP5", "line": "GP6"}
 
 
@@ -275,10 +271,6 @@ def test_a_payload_landing_with_the_devices_own_send_is_dropped_with_it():
 
     assert _ir(sim_hw).received is None
 
-
-# ---------------------------------------------------------------------------
-# Accelerometer
-# ---------------------------------------------------------------------------
 
 Reading = tuple[float, float, float]
 """An ``(x, y, z)`` acceleration in m/s², as the accelerometer reports it."""
@@ -461,11 +453,6 @@ def test_without_a_magnetometer_a_field_cannot_be_set():
 
     with pytest.raises(ValueError, match="no magnetometer"):
         sim_hw.magnetize(1.0, 2.0, 3.0)
-
-
-# ---------------------------------------------------------------------------
-# Booting through the Device assembly
-# ---------------------------------------------------------------------------
 
 
 def test_a_disabled_matrix_entry_boots():

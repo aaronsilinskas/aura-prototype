@@ -3,10 +3,6 @@ import pytest
 from engine.network import AREA_OF_EFFECT, CONE, IR_EMITTERS, LINE, NetworkEvents
 from engine.state import EffectControls, GameState, NetworkControls, SceneControls
 
-# ---------------------------------------------------------------------------
-# Emitter constants
-# ---------------------------------------------------------------------------
-
 
 def test_emitter_constants_are_distinct_so_routing_is_unambiguous() -> None:
     assert LINE != CONE
@@ -21,18 +17,8 @@ def test_ir_emitters_contains_exactly_the_three_emitter_constants_in_order() -> 
     assert IR_EMITTERS == (LINE, CONE, AREA_OF_EFFECT)
 
 
-# ---------------------------------------------------------------------------
-# NetworkEvents.GROUP
-# ---------------------------------------------------------------------------
-
-
 def test_network_events_group_name_is_net() -> None:
     assert NetworkEvents.GROUP.name == "net"
-
-
-# ---------------------------------------------------------------------------
-# NetworkEvents.IRReceived — full telemetry fields
-# ---------------------------------------------------------------------------
 
 
 def test_ir_received_identifies_itself_to_the_engine_as_ir_received() -> None:
@@ -85,11 +71,6 @@ def test_ir_received_stores_error_margin_from_hardware() -> None:
     assert event.error_margin == 42
 
 
-# ---------------------------------------------------------------------------
-# NetworkEvents.RadioReceived
-# ---------------------------------------------------------------------------
-
-
 def test_radio_received_event_name() -> None:
     event = NetworkEvents.RadioReceived(b"hello", "device-1")
 
@@ -114,11 +95,6 @@ def test_radio_received_group() -> None:
     assert event.group is NetworkEvents.GROUP
 
 
-# ---------------------------------------------------------------------------
-# NetworkControls — abstract base raises NotImplementedError
-# ---------------------------------------------------------------------------
-
-
 def test_network_controls_send_ir_raises_not_implemented() -> None:
     controls = NetworkControls()
 
@@ -137,11 +113,6 @@ def test_abstract_network_controls_has_no_poll_transmits() -> None:
     """The lifecycle pump is InfraredTransceiver-only — the abstract seam
     game rules see stays send-only."""
     assert not hasattr(NetworkControls(), "poll_transmits")
-
-
-# ---------------------------------------------------------------------------
-# GameState — network_controls field
-# ---------------------------------------------------------------------------
 
 
 def test_game_state_exposes_network_controls() -> None:

@@ -11,21 +11,12 @@ from hardware.shared.network_controls import HardwareNetworkControls
 from hardware.shared.radio_transceiver import RadioTransceiver
 from hardware.shared.tests.ir_fakes import EmitterPulseWriter
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 
 def _transceiver_with_emitter(emitter: str) -> tuple[InfraredTransceiver, EmitterPulseWriter]:
     """A receiver-less transceiver with only *emitter* wired, and that emitter's writer."""
     writer = EmitterPulseWriter()
     transceiver = InfraredTransceiver([], {emitter: "GP1"}, lambda _e, _pin: (writer, "fake"))
     return transceiver, writer
-
-
-# ---------------------------------------------------------------------------
-# HardwareNetworkControls — send_ir delegates to the wired transceiver
-# ---------------------------------------------------------------------------
 
 
 def test_send_ir_writes_the_encoded_payload_on_the_named_emitter() -> None:
@@ -92,11 +83,6 @@ def test_hardware_network_controls_send_radio_delegates_to_the_wired_transceiver
     controls.send_radio(b"\xab\xcd")
 
     assert transceiver.sent == [b"\xab\xcd"]
-
-
-# ---------------------------------------------------------------------------
-# HardwareNetworkControls — handed to rules through GameState (issue #608)
-# ---------------------------------------------------------------------------
 
 
 def test_a_state_exposes_the_hardware_network_controls_it_is_given() -> None:

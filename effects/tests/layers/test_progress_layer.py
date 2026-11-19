@@ -1,9 +1,5 @@
 from effects.layers.progress_layer import ProgressLayer
 
-# ---------------------------------------------------------------------------
-# ProgressLayer — full and empty bars
-# ---------------------------------------------------------------------------
-
 
 def test_progress_zero_returns_zero_for_every_pixel() -> None:
     layer = ProgressLayer(0.0)
@@ -19,11 +15,6 @@ def test_progress_full_returns_one_for_every_pixel() -> None:
         assert layer.sample(i / 10, 10) == 1.0
 
 
-# ---------------------------------------------------------------------------
-# ProgressLayer — partial bar on an even pixel count
-# ---------------------------------------------------------------------------
-
-
 def test_progress_half_lights_first_half_only() -> None:
     layer = ProgressLayer(0.5)
 
@@ -32,11 +23,6 @@ def test_progress_half_lights_first_half_only() -> None:
         assert layer.sample(i / 10, 10) == 1.0
     for i in range(5, 10):
         assert layer.sample(i / 10, 10) == 0.0
-
-
-# ---------------------------------------------------------------------------
-# ProgressLayer — boundary pixel anti-aliasing
-# ---------------------------------------------------------------------------
 
 
 def test_progress_mid_pixel_boundary_returns_partial_fraction() -> None:
@@ -55,11 +41,6 @@ def test_progress_mid_pixel_boundary_returns_partial_fraction() -> None:
         assert layer.sample(i / 10, 10) == 0.0
 
 
-# ---------------------------------------------------------------------------
-# ProgressLayer — clamping
-# ---------------------------------------------------------------------------
-
-
 def test_progress_below_zero_clamped_to_empty() -> None:
     layer = ProgressLayer(-0.5)
 
@@ -72,11 +53,6 @@ def test_progress_above_one_clamped_to_full() -> None:
 
     for i in range(10):
         assert layer.sample(i / 10, 10) == 1.0
-
-
-# ---------------------------------------------------------------------------
-# ProgressLayer — update is a no-op
-# ---------------------------------------------------------------------------
 
 
 def test_progress_update_does_not_change_sample_result() -> None:

@@ -25,9 +25,6 @@ def _render(effect, pixel_count: int = 10) -> list:
     return list(buf)
 
 
-# --- Builder ---
-
-
 def test_progress_build_returns_effect_builder_instance() -> None:
     from engine.effects.builder import EffectBuilder
     from packs.effects.basic.progress import BUILD
@@ -40,9 +37,6 @@ def test_progress_effect_name_is_basic_progress() -> None:
     assert effect.name == "basic.progress"
 
 
-# --- color option ---
-
-
 def test_progress_color_option_sets_fill_color() -> None:
     pixels = _render(_build(options={"color": 0x12AB34, "progress": 1.0}))
     assert all(p == 0x12AB34 for p in pixels)
@@ -51,9 +45,6 @@ def test_progress_color_option_sets_fill_color() -> None:
 def test_progress_default_color_is_white() -> None:
     pixels = _render(_build(options={"progress": 1.0}))
     assert all(p == 0xFFFFFF for p in pixels)
-
-
-# --- progress option ---
 
 
 def test_progress_option_sets_how_far_the_fill_reaches() -> None:
@@ -66,15 +57,9 @@ def test_progress_default_progress_is_empty() -> None:
     assert all(p == 0x000000 for p in pixels)
 
 
-# --- brightness ignored ---
-
-
 def test_progress_ignores_brightness_option() -> None:
     with_brightness = _build(options={"color": 0xFFFFFF, "progress": 1.0, "brightness": 0.5})
     assert all(p == 0xFFFFFF for p in _render(with_brightness))
-
-
-# --- Resolvable through the pack registry ---
 
 
 def test_progress_is_resolvable_via_pack_registry() -> None:

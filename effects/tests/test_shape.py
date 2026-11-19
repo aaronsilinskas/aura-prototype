@@ -3,10 +3,6 @@ import pytest
 from effects.shape import Shape
 from effects.value import GAMMA_FACTOR
 
-# ---------------------------------------------------------------------------
-# Shape.none
-# ---------------------------------------------------------------------------
-
 
 def test_none_shape_produces_zero_everywhere() -> None:
     shape = Shape.none()
@@ -14,11 +10,6 @@ def test_none_shape_produces_zero_everywhere() -> None:
     assert shape(0.0) == 0.0
     assert shape(0.5) == 0.0
     assert shape(1.0) == 0.0
-
-
-# ---------------------------------------------------------------------------
-# Shape.gradient
-# ---------------------------------------------------------------------------
 
 
 def test_gradient_is_zero_at_start_of_strip() -> None:
@@ -58,11 +49,6 @@ def test_gradient_wraps_out_of_range_positions() -> None:
     assert shape(1.5) == pytest.approx(shape(0.5))
 
 
-# ---------------------------------------------------------------------------
-# Shape.centered_gradient
-# ---------------------------------------------------------------------------
-
-
 def test_centered_gradient_peaks_at_center_of_strip() -> None:
     shape = Shape.centered_gradient()
 
@@ -96,11 +82,6 @@ def test_centered_gradient_wraps_out_of_range_positions() -> None:
     shape = Shape.centered_gradient()
 
     assert shape(1.25) == pytest.approx(shape(0.25))
-
-
-# ---------------------------------------------------------------------------
-# Shape.padded
-# ---------------------------------------------------------------------------
 
 
 def test_padded_returns_zero_inside_leading_padding_zone() -> None:
@@ -154,11 +135,6 @@ def test_padded_wraps_out_of_range_positions() -> None:
     assert shape(1.1) == pytest.approx(0.0)
 
 
-# ---------------------------------------------------------------------------
-# Shape.reverse
-# ---------------------------------------------------------------------------
-
-
 def test_reverse_maps_start_of_strip_to_end_of_inner_shape() -> None:
     # gradient(1.0) wraps to 0.0, so use a shape that returns the raw position.
     shape = Shape.reverse(lambda pos: pos)
@@ -172,11 +148,6 @@ def test_reverse_maps_end_of_strip_to_start_of_inner_shape() -> None:
     shape = Shape.reverse(lambda pos: pos)
 
     assert shape(0.9999) == pytest.approx(0.0001, abs=1e-4)
-
-
-# ---------------------------------------------------------------------------
-# Shape.sine
-# ---------------------------------------------------------------------------
 
 
 def test_sine_midpoint_is_halfway_between_min_and_max() -> None:
@@ -193,11 +164,6 @@ def test_sine_output_stays_within_zero_to_one() -> None:
     for pos in positions:
         value = shape(pos)
         assert 0.0 <= value <= 1.0
-
-
-# ---------------------------------------------------------------------------
-# Shape.checkers
-# ---------------------------------------------------------------------------
 
 
 def test_checkers_returns_flat_value_at_start_of_each_segment() -> None:

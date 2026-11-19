@@ -14,15 +14,9 @@ def _layer(
     return PulseLayer(brighten, on, darken, off)
 
 
-# --- at_peak in __slots__ and initialized False ---
-
-
 def test_pulse_layer_at_peak_initialized_false() -> None:
     layer = _layer()
     assert layer.at_peak is False
-
-
-# --- at_peak is False before reaching the end of brighten ---
 
 
 def test_pulse_layer_at_peak_false_during_brighten() -> None:
@@ -31,25 +25,16 @@ def test_pulse_layer_at_peak_false_during_brighten() -> None:
     assert layer.at_peak is False
 
 
-# --- at_peak is True on the exact tick that crosses the end of brighten ---
-
-
 def test_pulse_layer_at_peak_true_when_elapsed_crosses_end_of_brighten() -> None:
     layer = _layer(brighten=0.5)
     layer.update(0.6)  # crosses the end of brighten at 0.5
     assert layer.at_peak is True
 
 
-# --- at_peak is True when elapsed exactly equals the end of brighten ---
-
-
 def test_pulse_layer_at_peak_true_when_elapsed_equals_end_of_brighten_exactly() -> None:
     layer = _layer(brighten=0.5)
     layer.update(0.5)
     assert layer.at_peak is True
-
-
-# --- at_peak is False during ON phase after the crossing tick ---
 
 
 def test_pulse_layer_at_peak_false_during_on_phase_after_crossing() -> None:
@@ -59,17 +44,11 @@ def test_pulse_layer_at_peak_false_during_on_phase_after_crossing() -> None:
     assert layer.at_peak is False
 
 
-# --- at_peak is False during darken phase ---
-
-
 def test_pulse_layer_at_peak_false_during_darken() -> None:
     layer = _layer(brighten=0.5, on=0.5, darken=0.5)
     layer.update(0.6)  # cross the end of brighten → at_peak=True
     layer.update(0.8)  # into darken, no crossing → at_peak=False
     assert layer.at_peak is False
-
-
-# --- at_peak is False during off phase ---
 
 
 def test_pulse_layer_at_peak_false_during_off() -> None:
@@ -85,9 +64,6 @@ def test_pulse_layer_at_peak_true_on_second_cycle_crossing() -> None:
     layer.update(2.0)  # t=2.0 (start of cycle 2)
     layer.update(0.6)  # t=2.6, crosses the end of brighten in cycle 2 (2.0 + 0.5 = 2.5)
     assert layer.at_peak is True
-
-
-# --- Interval detection: large elapsed skips over peak ---
 
 
 def test_pulse_layer_at_peak_true_when_large_elapsed_skips_past_peak() -> None:
@@ -111,9 +87,6 @@ def test_pulse_layer_at_peak_true_only_on_the_tick_that_ends_brighten() -> None:
         layer.update(0.125)
         peaks.append(layer.at_peak)
     assert [i for i, peak in enumerate(peaks) if peak] == [1, 9]
-
-
-# --- sample() still uses modulo internally for visual correctness ---
 
 
 def test_pulse_layer_sample_correct_after_more_than_one_cycle() -> None:

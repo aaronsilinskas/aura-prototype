@@ -65,11 +65,6 @@ def heard_by_receiver(simulation: Simulation, capsys: pytest.CaptureFixture[str]
     return heard
 
 
-# ---------------------------------------------------------------------------
-# Reach
-# ---------------------------------------------------------------------------
-
-
 def test_a_send_reaches_every_other_device(simulation):
     red, blue, green = add_in_radio_mode(simulation, "red", "blue", "green")
 
@@ -104,11 +99,6 @@ def test_a_send_lands_on_the_tick_after_it_was_sent_whatever_the_add_order(
     assert flashed(blue)
 
 
-# ---------------------------------------------------------------------------
-# Queueing
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.parametrize("red_first", [True, False], ids=["red-added-first", "green-added-first"])
 def test_sends_on_one_tick_reach_a_receiver_in_sender_add_order(simulation, capsys, red_first):
     names = ("red", "green") if red_first else ("green", "red")
@@ -133,11 +123,6 @@ def test_sends_on_one_tick_take_one_tick_each_to_read(simulation, capsys):
     assert heard_from(capsys.readouterr().out) == [green.radio_node]
 
 
-# ---------------------------------------------------------------------------
-# Nodes
-# ---------------------------------------------------------------------------
-
-
 def test_each_device_gets_its_own_radio_node_in_add_order(simulation):
     devices = [
         simulation.add_device(name, scene="hardware_test") for name in ("red", "blue", "green")
@@ -153,11 +138,6 @@ def test_a_received_packet_names_its_senders_node(simulation, capsys):
     green.tap("A")
 
     assert heard_from(capsys.readouterr().out) == [green.radio_node, green.radio_node]
-
-
-# ---------------------------------------------------------------------------
-# Recordings
-# ---------------------------------------------------------------------------
 
 
 def test_radio_sent_records_when_each_packet_went_out_and_what_it_carried(simulation):
@@ -177,11 +157,6 @@ def test_forget_clears_radio_sent(simulation):
     red.forget()
 
     assert red.radio_sent == []
-
-
-# ---------------------------------------------------------------------------
-# Outside senders
-# ---------------------------------------------------------------------------
 
 
 def test_receive_radio_lands_a_packet_on_the_next_tick(simulation):

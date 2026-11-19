@@ -18,11 +18,6 @@ def _runs_anything(scene: str) -> bool:
     return True
 
 
-# ---------------------------------------------------------------------------
-# scope_by_name
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.parametrize(
     "name,expected",
     [
@@ -50,11 +45,6 @@ def test_scope_by_name_raises_naming_the_unknown_scope():
 def test_scope_by_name_raises_value_error_for_a_scope_that_is_not_a_string(name):
     with pytest.raises(ValueError):
         scope_by_name(name)
-
-
-# ---------------------------------------------------------------------------
-# Building from Settings
-# ---------------------------------------------------------------------------
 
 
 def test_construction_accepts_a_single_scope_and_single_entry():

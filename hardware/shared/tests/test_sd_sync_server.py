@@ -48,11 +48,6 @@ def test_read_yields_more_than_one_chunk_for_content_larger_than_chunk_size(devi
     assert len(list(chunks)) > 1
 
 
-# ---------------------------------------------------------------------------
-# write
-# ---------------------------------------------------------------------------
-
-
 def test_write_stores_the_exact_bytes_of_the_streamed_chunks(device_storage):
     server = SdSyncServer(device_storage)
 
@@ -67,11 +62,6 @@ def test_write_creates_missing_parent_directories(device_storage):
     server.write("aura_packs/scenes/tag/scene.json", [b"{}"])
 
     assert device_storage.read_bytes("aura_packs/scenes/tag/scene.json") == b"{}"
-
-
-# ---------------------------------------------------------------------------
-# list
-# ---------------------------------------------------------------------------
 
 
 def test_list_returns_every_seeded_file_at_the_card_root(device_storage):
@@ -105,11 +95,6 @@ def test_list_with_no_sd_configured_returns_none_rather_than_raising():
     server = SdSyncServer(None)
 
     assert server.list() is None
-
-
-# ---------------------------------------------------------------------------
-# serve_one -- request-verb dispatch (#930)
-# ---------------------------------------------------------------------------
 
 
 class _ScriptedTransport(Transport):

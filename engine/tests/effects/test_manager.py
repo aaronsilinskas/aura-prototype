@@ -21,10 +21,6 @@ from engine.tests.effects.helpers import (
 )
 from engine.timer import Timer
 
-# ---------------------------------------------------------------------------
-# Fixtures and helpers
-# ---------------------------------------------------------------------------
-
 
 def _stub_item() -> str:
     return (
@@ -64,19 +60,9 @@ def _make_manager(registry, outputs, allowed=None) -> EffectManager:
     return manager
 
 
-# ---------------------------------------------------------------------------
-# Construction
-# ---------------------------------------------------------------------------
-
-
 def test_manager_with_no_outputs_updates_without_error() -> None:
     manager = _make_manager(registry=PackRegistry(), outputs=[])
     manager.update(_make_timer())
-
-
-# ---------------------------------------------------------------------------
-# update — go-dark signal when no effects are active
-# ---------------------------------------------------------------------------
 
 
 def test_update_with_no_effects_sends_go_dark_to_output() -> None:
@@ -121,11 +107,6 @@ def test_update_delivers_one_composed_frame_to_output_on_every_tick(pack_tree) -
     assert len(output.update_pixels_calls) == 2
 
 
-# ---------------------------------------------------------------------------
-# set_effect + update — slice 2
-# ---------------------------------------------------------------------------
-
-
 def test_set_effect_delivers_one_frame_to_matching_output(pack_tree) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
@@ -146,11 +127,6 @@ def test_set_effect_nonmatching_output_receives_go_dark(pack_tree) -> None:
 
     assert output_b.update_pixels_calls == []
     assert output_b.clear_pixels_calls == ["directional"]
-
-
-# ---------------------------------------------------------------------------
-# set_effect twice — slice 3
-# ---------------------------------------------------------------------------
 
 
 def test_set_effect_twice_replaces_effect(pack_tree) -> None:
@@ -180,11 +156,6 @@ def test_set_effect_twice_first_effect_not_advanced(pack_tree) -> None:
     assert effect_a.update_count == 0
 
 
-# ---------------------------------------------------------------------------
-# out-of-scope go-dark — slice 6
-# ---------------------------------------------------------------------------
-
-
 def test_out_of_scope_output_receives_go_dark_each_frame(pack_tree) -> None:
     output_a = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_b = SpyEffectOutput(min_resolution=10, scopes=[Scope.DIRECTIONAL])
@@ -196,11 +167,6 @@ def test_out_of_scope_output_receives_go_dark_each_frame(pack_tree) -> None:
 
     assert output_b.update_pixels_calls == []
     assert output_b.clear_pixels_calls == ["directional", "directional"]
-
-
-# ---------------------------------------------------------------------------
-# effect events — slice 8
-# ---------------------------------------------------------------------------
 
 
 def test_effect_event_reaches_matching_scope_output(pack_tree) -> None:
@@ -252,11 +218,6 @@ def test_effect_event_does_not_reach_out_of_scope_output(pack_tree) -> None:
     assert output_b.handle_event_calls == []
 
 
-# ---------------------------------------------------------------------------
-# resolution — slice 9
-# ---------------------------------------------------------------------------
-
-
 def test_resolution_equals_max_min_resolution_of_matching_outputs(pack_tree) -> None:
     registry = pack_tree.scan(
         effect_packs={
@@ -295,11 +256,6 @@ def test_resolution_falls_back_to_default_when_no_outputs_match(pack_tree) -> No
 
     builder = registry.get("capture", "fire", CapturingEffectBuilder)
     assert builder.last_config.resolution == 16
-
-
-# ---------------------------------------------------------------------------
-# add_effect — slice 4
-# ---------------------------------------------------------------------------
 
 
 def test_add_effect_after_set_effect_delivers_a_single_composed_frame(pack_tree) -> None:
@@ -395,11 +351,6 @@ def test_render_runs_after_merge_strategy_sizes_the_buffer(pack_tree) -> None:
     assert builder.observed_lengths == [5, 5]
 
 
-# ---------------------------------------------------------------------------
-# stop_effect — slice 5
-# ---------------------------------------------------------------------------
-
-
 def test_stop_effect_causes_go_dark_on_next_update(pack_tree) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
@@ -441,11 +392,6 @@ def test_stop_effect_does_not_affect_other_scopes(pack_tree) -> None:
     assert output_directional.update_pixels_calls == [
         ("directional", output_directional.created_buffers[0])
     ]
-
-
-# ---------------------------------------------------------------------------
-# shared effect dedup — slice 7
-# ---------------------------------------------------------------------------
 
 
 def test_shared_effect_advanced_once_per_frame_for_composite_scope(pack_tree) -> None:
@@ -508,11 +454,6 @@ def test_stop_effect_all_sends_go_dark_to_every_output(pack_tree) -> None:
     assert len(output_directional.update_pixels_calls) == 1
     assert output_personal.clear_pixels_calls[-1] == "personal"
     assert output_directional.clear_pixels_calls[-1] == "directional"
-
-
-# ---------------------------------------------------------------------------
-# scope subtraction — flat list refactor (#61)
-# ---------------------------------------------------------------------------
 
 
 def test_set_effect_on_partial_scope_leaves_other_scope_effects_running(pack_tree) -> None:
@@ -581,11 +522,6 @@ def test_add_effect_does_not_stop_effects_already_running_in_scope(pack_tree) ->
     assert len(output_directional.update_pixels_calls) == 1
 
 
-# ---------------------------------------------------------------------------
-# EffectReceipt generation (#63)
-# ---------------------------------------------------------------------------
-
-
 def test_two_add_effect_calls_return_different_receipts(pack_tree) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
@@ -595,11 +531,6 @@ def test_two_add_effect_calls_return_different_receipts(pack_tree) -> None:
 
     assert receipt_a is not receipt_b
     assert receipt_a.id != receipt_b.id
-
-
-# ---------------------------------------------------------------------------
-# receipt.stop() + deferred-stop (#64)
-# ---------------------------------------------------------------------------
 
 
 def test_stop_effect_by_receipt_stops_the_matching_effect(pack_tree) -> None:
@@ -673,11 +604,6 @@ def test_stop_effect_by_receipt_with_stale_receipt_is_silent_noop(pack_tree) -> 
     manager.update(_make_timer())
 
     assert output.update_pixels_calls == []
-
-
-# ---------------------------------------------------------------------------
-# lifecycle events — start/stop (#58)
-# ---------------------------------------------------------------------------
 
 
 def test_add_effect_fires_start_event_to_matching_output(pack_tree) -> None:
@@ -880,11 +806,6 @@ def test_stop_effect_by_receipt_only_notifies_outputs_still_serving_the_effect(p
     ]
 
 
-# ---------------------------------------------------------------------------
-# scope forwarding
-# ---------------------------------------------------------------------------
-
-
 def test_handle_event_receives_personal_scope_for_personal_effect(pack_tree) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
@@ -925,11 +846,6 @@ def test_handle_event_receives_composite_scope_not_decomposed_leaf(pack_tree) ->
     ]
 
 
-# ---------------------------------------------------------------------------
-# Name resolution errors reach the caller typed (routing lives in test_namespace.py)
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.parametrize("method", ["set_effect", "add_effect"])
 def test_unresolvable_effect_name_raises_the_namespace_error(pack_tree, method) -> None:
     manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[])
@@ -945,11 +861,6 @@ def test_effect_from_a_pack_the_scene_did_not_declare_raises_undeclared_pack(pac
 
     with pytest.raises(UndeclaredPackError):
         manager.set_effect(Scope.PERSONAL, "stub.fire", {})
-
-
-# ---------------------------------------------------------------------------
-# A failed set_effect leaves the scope unchanged (#1114)
-# ---------------------------------------------------------------------------
 
 
 def test_failed_set_effect_keeps_the_running_effect_rendering(pack_tree) -> None:
@@ -1001,11 +912,6 @@ def test_failed_set_effect_takes_no_receipt_id(pack_tree) -> None:
     second = manager.set_effect(Scope.PERSONAL, "stub.fire", {})
 
     assert second.id == first.id + 1
-
-
-# ---------------------------------------------------------------------------
-# Clips resolve when the effect is built (#1116)
-# ---------------------------------------------------------------------------
 
 
 # A verb no test effect emits, and a hand-made twin of the declared FIRED.
@@ -1180,11 +1086,6 @@ def test_building_leaves_the_shared_playback_configs_unchanged(pack_tree) -> Non
     assert starts[0].clip.config is declared
     assert starts[1].clip.config is declared
     assert starts[0].clip is not starts[1].clip
-
-
-# ---------------------------------------------------------------------------
-# Verb keys are checked when the effect is built (ADR-0006)
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize("method", ["set_effect", "add_effect"])
@@ -1375,11 +1276,6 @@ def test_verb_key_error_leaves_the_scope_unchanged(pack_tree, method, bad_item) 
     ]
 
 
-# ---------------------------------------------------------------------------
-# flush
-# ---------------------------------------------------------------------------
-
-
 def test_update_calls_flush_when_no_effects_are_active() -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     manager = _make_manager(registry=PackRegistry(), outputs=[output])
@@ -1409,11 +1305,6 @@ def test_update_calls_flush_on_all_outputs_each_tick() -> None:
 
     assert len(output_a.flush_calls) == 1
     assert len(output_b.flush_calls) == 1
-
-
-# ---------------------------------------------------------------------------
-# clear_pixels — issue #139
-# ---------------------------------------------------------------------------
 
 
 def test_stop_effect_calls_clear_pixels_when_last_effect_stops(pack_tree) -> None:
@@ -1551,11 +1442,6 @@ def test_update_calls_flush_after_clear_pixels_each_tick_when_no_effects_are_act
     assert call_order == ["clear_pixels", "flush"]
 
 
-# ---------------------------------------------------------------------------
-# per-key create_buffer
-# ---------------------------------------------------------------------------
-
-
 def test_create_buffer_called_with_scope_key_on_effect_start(pack_tree) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
@@ -1627,11 +1513,6 @@ def test_scoped_listener_uses_live_keys_after_scope_narrowing(pack_tree) -> None
     )
 
 
-# ---------------------------------------------------------------------------
-# per-key update_pixels
-# ---------------------------------------------------------------------------
-
-
 def test_update_pixels_called_once_per_registered_key_for_multi_key_output(pack_tree) -> None:
     output = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL, Scope.DIRECTIONAL])
     manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[output])
@@ -1642,11 +1523,6 @@ def test_update_pixels_called_once_per_registered_key_for_multi_key_output(pack_
     called_keys = [key for key, _ in output.update_pixels_calls]
     assert set(called_keys) == {"personal", "directional"}
     assert len(called_keys) == 2  # exactly one call per key, no duplicates
-
-
-# ---------------------------------------------------------------------------
-# receives_pixels — issue #191
-# ---------------------------------------------------------------------------
 
 
 def test_output_with_receives_pixels_false_gets_no_create_buffer(pack_tree) -> None:
@@ -1708,11 +1584,6 @@ def test_pixel_output_alongside_non_pixel_output_both_get_flush(pack_tree) -> No
     assert non_pixel_output.create_buffer_key_calls == []
 
 
-# ---------------------------------------------------------------------------
-# renders_pixels — issue #191
-# ---------------------------------------------------------------------------
-
-
 def test_effect_with_renders_pixels_false_skips_buffer_allocation(pack_tree) -> None:
     registry = pack_tree.scan(
         effect_packs={
@@ -1760,11 +1631,6 @@ def test_effect_with_renders_pixels_false_skips_update_pixels_but_calls_flush(pa
     assert output.update_pixels_calls == []
     assert output.clear_pixels_calls == ["personal"]
     assert len(output.flush_calls) == 1
-
-
-# ---------------------------------------------------------------------------
-# EffectReceipt — brightness and loudness from options (#249)
-# ---------------------------------------------------------------------------
 
 
 def test_set_effect_receipt_brightness_defaults_to_one(pack_tree) -> None:
@@ -1819,11 +1685,6 @@ def test_set_effect_rejects_out_of_range_loudness_option(pack_tree) -> None:
 
     with pytest.raises(ValueError):
         manager.set_effect(Scope.PERSONAL, "stub.fire", {"loudness": -0.1})
-
-
-# ---------------------------------------------------------------------------
-# set_merge_strategy — issue #587
-# ---------------------------------------------------------------------------
 
 
 def test_set_merge_strategy_takes_effect_starting_next_tick(pack_tree) -> None:
@@ -1890,11 +1751,6 @@ def test_set_merge_strategy_leaves_other_scopes_strategy_unchanged(pack_tree) ->
     assert list(composed) == [0xFF0000] * 5 + [0x0000FF] * 5  # DIRECTIONAL still Split
 
 
-# ---------------------------------------------------------------------------
-# Mirrored outputs — two outputs share a scope key (issue #483)
-# ---------------------------------------------------------------------------
-
-
 def test_two_outputs_sharing_scope_both_receive_frame_on_update(pack_tree) -> None:
     output_a = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
     output_b = SpyEffectOutput(min_resolution=10, scopes=[Scope.PERSONAL])
@@ -1950,11 +1806,6 @@ def test_two_outputs_sharing_scope_both_reflect_the_same_receipts_brightness(pac
     assert list(buf_a) == list(buf_b) == [0x7F0000] * 4
 
 
-# ---------------------------------------------------------------------------
-# Merge-strategy and held-effects fixtures
-# ---------------------------------------------------------------------------
-
-
 def _make_counting_manager(pack_tree):
     """Return (manager, output) over one PERSONAL output of 4 pixels.
 
@@ -1997,11 +1848,6 @@ def _tick(manager, output) -> list | None:
 
 _SPLIT_RED_BLUE = [0xFF0000] * 2 + [0x0000FF] * 2
 _ADDITIVE_RED_BLUE = [0xFF00FF] * 4
-
-
-# ---------------------------------------------------------------------------
-# EffectAdmin steps — entering the boot scene, covering and uncovering
-# ---------------------------------------------------------------------------
 
 
 def test_entering_the_boot_scene_puts_every_scope_on_split(pack_tree) -> None:

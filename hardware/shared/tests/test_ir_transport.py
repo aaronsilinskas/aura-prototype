@@ -18,10 +18,6 @@ from hardware.shared.ir_transport import (
     _InfraredReceiver,
 )
 
-# ---------------------------------------------------------------------------
-# Port contracts
-# ---------------------------------------------------------------------------
-
 
 def test_pulse_writer_base_raises_not_implemented():
     writer = PulseWriter()
@@ -39,11 +35,6 @@ def test_pulse_writer_base_is_busy_raises_not_implemented():
     writer = PulseWriter()
     with pytest.raises(NotImplementedError):
         writer.is_busy()
-
-
-# ---------------------------------------------------------------------------
-# Telemetry field ownership
-# ---------------------------------------------------------------------------
 
 
 def test_ir_telemetry_field_ownership_partitions_every_snapshot_field_with_no_overlap():

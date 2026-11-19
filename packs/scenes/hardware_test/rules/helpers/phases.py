@@ -24,9 +24,6 @@ TYPE_CHECKING = False
 if TYPE_CHECKING:
     from typing import Final
 
-# ---------------------------------------------------------------------------
-# Phase keys — identity-typed singletons owned by the scene
-# ---------------------------------------------------------------------------
 
 MODE_RGB: Final = PhaseKey("rgb")
 MODE_ACCELEROMETER: Final = PhaseKey("accelerometer")

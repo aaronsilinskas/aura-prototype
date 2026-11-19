@@ -1,9 +1,5 @@
 from effects.layers.drift_noise_layer import DriftNoiseLayer
 
-# ---------------------------------------------------------------------------
-# DriftNoiseLayer — sample range
-# ---------------------------------------------------------------------------
-
 
 def test_drift_noise_layer_sample_returns_non_negative_value() -> None:
     layer = DriftNoiseLayer(resolution=10, drift_speed=0.1, amplitude=1.0)
@@ -26,11 +22,6 @@ def test_drift_noise_layer_sample_is_zero_when_amplitude_is_zero() -> None:
 
     for i in range(10):
         assert layer.sample(i / 10, 10) == 0.0
-
-
-# ---------------------------------------------------------------------------
-# DriftNoiseLayer — drift over time
-# ---------------------------------------------------------------------------
 
 
 def test_drift_noise_layer_sample_changes_after_update() -> None:

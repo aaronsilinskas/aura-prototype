@@ -15,11 +15,6 @@ def _make_state():
     return GameState(SpyEffectControls(), SceneControls())
 
 
-# ---------------------------------------------------------------------------
-# Construction defaults
-# ---------------------------------------------------------------------------
-
-
 def test_new_phase_state_starts_at_level_one_with_no_music():
     """A freshly constructed phase state begins at level 1 with no music
     playing -- the bootstrap state the Ready phase's first entry expects."""
@@ -27,11 +22,6 @@ def test_new_phase_state_starts_at_level_one_with_no_music():
 
     assert phase_state.level == 1
     assert phase_state.music_receipt is None
-
-
-# ---------------------------------------------------------------------------
-# stop_music -- stop-and-clear the nullable music receipt
-# ---------------------------------------------------------------------------
 
 
 def test_stop_music_stops_and_clears_the_receipt():
@@ -53,11 +43,6 @@ def test_stop_music_is_a_no_op_when_nothing_is_playing():
     phase_state.stop_music()
 
     assert phase_state.music_receipt is None
-
-
-# ---------------------------------------------------------------------------
-# rlgl_phase_state -- get-or-create accessor
-# ---------------------------------------------------------------------------
 
 
 def test_rlgl_phase_state_caches_the_same_instance_across_calls():

@@ -6,10 +6,6 @@ import pytest
 
 from engine.lerp import level_lerp, level_lerp_int
 
-# ---------------------------------------------------------------------------
-# level_lerp — falling pair (value shrinks as the level rises)
-# ---------------------------------------------------------------------------
-
 
 def test_level_lerp_falling_pair_at_level_1_returns_first_value():
     assert level_lerp(1, first_value=5.0, top_value=2.0, top_level=10) == pytest.approx(5.0)
@@ -24,11 +20,6 @@ def test_level_lerp_falling_pair_at_midpoint_blends_by_level_fraction():
     assert level_lerp(4, first_value=5.0, top_value=2.0, top_level=7) == pytest.approx(3.5)
 
 
-# ---------------------------------------------------------------------------
-# level_lerp — rising pair (value grows as the level rises)
-# ---------------------------------------------------------------------------
-
-
 def test_level_lerp_rising_pair_at_level_1_returns_first_value():
     assert level_lerp(1, first_value=0.2, top_value=0.8, top_level=10) == pytest.approx(0.2)
 
@@ -40,11 +31,6 @@ def test_level_lerp_rising_pair_at_top_level_returns_top_value():
 def test_level_lerp_rising_pair_at_midpoint_blends_by_level_fraction():
     """Level 4 of 1..10 is a third of the way: 0.2 → 0.8 gives 0.4."""
     assert level_lerp(4, first_value=0.2, top_value=0.8, top_level=10) == pytest.approx(0.4)
-
-
-# ---------------------------------------------------------------------------
-# level_lerp — out-of-range levels and degenerate top levels
-# ---------------------------------------------------------------------------
 
 
 def test_level_lerp_level_below_1_returns_first_value():
@@ -64,11 +50,6 @@ def test_level_lerp_top_level_1_returns_first_value_at_any_level():
 
 def test_level_lerp_top_level_below_1_returns_first_value():
     assert level_lerp(1, first_value=5.0, top_value=2.0, top_level=0) == pytest.approx(5.0)
-
-
-# ---------------------------------------------------------------------------
-# level_lerp_int
-# ---------------------------------------------------------------------------
 
 
 def test_level_lerp_int_rounds_to_nearest_whole_number_at_each_level():

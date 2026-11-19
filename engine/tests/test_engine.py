@@ -23,11 +23,6 @@ def _make_state() -> GameState:
     return GameState(EffectControls(), SceneControls())
 
 
-# ---------------------------------------------------------------------------
-# GameRule.on — event type dispatch
-# ---------------------------------------------------------------------------
-
-
 def test_registered_handler_fires_when_matching_event_is_dispatched() -> None:
     captured = []
     rule = GameRule()

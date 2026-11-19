@@ -1,10 +1,6 @@
 from effects.effect import EffectConfig
 from effects.level import effect_level
 
-# ---------------------------------------------------------------------------
-# effect_level
-# ---------------------------------------------------------------------------
-
 
 def test_effect_level_defaults_to_one_when_option_missing() -> None:
     assert effect_level(EffectConfig(resolution=8)) == 1
