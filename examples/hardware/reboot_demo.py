@@ -117,7 +117,6 @@ elif phase is None:
         raise
     print("__REBOOT ERROR: reboot_into returned without resetting")
 elif phase == "into":
-    # The criterion's proof: after the reset the boot picked up the override.
     print(f"__REBOOT boot=2 phase=into scene={scene_name!r} return_to={return_to!r}")
     print("__REBOOT boot=2 override survived the reset; will reboot_to_previous()")
     state.set("reboot_demo_phase", "previous")

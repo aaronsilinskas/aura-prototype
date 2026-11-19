@@ -30,7 +30,6 @@ class PulseEffect(LayerRenderer):
         self._config = config
 
     def update(self, elapsed: float) -> None:
-        """Advance the layer and emit ``PEAK`` if a peak was crossed."""
         super().update(elapsed)
         if self._pulse.at_peak:
             self._config.notify_listeners(self.PEAK)

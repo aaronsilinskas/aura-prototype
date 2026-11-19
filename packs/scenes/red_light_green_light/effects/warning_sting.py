@@ -6,11 +6,8 @@ Level's duration, scaled between the ``warning_pulse_max`` and
 ``warning_pulse_min`` Settings; the 1-second default is only a fallback and
 does not track those Settings.
 
-The effect owns its look: a black->yellow pulse that brightens, holds and
-darkens over 0.3 / 0.4 / 0.3 of its duration, with no off phase, so one pulse
-runs straight into the next. Any color or phase option a caller passes is
-overridden. Each ``PulseEffect.PEAK`` (one per pulse) plays a one-shot
-``scene.warning_sting_peak`` clip and a single ``STRONG_CLICK`` buzz.
+The effect owns its look, with no off phase so one pulse runs straight into
+the next. Any color or phase option a caller passes is overridden.
 """
 
 from __future__ import annotations
@@ -36,7 +33,6 @@ _pulse = PulseBuilder()
 
 _DEFAULT_PULSE_DURATION: Final = 1.0
 
-# Shares of each pulse spent brightening, holding and darkening.
 _BRIGHTEN_SHARE: Final = 0.3
 _ON_SHARE: Final = 0.4
 _DARKEN_SHARE: Final = 0.3

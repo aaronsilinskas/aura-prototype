@@ -1,15 +1,3 @@
-"""Tag scene Playing-phase shooting rule.
-
-An :class:`InPhaseRule` active during the Playing phase that owns the
-Button-A fire path. On a fresh Button-A press, it encodes the player's own
-``TagData`` identity, sends it on the LINE IR emitter, logs the send, and
-plays the scene-local ``scene.fire_shot`` effect on ``Scope.DIRECTIONAL`` for
-felt feedback.
-
-Phase lifecycle (hitpoints, the ``PERSONAL`` hitpoint bar, and the game-over
-transition) remains owned by :class:`TagPlayingRule`.
-"""
-
 from __future__ import annotations
 
 from engine.input import InputEvents
@@ -31,8 +19,6 @@ _SHOT_DAMAGE: Final = 1
 
 
 class TagShootingRule(InPhaseRule):
-    """Drives Button-A shot firing and felt feedback during the Playing phase."""
-
     def __init__(self) -> None:
         super().__init__(PHASE_PLAYING, tag_phase)
         self.on(InputEvents.Sensors, self._handle)
@@ -85,7 +71,6 @@ class TagShootingRule(InPhaseRule):
         self._end_reload(tag)
 
     def _end_reload(self, tag: TagState) -> None:
-        """Leave the reload and stop its ``scene.reload`` effect."""
         tag.shot.reload_started_at = None
         reload_receipt = tag.shot.reload_receipt
         assert reload_receipt is not None  # set together with reload_started_at

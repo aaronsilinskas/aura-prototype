@@ -1,15 +1,3 @@
-"""``IrRangeConfig`` -- the ir_range_receiver Scene Config.
-
-Holds the scene's three Settings, declared in its ``scene.json``: the
-rolling-window length and silence timeout the ``ReceptionQualityMeter`` uses,
-and the green threshold that decides how strict "Perfect" reception must be.
-
-``ir_range_config`` is a :class:`engine.state.StateSlot` callable accessor: it
-lazily builds the config from ``state.settings`` on first use and caches it
-under a single ``GameState`` key, mirroring the ``rlgl_config``/``tag_config``
-precedent.
-"""
-
 from __future__ import annotations
 
 from engine.settings import SCENE_NAMESPACE, Settings
@@ -24,9 +12,6 @@ _CONFIG_KEY: Final = "ir_range_config"
 
 
 class IrRangeConfig:
-    """Immutable configuration for the ir_range_receiver scene, each field
-    read from the scene Setting of the same name."""
-
     __slots__ = ("green_threshold", "silence_timeout", "window_seconds")
 
     def __init__(self, settings: Settings) -> None:

@@ -1,17 +1,8 @@
 """Phase keys and the typed phase-machine accessor for the ``red_light_green_light`` scene.
 
-The RLGL scene is an eight-phase state machine -- Ready -> Red Warning -> Red ->
-Green Warning -> Green -> (Level Up | Win) -> Game Over -- driven by the
-reusable phase-machine primitive in :mod:`engine.phase`. This module owns the
-scene's named :class:`PhaseKey` instances and the single :data:`rlgl_phase`
-:class:`~engine.phase.PhaseSlot` -- see that class's docstring for how every
-RLGL rule and this module-level reference come to share one
-:class:`~engine.phase.PhaseMachine`.
-
 Because :class:`PhaseKey` compares by identity, these module-level singletons
 are the *only* tokens that match the machine's current phase; a bare string
-literal never will. All eight phases share the one machine held by
-:data:`rlgl_phase`.
+literal never will.
 """
 
 from __future__ import annotations

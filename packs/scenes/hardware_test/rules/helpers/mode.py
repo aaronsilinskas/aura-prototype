@@ -1,10 +1,7 @@
-"""Shared mode plumbing for the hardware_test scene rules.
+"""Cross-rule constants for the hardware_test scene.
 
 Lives in ``rules/helpers/`` (a subpackage the scene scanner skips, like
-``tests/``) so it can hold cross-rule constants without being mistaken for a
-rule module. Mode identity and cycling live in :mod:`phases`; this module
-holds the IR/radio test payload and receive-flash colour, and the RGB idle
-effect table shared by ``rgb_rule`` (entry effect and Button A re-application).
+``tests/``) so it is not mistaken for a rule module.
 """
 
 from __future__ import annotations
@@ -16,7 +13,6 @@ TYPE_CHECKING = False
 if TYPE_CHECKING:
     from typing import Final
 
-# Shared payload for the IR/radio send-test round trip.
 HW_TEST_PAYLOAD: Final = b"hw_test"
 
 # The IR/radio receive flash: unlike the white idle it lights over, so it shows.
@@ -25,7 +21,6 @@ RECEIVE_FLASH_COLOR: Final = 0x00FF00
 # The IR/radio idle on a device lacking that hardware, in place of the white idle.
 UNAVAILABLE_COLOR: Final = 0xFF0000
 
-# RGB mode idle effect table: (scope, name)
 RGB_IDLE: Final = (
     (Scope.PERSONAL, "elements.water"),
     (Scope.DIRECTIONAL, "elements.fire"),

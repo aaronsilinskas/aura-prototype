@@ -22,13 +22,10 @@ _HELD_KEY: Final = "return_to_lobby_held"
 
 
 class ReturnToLobbyRule(GameRule):
-    """Reboots back to the launching scene after both buttons are held.
+    """Reboots back to the launching scene once both buttons are held for the
+    pack's ``hold_seconds`` Setting.
 
-    Accumulates both-buttons-held elapsed time in ``GameState`` -- the rule
-    itself is game-data-stateless -- resetting to zero the instant either
-    button releases. Reaching the pack's ``hold_seconds`` Setting calls
-    ``state.scene_controls.reboot_to_previous()``, rebooting back to
-    whichever scene launched the current one. No visual feedback in v1.
+    The held time lives in ``GameState``; the rule itself is game-data-stateless.
     """
 
     def __init__(self) -> None:

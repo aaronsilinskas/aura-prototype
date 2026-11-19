@@ -1,9 +1,7 @@
 """Tag scene "hit" effect — shared, unmistakable hit moment on ``Scope.Global.MAIN``.
 
-Built on ``basic.pulse`` for pixels: a quick white flash. Layers on a one-shot
-``scene.hit_start`` audio clip with ``stops_effect=True`` so the effect ends —
-and the scope returns to dark — the moment the clip finishes, plus a
-strong-buzz/pause/strong-click haptic sequence for a punchier hit feel.
+The clip's ``stops_effect=True`` ends the effect, returning the scope to dark,
+the moment the clip finishes.
 """
 
 from effects.effect import (

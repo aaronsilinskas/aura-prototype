@@ -20,11 +20,6 @@ _GRAVITY_PALETTE = bytes([  0,   0,   0,   0,
 
 class GravityBuilder(EffectBuilder):
     def __call__(self, name: str, config: EffectConfig) -> Effect:
-        """A slow, drifting nebula in deep blues, sprinkled with additive white
-        star sparkles.
-
-        Level: a denser, wider nebula with more stars winking in and out.
-        """
         level = effect_level(config)
 
         nebula_resolution = max(config.resolution, level_lerp_int(level, 18, 36, EFFECT_TOP_LEVEL))

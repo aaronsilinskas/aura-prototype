@@ -29,8 +29,8 @@ GREEN_MIN_MOTION_THRESHOLD: Final = 2.0
 def low_pass(previous: float, sample: float, factor: float) -> float:
     """Ease ``previous`` toward ``sample`` by ``factor`` (a one-pole low-pass / EMA).
 
-    Returns ``factor * sample + (1 - factor) * previous``.  ``factor`` of 1.0
-    snaps to ``sample`` (no smoothing); smaller values track more slowly.
+    ``factor`` of 1.0 snaps to ``sample`` (no smoothing); smaller values track
+    more slowly.
     Allocation-free for hot paths.
     """
     return factor * sample + (1.0 - factor) * previous

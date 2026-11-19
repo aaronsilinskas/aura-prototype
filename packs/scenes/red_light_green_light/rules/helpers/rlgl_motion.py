@@ -1,16 +1,3 @@
-"""``RlglMotion`` — mutable per-tick motion-tracking state for Red Light Green Light.
-
-Groups the gravity estimate, motion EMA, and green-still-timeout bookkeeping
-into a single mutable object. The gravity estimate is held as three float fields plus a
-``_seeded`` flag rather than a tuple, so :meth:`update` can advance it without
-allocating on every accelerometer sample.
-
-``rlgl_motion`` is a :class:`engine.state.StateSlot` callable accessor: it
-lazily builds the object on first use and caches it under a single
-``GameState`` key, mirroring the ``rlgl_config`` accessor for
-:class:`RlglConfig`.
-"""
-
 from __future__ import annotations
 
 from engine.input import AccelerationData
@@ -30,6 +17,10 @@ _MOTION_KEY: Final = "rlgl_motion"
 
 class RlglMotion:
     """Mutable gravity/motion-EMA tracking state for the RLGL scene.
+
+    The gravity estimate is held as three float fields plus a ``_seeded`` flag
+    rather than a tuple, so :meth:`update` can advance it without allocating
+    on every accelerometer sample.
 
     The gravity estimate is tracked per-axis with a slow low-pass filter and
     subtracted as a vector from each sample so motion reads the same in any
@@ -57,11 +48,7 @@ class RlglMotion:
         self.last_motion_time = 0.0
 
     def reset_gravity(self) -> None:
-        """Clear the seeded flag so the next :meth:`update` re-seeds gravity.
-
-        Called by the rule on phase entry so the gravity estimate never
-        carries a stale orientation across a phase transition.
-        """
+        """Clear the seeded flag so the next :meth:`update` re-seeds gravity."""
         self._seeded = False
 
     def update(

@@ -1,13 +1,3 @@
-"""``TagConfig`` — the Tag scene's Scene Config.
-
-Holds the scene's Settings, declared in its ``scene.json``, and the values
-derived from them.
-
-``tag_config`` is a :class:`engine.state.StateSlot` callable accessor: it lazily
-builds the config from ``state.settings`` on first use and caches it under a
-single ``GameState`` key.
-"""
-
 from __future__ import annotations
 
 from engine.settings import SCENE_NAMESPACE, Settings
@@ -22,9 +12,6 @@ _CONFIG_KEY: Final = "tag_config"
 
 
 class TagConfig:
-    """Immutable configuration for the Tag scene, each field read from the
-    scene Setting of the same name."""
-
     __slots__ = (
         "expected_player",
         "expected_team",
@@ -47,7 +34,6 @@ class TagConfig:
         self.reload_duration = settings.get_float(SCENE_NAMESPACE, "reload_duration")
 
     def warning_duration(self) -> float:
-        """Return the total Starting countdown duration = pulse count x pulse duration."""
         return self.warning_pulse_count * self.warning_pulse_duration
 
 

@@ -10,19 +10,6 @@ from packs.scenes.hardware_test.rules.helpers.phases import MODE_RADIO
 
 
 class HwTestRadioRule(HwModeRule):
-    """Drives the Radio mode: white idle entry effect, send + receive flash.
-
-    On entry, shows a white solid on ``Scope.ALL``. Button A transmits
-    ``HW_TEST_PAYLOAD`` via ``state.network_controls.send_radio`` — a real
-    over-the-air packet, not a local simulation. Receiving a genuine radio
-    packet flashes ``Scope.Global.ALL`` green and records the
-    receipt/timestamp so the shared ``HwModeRule`` flash-expiry can restore
-    the idle effect.
-
-    On a device without a radio, the entry effect is red instead and
-    Button A sends nothing.
-    """
-
     def __init__(self) -> None:
         super().__init__(MODE_RADIO, "radio")
         self.on(NetworkEvents.RadioReceived, self._handle_radio_received)

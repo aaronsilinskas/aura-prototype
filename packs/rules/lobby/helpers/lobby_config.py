@@ -1,24 +1,3 @@
-"""``LobbyConfig`` — resolved, validated configuration for ``LobbySelectRule``.
-
-Holds the ordered display scopes and ordered selectable entries the ``lobby``
-pack declares as its ``scopes`` and ``entries`` Settings (see
-``LobbySelectRule`` for their shape). The scan checks only that each is a
-list; the deep checks live here. ``LobbyConfig``'s constructor reads the
-Settings view and resolves each scope string to its engine ``ScopeValue`` via
-``scope_by_name``. Both Settings are required, with
-no default (a missing entry list can't default to "no scenes"), and an empty
-or malformed one raises rather than showing the wrong scenes. So does an entry
-list the device can run none of: a lobby with nothing to offer fails loudly
-rather than sitting dark.
-
-``scope_by_name`` is a small, lobby-local resolver: there is no engine-wide
-``Scope.by_name`` today, and only this one consumer needs config strings
-(``"personal"``, ``"global.main"``, ...) mapped to ``ScopeValue`` instances.
-The mapping is built from ``str()`` of each ``Scope`` constant rather than
-duplicating the strings by hand, so a future rename of a scope's internal
-string representation fails loudly here instead of silently drifting.
-"""
-
 from __future__ import annotations
 
 from engine.settings import Settings
@@ -32,6 +11,9 @@ if TYPE_CHECKING:
 
 NAMESPACE: Final = "lobby"
 
+# Lobby-local: no other consumer maps config strings to scopes. Keyed by
+# ``str()`` of each constant so a renamed scope string fails loudly here
+# instead of drifting from a hand-written copy.
 _SCOPE_BY_NAME: Final = {
     str(Scope.PERSONAL): Scope.PERSONAL,
     str(Scope.DIRECTIONAL): Scope.DIRECTIONAL,
@@ -85,7 +67,9 @@ class LobbyConfig:
     Built from the ``lobby`` pack's ``scopes`` and ``entries`` Settings. Keeps,
     in order, only the entries whose scene *can_run* accepts
     (``SceneControls.can_run`` on a device), so the lobby offers only scenes
-    this prop can play. Every entry is checked before any is left out.
+    this prop can play. Every entry is checked before any is left out. Both
+    Settings are required, and an empty or malformed one raises rather than
+    showing the wrong scenes or leaving the lobby dark.
 
     Raises:
         ValueError: if an entry is not an object or is missing

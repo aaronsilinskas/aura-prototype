@@ -6,14 +6,10 @@ from packs.effects.basic.helpers.pulse_effect import PulseEffect
 
 
 class PulseBuilder(EffectBuilder):
-    """Builds a :class:`PulseEffect` wrapping a :class:`PulseLayer` from a ``EffectConfig``.
+    """Builds a :class:`PulseEffect` from color and phase-duration options.
 
-    Reads ``start_color`` (default ``0x000000``), ``end_color`` (default
-    ``0xFFFFFF``), ``brighten_duration``, ``on_duration``, ``darken_duration``,
-    and ``off_duration`` (all default ``0.5`` seconds) from options. Colors are
-    stored raw and unscaled; the ``brightness`` option is silently ignored.
-    Brightness is an output-level concern applied by ``MatrixEffectOutput`` at
-    render time.
+    The ``brightness`` option is ignored: ``MatrixEffectOutput`` applies
+    brightness at render time.
 
     Raises ``ValueError``, from :class:`PulseLayer`, if any duration is
     negative or if all durations are zero.

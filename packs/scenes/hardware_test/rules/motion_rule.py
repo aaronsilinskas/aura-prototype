@@ -30,12 +30,6 @@ _AXIS_MAP: Final = (
 
 
 class HwTestMotionRule(HwModeRule):
-    """Drives the Accelerometer mode: idle entry effect and per-tick axis bars.
-
-    Maps accelerometer axes to per-scope ``basic.progress`` bars every tick,
-    independent of button state. Button A has no behaviour in this mode.
-    """
-
     def __init__(self) -> None:
         super().__init__(MODE_ACCELEROMETER)
 
@@ -60,8 +54,8 @@ class HwTestMotionRule(HwModeRule):
             progress = min(1.0, abs(accel) / ACCEL_MAX)
             ec.set_effect(scope, "basic.progress", {"color": color, "progress": progress})
 
-        # Throttle console logging to ~2/sec. ``state.total`` is monotonic, so
-        # the last-logged timestamp needs no teardown across mode changes.
+        # ``state.total`` is monotonic, so the last-logged timestamp needs no
+        # teardown across mode changes.
         if (
             "accel_log_last" not in state
             or state.total - state.get("accel_log_last", 0.0) >= ACCEL_LOG_INTERVAL

@@ -1,9 +1,4 @@
-"""Tag scene "ready" effect — a rotating red laser sweep.
-
-A red shape that rotates around the strip, looking like a laser sweeping
-across the screen. Used to indicate the device is idle in the Ready phase,
-waiting for a button press to start the game.
-"""
+"""Tag scene "ready" effect — a red laser sweep while the device waits in Ready."""
 
 from __future__ import annotations
 
@@ -21,7 +16,6 @@ TYPE_CHECKING = False
 if TYPE_CHECKING:
     from typing import Final
 
-# Black -> red: the laser body lights up red, the dead zones stay dark.
 _RED_PALETTE: Final = bytes([0, 0, 0, 0, 255, 255, 0, 0])
 
 # Revolutions per second of the sweeping laser.

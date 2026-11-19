@@ -1,13 +1,3 @@
-"""Tag scene Game Over phase rule.
-
-On entry, plays ``elements.fire`` across the whole device, adds the
-scene-local game-over sting, and declares that the phase ends when the sting's
-receipt stops, going back to Ready. The sting's ``EffectVerb.START`` audio clip
-carries ``stops_effect=True``, so the end fires the moment the sound finishes.
-There is no fixed duration; entering Ready replaces the looping fire with the
-ready effect.
-"""
-
 from __future__ import annotations
 
 from engine.phase import PhaseRule
@@ -20,7 +10,7 @@ from packs.scenes.tag.rules.helpers.phases import (
 
 
 class TagGameOverRule(PhaseRule):
-    """Drives the Game Over phase: fire + sting, then back to Ready."""
+    """The looping fire needs no ``on_exit``: entering Ready replaces it."""
 
     def __init__(self) -> None:
         super().__init__(PHASE_GAME_OVER, tag_phase)

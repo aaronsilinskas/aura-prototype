@@ -1,17 +1,3 @@
-"""``TagState`` — the residual flat per-tick state for the Tag scene.
-
-Phase mechanics (the current phase, the pending-entry flag, and the
-phase-start clock) now live in the scene's :class:`PhaseMachine`, reached via
-:func:`packs.scenes.tag.rules.helpers.phases.tag_phase`. What remains here is
-the flat gameplay bookkeeping that the phase machine deliberately does not
-own: hitpoints, shot bookkeeping, and the in-flight ``EffectReceipt``s the
-Playing phase shares between rules.
-
-The Playing rule owns ``hitpoints_receipt`` (shared with the hit reactor) and
-clears it, with the shot receipts, in its ``on_exit``. ``tag_state`` is a
-:class:`engine.state.StateSlot` callable accessor, mirroring ``tag_config``.
-"""
-
 from __future__ import annotations
 
 from engine.state import EffectReceipt, StateSlot
@@ -25,9 +11,7 @@ _STATE_KEY: Final = "tag_state"
 
 
 class ShotState:
-    """Shot-related gameplay state: ammo, shot-cooldown, and reload tracking.
-
-    ``reload_started_at`` is ``None`` when not reloading, else the
+    """``reload_started_at`` is ``None`` when not reloading, else the
     ``state.total`` timestamp the current hold-to-reload began.
     ``reload_receipt`` is the in-flight ``scene.reload`` effect on
     ``Scope.Global.BUFF``, if any.
@@ -48,13 +32,13 @@ class ShotState:
 
 
 class TagState:
-    """Mutable flat gameplay state shared by the Tag rules.
+    """Gameplay state shared by the Tag rules; phase state lives in the :class:`PhaseMachine`.
 
-    Fetched once per tick by the rules that need it via :func:`tag_state`.
     Receipts are typed nullable fields (``EffectReceipt | None``) rather than
     opaque ``GameState`` keys, so no runtime ``isinstance`` validation is
-    needed to read them back. Phase, the entry flag, and the phase-start clock
-    are *not* here — they belong to the :class:`PhaseMachine`.
+    needed to read them back. The Playing rule owns ``hitpoints_receipt``,
+    which the hit rule re-issues, and clears it and the shot receipts in its
+    ``on_exit``.
     """
 
     __slots__ = (

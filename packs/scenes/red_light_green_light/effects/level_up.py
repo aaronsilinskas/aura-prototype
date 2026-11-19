@@ -19,7 +19,6 @@ TYPE_CHECKING = False
 if TYPE_CHECKING:
     from typing import Final
 
-# Gold flash: black → #FFD700
 _GOLD_PALETTE: Final = PaletteLUT256(bytes([0, 0x00, 0x00, 0x00, 255, 0xFF, 0xD7, 0x00]))
 
 # Phase durations in seconds

@@ -1,10 +1,7 @@
 """Tag scene "fire_shot" effect — one-shot felt feedback for a Button-A shot.
 
-Built on ``basic.solid``: a bright white flash, whatever color a caller passes,
-layered with a one-shot ``scene.fire_shot_start`` audio clip
-(``stops_effect=True`` so the whole effect — pixels and haptic included — ends
-when the clip finishes, returning ``Scope.DIRECTIONAL`` to dark) and a strong
-haptic pulse.
+The clip's ``stops_effect=True`` ends the whole effect, pixels and haptic
+included, when the clip finishes, returning ``Scope.DIRECTIONAL`` to dark.
 """
 
 from effects.effect import (

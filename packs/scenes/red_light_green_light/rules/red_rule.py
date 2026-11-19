@@ -1,13 +1,3 @@
-"""RLGL scene Red phase rule.
-
-On entry, drops the gravity estimate (re-seeding it from the first sample of
-this phase rather than carrying a stale orientation across the transition),
-resets the motion EMA, shows solid red on ``Scope.NON_AMBIENT``, and starts
-the looping red-light music on ``Scope.PERSONAL``. Any motion above the red
-motion threshold ends the game; otherwise the phase times out into Green
-Warning. On exit, stops the music so it never leaks into the next phase.
-"""
-
 from __future__ import annotations
 
 from engine.input import InputEvents
@@ -28,8 +18,6 @@ from packs.scenes.red_light_green_light.rules.helpers.rlgl_phase_state import rl
 
 
 class RlglRedRule(PhaseRule):
-    """Drives the Red phase: solid red, music, and the motion gate."""
-
     def __init__(self) -> None:
         super().__init__(PHASE_RED, rlgl_phase)
         self.on(InputEvents.Sensors, self._handle)

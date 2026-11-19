@@ -17,11 +17,6 @@ _earth_palette = bytes([0, 96, 48, 8,
 
 class EarthBuilder(EffectBuilder):
     def __call__(self, name: str, config: EffectConfig) -> Effect:
-        """A slow, broad smolder in golds with sprouts of earthy greens.
-
-        Level: more heat sparks with a narrower spread, concentrating the smolder
-        into a tighter, more active column.
-        """
         level = effect_level(config)
         return Effect(
             name=name,

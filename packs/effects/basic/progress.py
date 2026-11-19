@@ -5,12 +5,10 @@ from engine.effects.builder import EffectBuilder
 
 
 class ProgressBuilder(EffectBuilder):
-    """Builds a :class:`ProgressRenderer` over a :class:`ProgressLayer`.
+    """Builds a progress bar from the ``color`` and ``progress`` options.
 
-    Reads ``color`` (default ``0xFFFFFF``, stored raw/unscaled) and ``progress``
-    (default ``0.0``, clamped to ``[0.0, 1.0]`` by the layer) from options.
-    The ``brightness`` option is silently ignored; brightness is an
-    output-level concern applied by ``MatrixEffectOutput`` at render time.
+    The ``brightness`` option is ignored: ``MatrixEffectOutput`` applies
+    brightness at render time.
 
     No ``Palette``/``PaletteLUT256`` is allocated, so re-issuing ``set_effect``
     every tick is cheap.

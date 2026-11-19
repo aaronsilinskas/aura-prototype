@@ -14,12 +14,6 @@ _light_palette = bytes([0, 32, 32, 32,
 
 class LightBuilder(EffectBuilder):
     def __call__(self, name: str, config: EffectConfig) -> Effect:
-        """Tight, rapid white flickers — a bright noisy pulse concentrated in a
-        narrow band, like an overdriven flash.
-
-        Level: hotter sparks that also cool faster — brighter peaks with quicker
-        turnover and more rapid flickering.
-        """
         level = effect_level(config)
         return Effect(
             name=name,

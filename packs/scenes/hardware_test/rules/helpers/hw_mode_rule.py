@@ -1,15 +1,8 @@
-"""Scene-local ``PhaseRule`` base shared by the six hardware_test mode rules.
+"""Scene-local ``PhaseRule`` base shared by the hardware_test mode rules.
 
-Each hardware_test mode (RGB, Accelerometer, Magnetometer, IR, Radio, SFX) is
-a :class:`HwModeRule` subclass: a :class:`~engine.phase.PhaseRule` bound to
-the scene's shared :func:`hw_phase` machine. Because the override-``on()``
-model in :mod:`engine.phase` dispatches one handler per event type, this base
-registers the single ``Sensors`` handler for all six modes and
-uses a template method: :meth:`_handle` calls :meth:`on_input_event` (each
-mode overrides) with the whole event for per-mode logic, then performs the
-behaviour every mode shares — Button B advances to the next mode in
-:data:`MODE_ORDER`, and the IR/radio receive-flash expiry is checked every
-tick.
+Because the override-``on()`` model in :mod:`engine.phase` dispatches one
+handler per event type, this base registers the single ``Sensors`` handler
+for every mode and calls each mode's :meth:`HwModeRule.on_input_event` from it.
 
 ``on_input_event`` is scene-local: it is not a general ``on_event`` and is
 only ever called for ``Sensors`` events.
@@ -59,7 +52,6 @@ class HwModeRule(PhaseRule):
         """Per-mode handling of the whole input event. No-op by default."""
 
     def idle_color(self, state: GameState) -> int:
-        """White, or ``UNAVAILABLE_COLOR`` when the device lacks this mode's hardware."""
         return 0xFFFFFF if self._has_hardware(state) else UNAVAILABLE_COLOR
 
     def _has_hardware(self, state: GameState) -> bool:
@@ -76,7 +68,6 @@ class HwModeRule(PhaseRule):
 
     def _advance_mode(self, state: GameState) -> None:
         state.effect_controls.stop_effect(Scope.ALL)
-        # Clear all flash keys
         state.delete(ir_flash.key)
         state.delete(radio_flash.key)
 
