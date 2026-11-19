@@ -61,6 +61,20 @@ class _CrcMismatchError(Exception):
     """
 
 
+def _expect(transport: Transport, kind: str, text: str) -> None:
+    """Receive the next frame on *transport*, raising unless its kind and text match.
+
+    Raises:
+        ValueError: The frame is not ``kind`` with ``text`` -- the peer broke
+            the protocol, so the exchange cannot safely continue.
+    """
+    frame = decode_frame(transport.recv())
+    if frame.kind != kind or frame.text != text:
+        raise ValueError(
+            f"expected SD-sync frame {kind!r} {text!r}, got {frame.kind!r} {frame.text!r}"
+        )
+
+
 class _ReplayTransport(Transport):
     """``Transport`` wrapper that replays one already-received line, then delegates.
 
@@ -166,12 +180,17 @@ class SdSyncServer:
         ``"ok"``, then streams the file as a sequence of
         :data:`~hardware.shared.sd_sync_protocol.CHUNK_SIZE`-bounded chunks
         read straight off disk by :meth:`read`, waiting for the client's
-        ``ack`` before sending the next (stop-and-wait), and finishes with a
-        ``done`` frame carrying the whole file's incremental CRC-32 for the
-        client to verify.
+        ``ack`` of each chunk's sequence number before sending the next
+        (stop-and-wait), and finishes with a ``done`` frame carrying the
+        whole file's incremental CRC-32 for the client to verify.
 
         Args:
             transport: The port to receive the request from and reply on.
+
+        Raises:
+            ValueError: The client answered a chunk with anything other than
+                an ``ack`` of that chunk's sequence number; no further chunks
+                are sent.
         """
         request = decode_frame(transport.recv())
         _, _, sd_path = request.text.partition(" ")
@@ -191,7 +210,7 @@ class SdSyncServer:
         for seq, chunk in enumerate(chunks):
             crc = binascii.crc32(chunk, crc)
             transport.send(encode_frame(Frame("chunk", str(seq), chunk)))
-            transport.recv()  # ack -- stop-and-wait; the seq is implied by order
+            _expect(transport, "ack", str(seq))
 
         transport.send(encode_frame(Frame("done", str(crc))))
 
@@ -291,7 +310,8 @@ class SdSyncServer:
 
         Raises:
             ValueError: The request's verb is none of ``"pull"``, ``"push"``,
-                ``"list"`` -- a malformed request, not a routine outcome.
+                ``"list"`` -- a malformed request, not a routine outcome -- or
+                the serving verb raised it (see :meth:`serve_pull`).
         """
         line = transport.recv()
         verb, _, _ = decode_frame(line).text.partition(" ")

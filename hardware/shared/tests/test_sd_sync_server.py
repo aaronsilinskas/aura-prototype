@@ -6,7 +6,9 @@ loopback tests in ``scripts/tests/test_sd_sync_loopback.py``, which drive
 protocol as a whole. These tests cover ``read``, ``write`` and ``list``
 directly, the pieces of server behaviour meaningful in isolation from the wire,
 plus ``serve_one``'s request-verb dispatch -- the piece a device-side
-loop needs to service a mix of verbs over one connection.
+loop needs to service a mix of verbs over one connection -- and a pull's
+refusal to keep streaming after a reply that isn't the expected ack, which a
+well-behaved client never sends.
 """
 
 import pytest
@@ -146,3 +148,31 @@ def test_serve_one_raises_for_an_unrecognized_verb():
 
     with pytest.raises(ValueError, match="frobnicate"):
         server.serve_one(transport)
+
+
+def test_pull_stops_with_an_error_when_the_client_replies_to_a_chunk_with_a_non_ack(
+    device_storage,
+):
+    device_storage.write_bytes("log.txt", b"x" * (CHUNK_SIZE + 1))
+    server = SdSyncServer(device_storage)
+    transport = _ScriptedTransport(
+        [encode_frame(Frame("req", "pull log.txt")), encode_frame(Frame("resp", "error"))]
+    )
+
+    with pytest.raises(ValueError):
+        server.serve_one(transport)
+
+    assert [decode_frame(line).kind for line in transport.sent] == ["resp", "chunk"]
+
+
+def test_pull_stops_with_an_error_when_the_client_acks_the_wrong_chunk(device_storage):
+    device_storage.write_bytes("log.txt", b"x" * (CHUNK_SIZE + 1))
+    server = SdSyncServer(device_storage)
+    transport = _ScriptedTransport(
+        [encode_frame(Frame("req", "pull log.txt")), encode_frame(Frame("ack", "1"))]
+    )
+
+    with pytest.raises(ValueError):
+        server.serve_one(transport)
+
+    assert [decode_frame(line).kind for line in transport.sent] == ["resp", "chunk"]
