@@ -69,8 +69,6 @@ _OVERRIDE_KEYS = ("settings", "rule_packs")
 
 
 class MissingRootError(PackScanError):
-    """A pack root passed to ``scan_pack_roots`` does not exist."""
-
     def __init__(self, root: str) -> None:
         self.root = root
         super().__init__(f"Pack root '{root}' does not exist")
@@ -91,8 +89,6 @@ class DuplicateNameError(PackScanError):
 
 
 class ReservedNameError(PackScanError):
-    """A pack is named ``scene``, the prefix reserved for scene-local names."""
-
     def __init__(self, path: str) -> None:
         self.path = path
         super().__init__(
@@ -101,8 +97,6 @@ class ReservedNameError(PackScanError):
 
 
 class MalformedVersionError(PackScanError):
-    """A version in *path* (a Pack manifest or ``scene.json``) is not ``'MAJOR.MINOR'``."""
-
     def __init__(self, path: str, value: object) -> None:
         self.path = path
         self.value = value
@@ -110,8 +104,6 @@ class MalformedVersionError(PackScanError):
 
 
 class MalformedManifestError(PackScanError):
-    """The Pack manifest at *path* cannot be used, for *reason*."""
-
     def __init__(self, path: str, reason: str) -> None:
         self.path = path
         self.reason = reason
@@ -119,8 +111,6 @@ class MalformedManifestError(PackScanError):
 
 
 class MalformedSceneError(PackScanError):
-    """Scene *scene*'s ``scene.json`` at *path* cannot be used, for *reason*."""
-
     def __init__(self, scene: str, path: str, reason: str) -> None:
         self.scene = scene
         self.path = path
@@ -129,8 +119,6 @@ class MalformedSceneError(PackScanError):
 
 
 class SceneDeclarationError(PackScanError):
-    """Scene *scene* declares *pack* in ``effect_packs`` or ``rule_packs`` and cannot have it."""
-
     def __init__(self, scene: str, pack: str, message: str) -> None:
         self.scene = scene
         self.pack = pack
@@ -138,8 +126,6 @@ class SceneDeclarationError(PackScanError):
 
 
 class UnknownDeclaredPackError(SceneDeclarationError):
-    """A scene declares a pack that is not installed as that kind (effect or rule)."""
-
     def __init__(self, scene: str, pack: str, kind: str) -> None:
         self.kind = kind
         super().__init__(
@@ -164,8 +150,6 @@ class IncompatiblePackError(SceneDeclarationError):
 
 
 class OverrideOfUndeclaredPackError(SceneDeclarationError):
-    """The scan's Setting overrides name a Rule pack the scene does not declare."""
-
     def __init__(self, scene: str, pack: str) -> None:
         super().__init__(
             scene,
@@ -176,12 +160,6 @@ class OverrideOfUndeclaredPackError(SceneDeclarationError):
 
 
 class SettingOverrideError(SceneDeclarationError):
-    """Scene *scene* cannot set Setting *setting* of *pack* (or ``"scene"``), for *reason*.
-
-    The override names an undeclared Setting or gives a value of the wrong
-    type, or the Setting is required and nothing set it.
-    """
-
     def __init__(self, scene: str, pack: str, setting: str, reason: str) -> None:
         self.setting = setting
         self.reason = reason
@@ -320,7 +298,6 @@ def _build_scenes(
     rule_packs: list[_PackEntry],
     setting_overrides: SettingOverrides,
 ) -> dict[str, Scene]:
-    """Return each scanned scene's ``Scene``, its Settings resolved and requirements merged."""
     rule_declarations = {entry.name: entry.declarations for entry in rule_packs}
     pack_requires = {entry.name: entry.requires for entry in rule_packs}
     return {
@@ -348,7 +325,6 @@ def _resolve_settings(
 
 
 def _read_setting_overrides(scene: str, given: object) -> tuple[dict[str, object], dict[str, dict]]:
-    """Return *scene*'s ``settings`` and ``rule_packs`` overrides."""
     if not isinstance(given, dict):
         raise ValueError(f"setting overrides for scene {scene!r} are not a dict")
     for key in given:
@@ -502,9 +478,6 @@ def _reject_effect_manifest_keys(manifest: dict, path: str) -> None:
 
     An effect pack is tuned per use through ``options``, so it declares no
     Settings and lists no Capabilities.
-
-    Raises:
-        MalformedManifestError: *manifest* has a ``requires`` or ``settings`` key.
     """
     if "requires" in manifest:
         raise MalformedManifestError(path, "an effect pack cannot list 'requires'")

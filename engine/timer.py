@@ -2,10 +2,7 @@ import time
 
 
 class Timer:
-    """Tracks elapsed time per update and cumulative total time.
-
-    Call ``update()`` each loop tick to advance the timer.
-    """
+    """Tracks elapsed time per update and cumulative total time."""
 
     __slots__ = ["_last", "elapsed", "total"]
 

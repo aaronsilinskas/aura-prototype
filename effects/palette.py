@@ -1,8 +1,5 @@
 class Palette:
-    """Maps a normalized float value to a packed RGB color.
-
-    Subclasses implement ``lookup`` to define the color mapping strategy.
-    """
+    """Maps a normalized float value to a packed RGB color."""
 
     @staticmethod
     def pack_rgb(r: int, g: int, b: int) -> int:
@@ -40,7 +37,6 @@ class PaletteLUT256(Palette):
         if len(color_stops) % 4 != 0:
             raise ValueError("Color stops length must be a multiple of 4")
 
-        # Ensure the first and last stops anchor the LUT at 0 and 255
         anchored_stops = color_stops[:]
         if anchored_stops[0] != 0:
             anchored_stops = bytes([0, 0, 0, 0]) + anchored_stops
@@ -49,7 +45,6 @@ class PaletteLUT256(Palette):
 
         lookup_palette: list[int] = [0] * 256
 
-        # Each stop is 4 bytes; walk adjacent stops and fill the LUT between them
         for anchor_index in range(0, len(anchored_stops) - 4, 4):
             start_index = anchored_stops[anchor_index]
             start_r = anchored_stops[anchor_index + 1]

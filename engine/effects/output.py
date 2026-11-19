@@ -84,8 +84,4 @@ class EffectOutput:
     def handle_event(
         self, event: EffectEvent, scope_keys: frozenset[str], effect: Effect, receipt: EffectReceipt
     ) -> None:
-        """Handle an event triggered by an effect lifecycle or effect-triggered signal.
-
-        Lifecycle events (start/stop) and effect-triggered signals all deliver
-        an ``EffectEvent`` instance.
-        """
+        """Handle an event triggered by an effect lifecycle or effect-triggered signal."""

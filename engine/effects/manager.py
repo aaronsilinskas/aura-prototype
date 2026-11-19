@@ -34,12 +34,11 @@ _DEFAULT_RESOLUTION = 16
 class VerbKeyError(ValueError):
     """A built effect keys ``clips`` or ``patterns`` on a verb it cannot use there.
 
-    Raised by ``EffectManager.set_effect``/``add_effect`` before anything in
-    scope is stopped. Not a **Registry lookup error**: every name resolved, but
-    the key is not one of the verbs the effect can emit (``Effect.emitted_verbs``),
-    or it is a ``STOP`` clip. *effect_name* is qualified, *modality* is
-    ``"clips"`` or ``"patterns"``, *problem* says what is wrong with *verb*,
-    and *emitted* lists the verbs the effect can emit.
+    Not a **Registry lookup error**: every name resolved, but the key is not one
+    of the verbs the effect can emit (``Effect.emitted_verbs``), or it is a
+    ``STOP`` clip. *effect_name* is qualified, *modality* is ``"clips"`` or
+    ``"patterns"``, *problem* says what is wrong with *verb*, and *emitted*
+    lists the verbs the effect can emit.
     """
 
     def __init__(
@@ -181,13 +180,11 @@ class EffectManager(EffectControls, EffectAdmin):
         self._output_key_sets: list[frozenset[str]] = [
             frozenset(k for s in o.scopes for k in s.keys) for o in outputs
         ]
-        # Every registered scope key defaults to the Split merge strategy.
         self._merge_strategies: dict[str, MergeStrategy] = {
             k: SPLIT for key_set in self._output_key_sets for k in key_set
         }
         # Pre-allocated per-output frame accumulators — cleared and reused each tick
         # to avoid dict/list allocation in the hot path.
-        # Non-pixel outputs (receives_pixels=False) get an empty, unused placeholder.
         self._frame_bufs: list[dict[str, list[PixelBuffer]]] = [
             {k: [] for k in key_set} if o.receives_pixels else {}
             for o, key_set in zip(outputs, self._output_key_sets)
@@ -286,7 +283,6 @@ class EffectManager(EffectControls, EffectAdmin):
         return entry
 
     def _update_output_buffers(self, entry: EffectManager._EffectEntry) -> None:
-        """Remove keys no longer in entry.keys from per-output buffer dicts."""
         key_set = set(entry.keys)
         for i in range(len(self._outputs)):
             buf_dict = entry.output_buffers[i]
@@ -355,19 +351,11 @@ class EffectManager(EffectControls, EffectAdmin):
         self._effects = new_effects
 
     def set_merge_strategy(self, scope: ScopeValue, strategy: MergeStrategy) -> None:
-        """Set the merge strategy for every key in scope.keys.
-
-        Keys outside scope.keys are left unchanged. Takes effect starting with
-        the next tick's ``prepare_buffers`` call.
-        """
         for key in scope.keys:
             self._merge_strategies[key] = strategy
 
     def enter_boot_scene(self, view: SceneView) -> None:
-        """Put every registered scope key on SPLIT, then install *view*.
-
-        See ``EffectAdmin.enter_boot_scene``.
-        """
+        """Put every registered scope key on SPLIT, then install *view*."""
         for key in self._merge_strategies:
             self._merge_strategies[key] = SPLIT
         self._namespace.install(view)
@@ -445,11 +433,9 @@ class EffectManager(EffectControls, EffectAdmin):
         return entry.receipt
 
     def stop_effect(self, scope: ScopeValue) -> None:
-        """Stop all running effects in scope."""
         self._remove_effects_in_scope(set(scope.keys))
 
     def update(self, timer: Timer) -> None:
-        """Tick all active effects and deliver frames to every registered output."""
         # Deferred-stop: remove any effects whose receipt was marked stopped since
         # the last tick.  This runs before Pass 1 so that stop events and
         # clear_pixels fire before the new frame is rendered, and so that calling
@@ -477,19 +463,13 @@ class EffectManager(EffectControls, EffectAdmin):
 
         elapsed = timer.elapsed
 
-        # Pass 1: advance each effect once.
         for entry in self._effects:
             if entry.effect.pixels is not None:
                 entry.effect.pixels.update(elapsed)
 
-        # Pass 2: merge and deliver one composed frame per key to each output.
         # Render must happen between prepare_buffers and merge — each buffer
         # is only correctly sized (by the key's MergeStrategy) once
         # prepare_buffers has run, and merge reads the rendered pixels.
-        # _frame_bufs, _frame_receipts, and _frame_pixels are pre-allocated in
-        # __init__ and cleared here — no new objects in steady state after warmup.
-        # Non-pixel outputs (receives_pixels=False) skip update_pixels entirely;
-        # flush() is always called unconditionally.
         for i, output in enumerate(self._outputs):
             if output.receives_pixels:
                 frame_bufs = self._frame_bufs[i]

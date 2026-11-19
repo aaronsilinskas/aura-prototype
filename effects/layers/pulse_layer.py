@@ -56,7 +56,6 @@ class PulseLayer(Layer):
         self.at_peak = False
 
     def update(self, elapsed: float) -> None:
-        """Advance phase by ``elapsed`` seconds. ``_elapsed`` is a raw accumulator."""
         prev = self._elapsed
         self._elapsed = prev + elapsed
         cycle_total = self._cycle_total
@@ -77,5 +76,4 @@ class PulseLayer(Layer):
             self._brightness = 0.0
 
     def sample(self, position: float, pixel_count: int) -> float:
-        """Return current brightness in ``[0.0, 1.0]``; position is ignored."""
         return self._brightness

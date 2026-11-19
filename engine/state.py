@@ -86,28 +86,21 @@ class Scope:
         MAIN: Final = ScopeValue("global.main")  # primary effect area (e.g. active spell)
         BUFF: Final = ScopeValue("global.buff")  # positive status effects
         DEBUFF: Final = ScopeValue("global.debuff")  # negative status effects
-        ALL: Final = ScopeValue(
-            "global.all", [MAIN, BUFF, DEBUFF]
-        )  # entire global area, no differentiation
+        ALL: Final = ScopeValue("global.all", [MAIN, BUFF, DEBUFF])
 
     PERSONAL: Final = ScopeValue("personal")  # only the local player's device
     DIRECTIONAL: Final = ScopeValue("directional")  # the direction the player is pointing
-    AMBIENT: Final = ScopeValue("ambient")  # long-running background effects
-    NON_AMBIENT: Final = ScopeValue(
-        "non_ambient", [PERSONAL, DIRECTIONAL, Global.ALL]
-    )  # all non-ambient scopes
-    ALL: Final = ScopeValue(
-        "all", [PERSONAL, DIRECTIONAL, Global.ALL, AMBIENT]
-    )  # every scope, including all global zones and ambient
+    AMBIENT: Final = ScopeValue("ambient")
+    NON_AMBIENT: Final = ScopeValue("non_ambient", [PERSONAL, DIRECTIONAL, Global.ALL])
+    ALL: Final = ScopeValue("all", [PERSONAL, DIRECTIONAL, Global.ALL, AMBIENT])
 
 
 class SceneControls:
     """Abstract interface for scene transitions called from within game rules.
 
-    All methods raise ``NotImplementedError`` by default.  ``SceneManager``
-    injects itself as the live implementation; standalone callers (e.g. rule
-    unit tests) pass the base ``SceneControls()`` instance, which raises on
-    any call.
+    ``SceneManager`` injects itself as the live implementation; standalone
+    callers (e.g. rule unit tests) pass the base ``SceneControls()`` instance,
+    which raises on any call.
 
     There is no in-process scene switch: a rule changes scene by Reboot
     (ADR-0005). The boot scene is activated by ``SceneManager`` itself, off
@@ -163,28 +156,22 @@ class SceneControls:
 class SceneReboot:
     """Board-free port through which ``SceneManager`` persists-and-reboots.
 
-    Mirrors how ``SceneManager`` already reaches ``EffectAdmin`` through an
-    injected seam: ``SceneManager`` validates ``reboot_into``'s *target*
-    against its scene registry (a typo must never persist a name the next
-    boot would only skip), checks the target's Required capabilities (reading
-    ``reboot_to_previous``'s target from ``previous_scene``), and otherwise
-    delegates both reboots straight to this port. All the device work —
-    writing the scene switch to durable storage and physically resetting the
-    device — lives on the concrete implementation, since a reboot is
-    inherently a hardware operation the board-free engine cannot perform
-    itself. Every method raises ``NotImplementedError`` by default;
-    ``DeviceSceneReboot`` (``hardware.shared.device_reboot``) is the
-    live implementation, and a recording fake stands in for CPython tests.
+    ``SceneManager`` validates ``reboot_into``'s *target* against its scene
+    registry (a typo must never persist a name the next boot would only skip),
+    checks the target's Required capabilities (reading ``reboot_to_previous``'s
+    target from ``previous_scene``), and otherwise delegates both reboots
+    straight to this port. All the device work — writing the scene switch to
+    durable storage and physically resetting the device — lives on the concrete
+    implementation, since a reboot is inherently a hardware operation the
+    board-free engine cannot perform itself.
     """
 
     __slots__ = ()
 
     def reboot_into(self, target: str) -> None:
-        """Persist *target* as the next boot scene and reboot immediately."""
         raise NotImplementedError
 
     def reboot_to_previous(self) -> None:
-        """Persist the recorded ``return_to`` scene and reboot immediately."""
         raise NotImplementedError
 
     def previous_scene(self) -> str | None:
@@ -199,10 +186,6 @@ class SceneReboot:
 class NetworkControls:
     """Abstract interface for network transmit operations called from within game rules.
 
-    All methods raise ``NotImplementedError`` by default.  ``HardwareNetworkControls``
-    in ``hardware/shared/network_controls.py`` provides the live hardware-backed
-    implementation.
-
     Transmits are always broadcast — no recipient parameter; player identity is
     encoded in the payload if needed.
     """
@@ -214,7 +197,6 @@ class NetworkControls:
         raise NotImplementedError
 
     def send_radio(self, data: bytes) -> None:
-        """Transmit a radio packet."""
         raise NotImplementedError
 
 
@@ -229,9 +211,7 @@ class EffectReceipt:
     ``[0.0, 1.0]`` (default ``1.0``) that rules set directly
     (``receipt.brightness = x``) to vary an effect's intensity without
     restarting it. Assigning a value outside that range raises
-    ``ValueError``. The pixel merge layer (``engine.effects.merge``) reads
-    ``brightness``; the voice pool (``hardware.shared.voice_pool``) reads
-    ``loudness``.
+    ``ValueError``.
     """
 
     __slots__ = ("_brightness", "_loudness", "_stopped", "id")
@@ -337,10 +317,8 @@ class EffectControls:
 class _StateSlotBase:
     """Callable accessor that owns the get-or-create-and-revalidate pattern for a GameState key.
 
-    Constructed once at module load. Calling it returns the value under
-    *key*, created by *factory* on first use, after checking it is an
-    *expected_class* instance. Use it as ``StateSlot``; the checker sees a
-    generic subclass that types the result as *expected_class*.
+    Use it as ``StateSlot``; the checker sees a generic subclass that types the
+    result as *expected_class*.
     """
 
     __slots__ = ("_expected_class", "_factory", "key")
@@ -392,8 +370,6 @@ else:
 class GameState:
     """Portable game context passed to every rule handler on every tick.
 
-    ``SceneManager`` builds one for each scene on its stack and wraps it, with
-    the scene's rules, in a ``SceneRun``; rule unit tests construct it directly.
     Data stored via ``state.set()`` survives across ticks.
 
     Rules read time and control effects, scenes and the network through it,
@@ -490,7 +466,6 @@ class GameState:
         return value
 
     def set(self, key: str, value: object) -> None:
-        """Store *value* under *key*."""
         self._data[key] = value
 
     def pop(self, key: str, type_: type[T]) -> T:
@@ -514,7 +489,6 @@ class GameState:
         self._data.pop(key, None)
 
     def has(self, key: str) -> bool:
-        """Return ``True`` if *key* is present in state."""
         return key in self._data
 
     def __contains__(self, key: object) -> bool:

@@ -222,9 +222,6 @@ class EffectConfig:
 class PixelBuffer:
     """In-memory pixel buffer backed by a list.
 
-    Used in tests, examples, or any context where rendered colors are
-    collected before being written to hardware.
-
     The backing list is allocated once at construction, at ``capacity`` size,
     and is never reallocated. ``resize`` only moves the logical length used
     by ``__len__`` within ``[0, capacity]`` — it does not touch the backing
@@ -257,7 +254,7 @@ class PixelBuffer:
         """Set the logical length reported by ``__len__`` to ``new_count``.
 
         ``new_count`` must be within ``[0, capacity]``; otherwise raises
-        ``ValueError``. Does not reallocate the backing list.
+        ``ValueError``.
         """
         if new_count < 0 or new_count > self.capacity:
             raise ValueError(f"new_count {new_count} out of range [0, {self.capacity}]")

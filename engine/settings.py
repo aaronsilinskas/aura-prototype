@@ -22,8 +22,6 @@ SCENE_NAMESPACE: Final = "scene"
 
 
 class UnknownSettingError(LookupError):
-    """No Setting *name* is declared in *namespace* for this scene."""
-
     def __init__(self, namespace: str, name: str) -> None:
         self.namespace = namespace
         self.name = name
@@ -131,7 +129,6 @@ def _wrong_type(namespace: str, name: str, value: object, type_name: str) -> Typ
     return TypeError(f"Setting '{namespace}.{name}' is {value!r}, not a {type_name}")
 
 
-# The types a Setting can be declared as.
 # A ``list`` is checked at the top level only; its items are the pack's to check.
 _TYPES = ("int", "float", "bool", "str", "list")
 
@@ -150,8 +147,6 @@ class SettingDeclaration:
 
 
 class SettingValueError(ValueError):
-    """Setting *setting* cannot take the value given or resolve, for *reason*."""
-
     def __init__(self, setting: str, reason: str) -> None:
         self.setting = setting
         self.reason = reason

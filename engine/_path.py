@@ -46,7 +46,6 @@ isfile: Callable[[str], bool]
 try:
     from os.path import isdir, isfile, join, normpath
 except (ImportError, AttributeError):
-    # CircuitPython / MicroPython fallback.
     normpath, join, isdir, isfile = _normpath, _join, _isdir, _isfile
 
 

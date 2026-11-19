@@ -6,8 +6,6 @@ from effects.value import lerp
 class Scroll:
     """Base interface for position scroll helpers.
 
-    All concrete subclasses must implement ``update`` and ``apply``.
-
     Uses ``raise NotImplementedError`` rather than ``abc.ABC`` /
     ``@abstractmethod`` for CircuitPython compatibility.
     """
@@ -24,11 +22,7 @@ class Scroll:
 
 
 class ScrollOffset(Scroll):
-    """Constant-speed position scroll.
-
-    Call ``update(elapsed)`` each frame to accumulate the offset, then
-    ``apply(position)`` per pixel to shift the sample position.
-    """
+    """Constant-speed position scroll."""
 
     __slots__ = ["_offset", "_speed"]
 

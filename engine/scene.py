@@ -31,9 +31,7 @@ if TYPE_CHECKING:
 class SceneLocalRegistry:
     """Single-namespace registry for one scene's local items (rules or effects).
 
-    Maps item name → loaded item, sharing item-loading internals (import,
-    attribute extraction, isinstance check, cache) with ``PackRegistry`` via
-    ``load_item``.  No version concept.
+    No version concept.
 
     Built only by ``engine.pack_catalog.scan_pack_roots``, which discovers the
     items and sets the attribute they export (``BUILD`` or ``RULE``).
@@ -135,9 +133,6 @@ class Scene:
     the one-way ``engine`` → ``hardware`` layering.  Resolving the name to a
     codec is a ``hardware``-layer concern.
 
-    ``settings`` is the scene's resolved ``Settings``, which ``SceneManager``
-    hands to each ``GameState`` it creates for the scene.
-
     ``required_capabilities`` is what the scene's ``requires`` lists plus what
     each of its Rule packs lists; ``SceneRegistry`` answers from it.
 
@@ -145,9 +140,7 @@ class Scene:
     ``SceneLocalRegistry`` instances for the scene's scene-local rules and
     effects (items export ``RULE`` and ``BUILD``).  ``local_sound_map`` is the
     bare-keyed ``{stem: path}`` map of its scene-local sounds (its ``sounds/``
-    subdirectory).  ``SceneManager`` resolves the local rules into the scene's
-    ``SceneRun``; the local effects and sounds go into its Scene view, which the
-    effect system installs on every transition into the scene (ADR-0008).
+    subdirectory).
     """
 
     __slots__ = (
@@ -248,20 +241,13 @@ class SceneRegistry:
         return sorted(self._scenes)
 
     def resolve_known(self, name: str) -> str:
-        """Return *name* if it is in the registry, else raise naming the known scenes.
-
-        The single known-scene check, shared by the Scene boot
-        (``app.scene_composition.build_scene_boot``, the boot-time guard) and
-        ``SceneManager.reboot_into`` (the Button-B fail-fast guard) so the
-        check and its message have exactly one implementation.
-        """
+        """Return *name* if it is in the registry, else raise naming the known scenes."""
         if name in self._scenes:
             return name
         raise ValueError(f"unknown scene {name!r}; known scenes: {', '.join(self.names())}")
 
 
 def _scene_view(scene: Scene) -> SceneView:
-    """Return *scene*'s Scene view: its local effects and sounds, and its declared packs."""
     return SceneView(
         scene.local_effect_registry,
         scene.local_sound_map,
@@ -270,7 +256,7 @@ def _scene_view(scene: Scene) -> SceneView:
 
 
 class _SceneStackEntry:
-    """One entry in ``SceneManager``'s scene stack.  Internal use only.
+    """One entry in ``SceneManager``'s scene stack.
 
     ``run`` is the scene's SceneRun: its state and its rules.  ``view`` is
     the scene's Scene view, built once and handed to every ``EffectAdmin``
@@ -300,18 +286,6 @@ class _SceneStackEntry:
 class SceneManager(SceneControls):
     """Manages a stack of active scenes, each a ``SceneRun``, ticking the top one.
 
-    Construction::
-
-        manager = SceneManager(
-            effect_controls,
-            network_controls,
-            capabilities,
-            rule_registry,
-            scene_registry,
-            effect_admin,
-            scene_reboot,
-        )
-
     Driving the game loop, with the tick's elapsed time from the clock its
     caller (``SceneRuntime``) holds::
 
@@ -335,10 +309,6 @@ class SceneManager(SceneControls):
     raises ``ValueError`` before it ticks if its rules leave out the owner
     of a phase one of them guards (``check_phase_owners_listed``).
 
-    Each scene's ``GameState`` carries *effect_controls*, *network_controls*,
-    *capabilities*, this manager as its ``SceneControls`` and the scene's
-    Settings.
-
     *capabilities* are the device's Capabilities. Every transition
     into a scene (``activate_boot_scene``, ``overlay``, ``reboot_into``,
     ``reboot_to_previous``) checks the target's Required capabilities against
@@ -357,14 +327,10 @@ class SceneManager(SceneControls):
 
     *scene_reboot* is the injected ``SceneReboot`` port ``reboot_into``/
     ``reboot_to_previous`` delegate to (its ``previous_scene`` names the
-    target ``reboot_to_previous`` checks). Unlike *effect_admin* it plays no
-    role in activation, ``overlay`` or ``pop`` — it exists solely for the
-    two reboot methods, which apply immediately and synchronously rather
-    than joining the deferred-transition queue.
+    target ``reboot_to_previous`` checks).
 
     *logger* is where ``reboot_to_previous`` logs declining a recorded scene
-    the scene registry doesn't know. Omitted or None normalizes to
-    ``Logger.SILENT``.
+    the scene registry doesn't know.
     """
 
     __slots__ = (
@@ -402,12 +368,8 @@ class SceneManager(SceneControls):
         self._stack: list[_SceneStackEntry] = []
         self._pending: tuple[Literal["overlay"], Scene] | tuple[Literal["pop"]] | None = None
 
-    # Not on SceneControls, so rules can't reach it.
     def activate_boot_scene(self, name: str) -> None:
         """Make *name* the active scene, at once, on Split for every scope.
-
-        Called once by the boot composition; a rule changes scene by
-        Reboot instead.
 
         Raises:
             ValueError: *name* is not in the scene registry, or a scene is
@@ -543,14 +505,12 @@ class SceneManager(SceneControls):
         return SceneRun(state, rules)
 
     def _do_overlay(self, scene: Scene) -> None:
-        """Suspend the current top, covering its effects, and push *scene* above it."""
         run = self._new_run(scene)
         view = _scene_view(scene)
         held = self._effect_admin.cover(view)
         self._stack.append(_SceneStackEntry(scene, run, view, held))
 
     def _do_pop(self) -> None:
-        """Remove the top entry and uncover the scene below it."""
         popped = self._stack.pop()
         # pop() rejects a stack of size <= 1, so the popped entry is always one
         # overlay() pushed — never the boot scene's base entry, whose held is

@@ -18,11 +18,6 @@ class ButtonData:
 
     This buffer is mutated each frame via ``set`` — it is not a cross-frame
     snapshot.  Callers that need to retain values across frames must copy.
-
-    Use the query methods (``is_pressed``, ``is_released``, ``is_down``,
-    ``is_up``) instead of accessing ``_states`` directly.  ``get`` and
-    ``items`` are provided for callers that need the raw constant or need to
-    iterate over all buttons.
     """
 
     __slots__ = ("_states",)
@@ -120,8 +115,6 @@ class MagneticData(_AxisReading):
 
 
 class InputEvents:
-    """Namespace for input-layer event types."""
-
     GROUP: Final = EventGroup("in")
 
     class Sensors(Event):

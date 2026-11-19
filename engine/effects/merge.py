@@ -12,12 +12,10 @@ _FULL_BRIGHTNESS: Final = 1.0
 
 
 def _brightness_of(receipt: EffectReceipt | None) -> float:
-    """Return *receipt*'s brightness, or full brightness for a missing receipt."""
     return _FULL_BRIGHTNESS if receipt is None else receipt.brightness
 
 
 def _scale_color(color: int, brightness: float) -> int:
-    """Scale each RGB channel of *color* by *brightness*."""
     r = int(((color >> 16) & 255) * brightness)
     g = int(((color >> 8) & 255) * brightness)
     b = int((color & 255) * brightness)
@@ -62,7 +60,6 @@ class AdditiveMerge(MergeStrategy):
     """Composites all buffers over the full region by per-channel additive blend."""
 
     def prepare_buffers(self, buffers: list[PixelBuffer]) -> None:
-        """Size every buffer to the full region width, even if previously sized differently."""
         region = buffers[0].capacity
         for buf in buffers:
             buf.resize(region)
@@ -70,7 +67,6 @@ class AdditiveMerge(MergeStrategy):
     def merge(
         self, buffers: list[PixelBuffer], receipts: list[EffectReceipt | None]
     ) -> PixelBuffer:
-        """Blend all (brightness-scaled) buffers per channel, clamped to 255, into buffers[0]."""
         dest = buffers[0]
         region = len(dest)
         dest_brightness = _brightness_of(receipts[0])
