@@ -4,10 +4,7 @@ from magic.values import Counter, Duration
 
 
 class EarthShieldSpell(Spell):
-    """Resists incoming damage for a number of hits or duration.
-
-    Level scaling: Increases the damage reduction percentage up to 100%.
-    """
+    """Resists incoming damage for a number of hits or duration."""
 
     def __init__(self, reduction: float, max_hits: int, duration: float) -> None:
         super().__init__([SpellTags.BUFF, SpellTags.SHIELD, ElementTags.EARTH])

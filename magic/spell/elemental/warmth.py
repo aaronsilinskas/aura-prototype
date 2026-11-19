@@ -3,10 +3,7 @@ from magic.spell.elemental.elements import ElementTags
 
 
 class WarmthSpell(Spell):
-    """Remove debuffs from the water and ice elements.
-
-    Level scaling: No scaling (instant removal effect).
-    """
+    """Remove debuffs from the water and ice elements."""
 
     def __init__(self) -> None:
         super().__init__([SpellTags.BUFF, ElementTags.FIRE])

@@ -11,10 +11,7 @@ class PauseSpell(Spell):
     While active:
     - Cancels all spell casts
     - Multiplies cast delay by the pause duration
-    - Does not affect damage, healing, or spell hits
-
-    Level scaling: Increases the pause duration.
-    """
+    - Does not affect damage, healing, or spell hits"""
 
     def __init__(self, duration: float) -> None:
         super().__init__(tags=[SpellTags.DEBUFF, ElementTags.TIME])
@@ -42,7 +39,6 @@ class PauseSpell(Spell):
             if not already_paused:
                 aura.add_spell(PauseSpell(self.duration.length))
 
-            # Cancel a stacking pause; let the first pause through to pause this Aura.
             event.is_canceled = already_paused
         else:
             event.is_canceled = True

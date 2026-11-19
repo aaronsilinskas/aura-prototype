@@ -1,5 +1,3 @@
-"""Detects sets of spells on an Aura and replaces them with a combined spell."""
-
 from __future__ import annotations
 
 from magic.aura import AddSpellEvent, Aura, AuraEvent, EventListener
@@ -26,17 +24,14 @@ class SpellCombinations(EventListener):
         self._combinations: list[SpellCombination] = []
 
     def on_spell_event(self, aura: Aura, event: AuraEvent) -> None:
-        """Runs every registered combination check when a spell is added."""
         if isinstance(event, AddSpellEvent):
             for combo in self._combinations:
                 combo.check(aura)
 
     def add(self, combination: SpellCombination) -> None:
-        """Registers ``combination``."""
         self._combinations.append(combination)
 
     def remove(self, combination: SpellCombination) -> None:
-        """Unregisters ``combination`` if present."""
         if combination in self._combinations:
             self._combinations.remove(combination)
 

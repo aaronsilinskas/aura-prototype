@@ -20,12 +20,10 @@ class Duration:
         return self.is_expired
 
     def reset(self) -> None:
-        """Resets the elapsed time to zero."""
         self._elapsed = 0.0
 
     @property
     def length(self) -> float:
-        """The total length of the duration."""
         return self._length
 
     @length.setter
@@ -34,7 +32,6 @@ class Duration:
 
     @property
     def elapsed(self) -> float:
-        """The time elapsed since the start of the duration."""
         return self._elapsed
 
     @property
@@ -44,7 +41,6 @@ class Duration:
 
     @property
     def is_expired(self) -> bool:
-        """Whether the elapsed time has reached the length."""
         return self._elapsed >= self._length
 
 
@@ -94,13 +90,11 @@ class ValueModifiers:
         return False
 
     def remove(self, modifier: ValueModifier) -> None:
-        """Removes ``modifier`` if present."""
         if modifier in self._modifiers:
             self._modifiers.remove(modifier)
             self._notify_modifiers_changed()
 
     def update(self, elapsed_time: float) -> None:
-        """Advances all modifiers, dropping any that have expired."""
         modifiers_to_remove = []
         for modifier in self._modifiers:
             if modifier.update(elapsed_time):
@@ -113,7 +107,6 @@ class ValueModifiers:
             self._notify_modifiers_changed()
 
     def modify(self, base_value: float) -> float:
-        """Returns ``base_value`` with every active modifier's multiplier applied."""
         modified_value = base_value
         for modifier in self._modifiers:
             modified_value *= modifier.multiplier
@@ -137,13 +130,11 @@ class ValueWithModifiers:
         self._modifiers: ValueModifiers = ValueModifiers(self._update_value)
 
     def _update_value(self) -> None:
-        """Recomputes the modified value, then fires the change callback if set."""
         self._value = self._modifiers.modify(self._base)
         if self._value_changed:
             self._value_changed()
 
     def update(self, elapsed_time: float) -> None:
-        """Advances the modifiers, expiring any that have elapsed."""
         self._modifiers.update(elapsed_time)
 
     @property
@@ -174,7 +165,6 @@ class MinMaxValue:
         self._max = ValueWithModifiers(base_value=max, value_changed=self._clamp_value)
 
     def _clamp_value(self) -> None:
-        """Clamps the current value between min and max."""
         self._value = max(self.min, min(self._value, self.max.value))
 
     def update(self, elapsed_time: float) -> None:
@@ -202,13 +192,10 @@ class MinMaxValue:
 
     @property
     def max(self) -> ValueWithModifiers:
-        """The dynamic maximum, including active modifiers."""
         return self._max
 
 
 class Counter:
-    """A counter for tracking attributes like spell hits."""
-
     def __init__(self, max: int) -> None:
         self._max: int = max
         self._count: int = 0
@@ -220,7 +207,6 @@ class Counter:
         return self._count >= self._max
 
     def reset(self) -> None:
-        """Resets the count to zero."""
         self._count = 0
 
     @property
@@ -233,5 +219,4 @@ class Counter:
 
     @property
     def is_max(self) -> bool:
-        """Whether the count has reached the maximum."""
         return self._count >= self._max
