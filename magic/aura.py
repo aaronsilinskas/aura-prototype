@@ -57,6 +57,13 @@ class Spell:
         raise NotImplementedError()
 
     @property
+    def is_spent(self) -> bool:
+        """Whether events have used the spell up; ``Aura.update`` removes it once every spell
+        has updated, so a spell spent by a later spell's update still leaves that update.
+        """
+        return False
+
+    @property
     def tags(self) -> Iterator[str]:
         return iter(self._tags)
 
@@ -204,6 +211,9 @@ class Aura:
         for spell in self.spells:
             should_remove = spell.update(self, elapsed_time)
             if should_remove:
+                spells_to_remove.append(spell)
+        for spell in self.spells:
+            if spell.is_spent and spell not in spells_to_remove:
                 spells_to_remove.append(spell)
         for spell in spells_to_remove:
             self.remove_spell(spell)

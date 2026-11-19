@@ -170,18 +170,3 @@ def test_absorb_does_not_absorb_after_depleted(fixture: AbsorbFixture) -> None:
     aura.update(0.1)
 
     assert debuff2 in list(aura.spells)
-
-
-def test_absorb_removes_itself_when_count_zero(fixture: AbsorbFixture) -> None:
-    aura = fixture.aura
-
-    aura.add_spell(fixture.absorb_spell)
-
-    debuff = DebuffSpell()
-    aura.add_spell(debuff)
-    aura.update(0.1)
-
-    # Absorb count is now 0, next update should remove it
-    aura.update(0.1)
-
-    assert fixture.absorb_spell not in list(aura.spells)

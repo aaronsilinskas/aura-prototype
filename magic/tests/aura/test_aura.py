@@ -1,7 +1,17 @@
 import pytest
 
-from magic.aura import Aura, AuraEvent, DamageEvent, HealEvent, Spell, SpellTags
-from magic.tests.helpers import AuraFixture
+from magic.aura import (
+    Aura,
+    AuraEvent,
+    DamageEvent,
+    HealEvent,
+    RemoveSpellEvent,
+    Spell,
+    SpellTags,
+)
+from magic.spell.elemental.earth_shield import EarthShieldSpell
+from magic.spell.elemental.slice import SliceSpell
+from magic.tests.helpers import AuraFixture, MockEventListener
 from magic.values import ValueModifier
 
 
@@ -53,6 +63,37 @@ def test_update_triggers_cast_delay_update(fixture: AuraFixture) -> None:
     aura.update(1.0)
 
     assert len(aura.cast_delay.modifiers) == 0
+
+
+@pytest.mark.parametrize("shield_first", [True, False], ids=["shield_first", "damage_first"])
+def test_a_spell_spent_by_another_spells_update_leaves_in_that_same_update(
+    fixture: AuraFixture, shield_first: bool
+) -> None:
+    aura = fixture.aura
+    shield = EarthShieldSpell(reduction=0.5, max_hits=1, duration=10.0)
+    damage = SliceSpell(damage=1.0)
+    for spell in [shield, damage] if shield_first else [damage, shield]:
+        aura.add_spell(spell)
+
+    aura.update(0.1)
+
+    assert list(aura.spells) == []
+
+
+def test_listeners_hear_a_spent_spell_removed_in_the_update_that_spent_it(
+    fixture: AuraFixture,
+) -> None:
+    aura = fixture.aura
+    listener = MockEventListener()
+    aura.event_listeners.append(listener)
+    shield = EarthShieldSpell(reduction=0.5, max_hits=1, duration=10.0)
+    aura.add_spell(shield)
+    aura.add_spell(SliceSpell(damage=1.0))
+
+    aura.update(0.1)
+
+    removed = [e.spell for _, e in listener.events if isinstance(e, RemoveSpellEvent)]
+    assert shield in removed
 
 
 def test_handle_event_applies_damage_event(fixture: AuraFixture) -> None:

@@ -27,17 +27,12 @@ class IceShieldSpell(Spell):
         self._freeze_spell = freeze_spell
         self._caster = caster
 
-        self._freeze_cast = False
-
     def update(self, aura: Aura, elapsed_time: float) -> bool:
-        if self.duration.update(elapsed_time):
-            return True
+        return self.duration.update(elapsed_time)
 
-        if self.hits.is_max:
-            self._cast_freeze()
-            return True
-
-        return False
+    @property
+    def is_spent(self) -> bool:
+        return self.hits.is_max
 
     def modify_event(self, aura: Aura, event: AuraEvent) -> None:
         if self.duration.is_expired or self.hits.is_max:
@@ -46,15 +41,10 @@ class IceShieldSpell(Spell):
         if isinstance(event, DamageEvent):
             event.amount *= 1 - self.reduction
             self.hits.increment()
-
-    def _cast_freeze(self) -> None:
-        if self._freeze_cast:
-            return
-        self._freeze_cast = True
-
-        self._caster.cast_spell(
-            self._freeze_spell, cast_type=CastType.AREA_OF_EFFECT
-        )  # Cast type can be arbitrary here
+            if self.hits.is_max:
+                self._caster.cast_spell(
+                    self._freeze_spell, cast_type=CastType.AREA_OF_EFFECT
+                )  # Cast type can be arbitrary here
 
     def on_level_changed(self, level: int) -> None:
         self.reduction = Spell.LEVEL_SCALER.scale_percentage(self._base_reduction, level)
