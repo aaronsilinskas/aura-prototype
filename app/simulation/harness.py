@@ -38,6 +38,7 @@ from engine.log import Logger
 from engine.pack_catalog import SettingOverrides
 from engine.state import ScopeValue
 from engine.timer import Timer
+from hardware.shared.device_assembly import button_label
 from hardware.shared.device_config import (
     DeviceConfig,
     parse_device_config,
@@ -93,8 +94,10 @@ def _drop(mapping: dict, capability: str) -> None:
     label = button_label_of(capability)
     emitter = ir_emitter_of(capability)
     if label is not None:
-        # Labels follow declaration order, so lacking B means lacking B onward.
-        mapping["buttons"] = mapping["buttons"][: ord(label) - ord("A")]
+        # Labels are positional, so dropping only B would relabel C as B.
+        labels = [button_label(i) for i in range(len(mapping["buttons"]))]
+        if label in labels:
+            mapping["buttons"] = mapping["buttons"][: labels.index(label)]
     elif emitter is not None or capability == IR_RECEIVE:
         ir = mapping.get("ir", {})
         ir.pop("rx" if emitter is None else emitter, None)

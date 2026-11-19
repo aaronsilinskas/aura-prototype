@@ -473,15 +473,16 @@ def test_push_of_a_small_payload_sends_exactly_one_chunk(
     assert transport.sent_kind_counts["chunk"] == 1
 
 
-class _AckReplacingTransport(Transport):
-    """Wraps the server's ``Transport``, sending *reply* in place of its first chunk ack."""
+class _FrameReplacingTransport(Transport):
+    """Wraps the server's ``Transport``, sending *reply* in place of its first *kind* frame."""
 
-    def __init__(self, inner: Transport, reply: Frame) -> None:
+    def __init__(self, inner: Transport, kind: str, reply: Frame) -> None:
         self._inner = inner
+        self._kind = kind
         self._reply: Frame | None = reply
 
     def send(self, line: bytes) -> None:
-        if self._reply is not None and decode_frame(line).kind == "ack":
+        if self._reply is not None and decode_frame(line).kind == self._kind:
             line = encode_frame(self._reply)
             self._reply = None
         self._inner.send(line)
@@ -501,7 +502,7 @@ def test_push_stops_with_an_error_when_a_chunk_is_not_acked_by_its_sequence_numb
     client, transport = make_loopback_client(
         device_storage,
         verb="push",
-        server_side_wrapper=lambda inner: _AckReplacingTransport(inner, reply),
+        server_side_wrapper=lambda inner: _FrameReplacingTransport(inner, "ack", reply),
     )
     host_path = tmp_path / "log.txt"
     host_path.write_bytes(b"x" * (CHUNK_SIZE + 1))
@@ -510,6 +511,24 @@ def test_push_stops_with_an_error_when_a_chunk_is_not_acked_by_its_sequence_numb
         client.push(str(host_path), "log.txt")
 
     assert transport.sent_kind_counts["chunk"] == 1
+
+
+def test_pull_stops_with_an_error_when_the_transfer_ends_in_neither_a_chunk_nor_done(
+    device_storage: DeviceStorage, tmp_path: Path
+):
+    device_storage.write_bytes("log.txt", b"hello")
+    client, _ = make_loopback_client(
+        device_storage,
+        server_side_wrapper=lambda inner: _FrameReplacingTransport(
+            inner, "done", Frame("resp", "error")
+        ),
+    )
+    host_path = tmp_path / "log.txt"
+
+    with pytest.raises(SdSyncProtocolError, match="got 'resp' 'error'"):
+        client.pull("log.txt", str(host_path))
+
+    assert not host_path.exists()
 
 
 def test_push_retries_and_succeeds_after_one_transient_checksum_mismatch(

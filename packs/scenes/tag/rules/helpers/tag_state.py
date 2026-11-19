@@ -10,27 +10,33 @@ if TYPE_CHECKING:
 _STATE_KEY: Final = "tag_state"
 
 
-class ShotState:
-    """Ammo, shot-cooldown and reload tracking.
+class ReloadHold:
+    """A hold-to-reload in progress: when it began and its ``scene.reload`` effect.
 
-    ``reload_started_at`` is ``None`` when not reloading, else the
-    ``state.total`` timestamp the current hold-to-reload began.
-    ``reload_receipt`` is the in-flight ``scene.reload`` effect on
-    ``Scope.Global.BUFF``, if any.
+    *started_at* is the ``state.total`` timestamp the hold began; *receipt*
+    is the ``scene.reload`` effect on ``Scope.Global.BUFF``.
     """
+
+    __slots__ = ("receipt", "started_at")
+
+    def __init__(self, started_at: float, receipt: EffectReceipt) -> None:
+        self.started_at = started_at
+        self.receipt = receipt
+
+
+class ShotState:
+    """Ammo, shot-cooldown and reload tracking; ``reload`` is ``None`` when not reloading."""
 
     __slots__ = (
         "ammo",
         "last_shot_at",
-        "reload_receipt",
-        "reload_started_at",
+        "reload",
     )
 
     def __init__(self) -> None:
         self.ammo = 0
         self.last_shot_at = float("-inf")
-        self.reload_started_at: float | None = None
-        self.reload_receipt: EffectReceipt | None = None
+        self.reload: ReloadHold | None = None
 
 
 class TagState:

@@ -36,8 +36,7 @@ class TagPlayingRule(PhaseRule):
         )
 
         tag.shot.ammo = tag_config(state).max_ammo
-        tag.shot.reload_started_at = None
-        tag.shot.reload_receipt = None
+        tag.shot.reload = None
         state.effect_controls.set_effect(
             Scope.Global.BUFF, "basic.progress", {"progress": 1.0, "color": AMMO_COLOR}
         )
@@ -53,10 +52,9 @@ class TagPlayingRule(PhaseRule):
 
         state.effect_controls.stop_effect(Scope.Global.BUFF)
 
-        if tag.shot.reload_receipt is not None:
-            tag.shot.reload_receipt.stop()
-            tag.shot.reload_receipt = None
-        tag.shot.reload_started_at = None
+        if tag.shot.reload is not None:
+            tag.shot.reload.receipt.stop()
+            tag.shot.reload = None
 
 
 def _out_of_hitpoints(state: GameState) -> bool:

@@ -49,6 +49,7 @@ if TYPE_CHECKING:
     from typing import Protocol, TypeVar
 
     from hardware.shared.device_parts import Bus
+    from hardware.shared.polled_sensor import Reading
 
     class _Gated(Protocol):
         """A config section ``_gated_step`` can skip: one with an ``enabled`` flag."""
@@ -177,8 +178,8 @@ def _polled_sensor(
     section: I2CDeviceConfig | None,
     describe: Callable[[I2CDeviceConfig], str],
     read_part: Callable[[I2CDeviceConfig, Bus], Callable[[], tuple[float, float, float]]],
-    reading: AccelerationData | MagneticData,
-) -> PolledSensor | None:
+    reading: Reading,
+) -> PolledSensor[Reading] | None:
     """Build the I2C sensor ``name`` as a **PolledSensor** over ``reading``, gated like any section.
 
     ``read_part`` is the ``DeviceParts`` method building its raw read; the
@@ -202,8 +203,8 @@ def _append_built(polled: list[PolledPart], part: PolledPart | None) -> None:
 
 def _capabilities(
     buttons: DebouncedButtons,
-    accelerometer: PolledSensor | None,
-    magnetometer: PolledSensor | None,
+    accelerometer: PolledSensor[AccelerationData] | None,
+    magnetometer: PolledSensor[MagneticData] | None,
     radio: RadioTransceiver | None,
     storage: DeviceStorage | None,
     ir: InfraredTransceiver | None,

@@ -96,6 +96,8 @@ class SdSyncClient:
             SdSyncNoStorageError: The device has no SD card configured.
             SdSyncNotFoundError: *sd_path* was never written on the SD card.
             SdSyncIntegrityError: Every attempt's CRC-32 mismatched.
+            SdSyncProtocolError: The server sent a frame other than a chunk
+                or the closing ``done``; the pull stops without retrying.
         """
         for _attempt in range(self._max_attempts):
             self._transport.send(encode_frame(Frame("req", f"pull {sd_path}")))
@@ -161,8 +163,12 @@ class SdSyncClient:
                 crc = binascii.crc32(frame.payload, crc)
                 dest.write(frame.payload)
                 self._transport.send(encode_frame(Frame("ack", frame.text)))
-            else:  # "done"
+            elif frame.kind == "done":
                 return crc == int(frame.text)
+            else:
+                raise SdSyncProtocolError(
+                    f"expected SD-sync frame 'chunk' or 'done', got {frame.kind!r} {frame.text!r}"
+                )
 
     def push(self, host_path: str, sd_path: str) -> None:
         """Upload *host_path* to the SD card at *sd_path*, preserving its bytes exactly.

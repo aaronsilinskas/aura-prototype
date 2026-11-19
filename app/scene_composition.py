@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import engine._path as _path
 from engine.capabilities import MissingCapabilityError, describe_capabilities
-from engine.input import AccelerationData, InputEvents, MagneticData
+from engine.input import InputEvents
 from engine.log import Logger
 from engine.namespace import ActiveSceneNamespace
 from engine.network import NetworkEvents
@@ -262,9 +262,6 @@ def _build_scene_tick(hw: DeviceHardware, runtime: SceneRuntime) -> Callable[[],
     button_data = hw.buttons.reading
     acceleration = accelerometer.reading if accelerometer is not None else None
     magnetic = magnetometer.reading if magnetometer is not None else None
-    # Narrow each PolledSensor.reading, typed as either buffer, to the one it holds.
-    assert acceleration is None or isinstance(acceleration, AccelerationData)
-    assert magnetic is None or isinstance(magnetic, MagneticData)
     input_event = InputEvents.Sensors(button_data, acceleration, magnetic)
     ir = hw.ir
     radio = hw.radio
