@@ -82,8 +82,8 @@
   "radio": {
     "enabled": true,
     "spi": "radio",
-    "cs": "GP13",
-    "reset": "GP11",
+    "cs": "GP11",
+    "reset": "GP13",
     "frequency": 915.0,
     "node": 1
   },
