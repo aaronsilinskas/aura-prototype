@@ -163,6 +163,9 @@ class SdSyncClient:
     def push(self, host_path: str, sd_path: str) -> None:
         """Upload *host_path* to the SD card at *sd_path*, preserving its bytes exactly.
 
+        Reads the host file chunk-by-chunk, never buffering the whole file. A
+        CRC-32 mismatch retries the whole upload up to ``max_attempts`` times.
+
         Args:
             host_path: The local file to upload.
             sd_path: Where to write it on the SD card, relative to the mount
@@ -193,8 +196,10 @@ class SdSyncClient:
         """Stream *host_path* to the server (stop-and-wait); return whether it committed.
 
         Runs after the server has already confirmed ``"ok"`` for the request.
-        The server replies to the closing ``done`` frame with ``"ok"``
-        (committed) or ``"crc_mismatch"`` (left on disk untouched).
+        Waits for each chunk's ack before sending the next, so at most one chunk
+        is held before the server acknowledges it. The server replies to the
+        closing ``done`` frame with ``"ok"`` (committed) or ``"crc_mismatch"``
+        (left on disk untouched).
         """
         crc = 0
         with open(host_path, "rb") as host_file:
