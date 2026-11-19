@@ -17,6 +17,8 @@ the state machine raw mark/space durations only.
 from array import array
 from typing import TYPE_CHECKING, cast
 
+import pytest
+
 if TYPE_CHECKING:
     import rp2pio
 
@@ -95,7 +97,7 @@ def test_write_pulses_starts_a_background_write():
 
 def test_write_pulses_returns_before_transmission_completes():
     writer, _sm = _make_writer()
-    writer.write_pulses(array("H", [100, 200]))
+    writer.write_pulses(array("H", [100, 200, 300]))
     assert writer.is_busy() is True
 
 
@@ -120,7 +122,7 @@ def test_is_busy_is_false_before_any_write_even_when_state_machine_reports_writi
 
 def test_is_busy_reflects_state_machine_writing_flag():
     writer, sm = _make_writer()
-    writer.write_pulses(array("H", [100, 200]))
+    writer.write_pulses(array("H", [100, 200, 300]))
     assert writer.is_busy() is True
     sm.writing = False
     assert writer.is_busy() is False
@@ -140,7 +142,7 @@ def test_write_pulses_hands_the_built_buffer_to_the_dma():
 
 def test_in_flight_buffer_reference_is_dropped_once_idle():
     writer, sm = _make_writer()
-    writer.write_pulses(array("H", [100, 200]))
+    writer.write_pulses(array("H", [100, 200, 300]))
     sm.writing = False
     assert writer.is_busy() is False
     assert writer._inflight is None
@@ -149,7 +151,7 @@ def test_in_flight_buffer_reference_is_dropped_once_idle():
 def test_busy_query_keeps_buffer_while_still_writing():
     """Polling is_busy() mid-write does not prematurely drop the buffer."""
     writer, sm = _make_writer()
-    writer.write_pulses(array("H", [100, 200]))
+    writer.write_pulses(array("H", [100, 200, 300]))
     assert writer.is_busy() is True
     assert writer._inflight is sm.background_writes[0]
 
@@ -169,20 +171,23 @@ def test_write_pulses_converts_us_durations_to_loop_counts():
     assert sm.background_writes[0][0] == 18
 
 
-def test_write_pulses_pads_odd_frames_to_even_with_a_trailing_gap():
-    """An odd-length frame is padded to even with the inter-frame gap appended.
-
-    Even length keeps the PIO program's pull-mark/pull-space phase aligned across
-    frames; an odd count would clock the next frame's header mark out as a space.
-    """
+@pytest.mark.parametrize("length", [1, 3, 17, 19])
+def test_every_accepted_frame_ends_with_the_inter_frame_gap(length):
     writer, sm = _make_writer()
-    writer.write_pulses(array("H", [IR_UNIT, IR_UNIT, IR_LEAD_OUT]))  # odd (3)
+    writer.write_pulses(array("H", [IR_UNIT] * (length - 1) + [IR_LEAD_OUT]))
     buffer = sm.background_writes[0]
-    assert len(buffer) == 4  # padded to even
-    # The pad is the 5000 µs inter-frame gap, hand-computed against the source
+    assert len(buffer) == length + 1
+    # The gap is 5000 µs, hand-computed against the source
     # formula (independent of the function under test):
     # round(5000 / 26) - 1 = 192 - 1 = 191 carrier periods.
     assert buffer[-1] == 191
+
+
+def test_write_pulses_rejects_an_even_length_frame_naming_its_length():
+    writer, sm = _make_writer()
+    with pytest.raises(ValueError, match="has 4 durations"):
+        writer.write_pulses(array("H", [IR_UNIT, IR_UNIT, IR_UNIT, IR_LEAD_OUT]))
+    assert sm.background_writes == []
 
 
 def test_header_mark_round_trips_within_protocol_tolerance():

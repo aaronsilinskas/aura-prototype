@@ -34,8 +34,9 @@ class PulseWriter:
 
         Args:
             durations: An ``array('H', …)`` of pulse durations (µs), as an
-                encoder returns them, alternating mark/space, starting with a
-                mark.
+                encoder returns them, alternating mark/space, starting and
+                ending with a mark, so odd-length. A writer may reject an
+                even-length frame with ``ValueError``.
 
         Raises:
             NotImplementedError: Always — subclasses must override.
