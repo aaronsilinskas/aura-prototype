@@ -1,10 +1,3 @@
-"""RLGL scene Win phase rule.
-
-On entry, plays ``elements.lightning`` at level 7 across the whole device,
-adds the win sting, and declares that the phase ends when the sting stops,
-moving back to Ready.
-"""
-
 from __future__ import annotations
 
 from engine.phase import PhaseRule
@@ -17,8 +10,6 @@ from packs.scenes.red_light_green_light.rules.helpers.phases import (
 
 
 class RlglWinRule(PhaseRule):
-    """Drives the Win phase: lightning + win sting, then back to Ready."""
-
     def __init__(self) -> None:
         super().__init__(PHASE_WIN, rlgl_phase)
 

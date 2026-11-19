@@ -4,11 +4,8 @@ Built on ``basic.pulse``. Takes one option, ``pulse_duration``: seconds per
 pulse. The Starting rule always passes the ``warning_pulse_duration`` Setting;
 the 1-second default is only a fallback and does not track that Setting.
 
-The effect owns its look: a black->white fade spending half the pulse
-brightening and half darkening, with no on or off phase. Any color or phase
-option a caller passes is overridden. Each ``PulseEffect.PEAK`` (one per pulse)
-plays a one-shot ``scene.warning_pulse_peak`` clip and a single ``SHARP_CLICK``
-buzz, so every pulse buzzes uniformly.
+The effect owns its look: any color or phase option a caller passes is
+overridden.
 """
 
 from __future__ import annotations
@@ -34,7 +31,6 @@ _pulse = PulseBuilder()
 
 _DEFAULT_PULSE_DURATION: Final = 1.0
 
-# Shares of each pulse spent brightening and darkening.
 _BRIGHTEN_SHARE: Final = 0.5
 _DARKEN_SHARE: Final = 0.5
 

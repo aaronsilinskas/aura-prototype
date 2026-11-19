@@ -1,5 +1,3 @@
-"""Element browser scene — cycles element pages and effect levels."""
-
 from __future__ import annotations
 
 from engine.engine import GameRule

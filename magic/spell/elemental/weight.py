@@ -15,8 +15,6 @@ GRAVITY: Final = 9.81  # m/s²
 
 
 class AccelerationEvent(AuraEvent):
-    """Event representing acceleration."""
-
     def __init__(
         self,
         x_accel: float,
@@ -39,10 +37,7 @@ class AccelerationEvent(AuraEvent):
 
 
 class WeightSpell(Spell):
-    """Deals damage over time when acceleration above a threshold is detected.
-
-    Level scaling: Increases the damage per second.
-    """
+    """Deals damage over time when acceleration above a threshold is detected."""
 
     def __init__(
         self, acceleration_threshold: float, damage_per_second: float, duration: float

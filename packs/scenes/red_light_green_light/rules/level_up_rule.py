@@ -1,11 +1,3 @@
-"""RLGL scene Level Up phase rule.
-
-On entry, increments the Game Level, updates the ``Scope.AMBIENT`` progress
-bar to the new level's fraction, and replaces Green Light on
-``Scope.NON_AMBIENT`` with the level-up flash. Declares that the phase ends
-after ``level_up_duration``, moving back to Red Warning.
-"""
-
 from __future__ import annotations
 
 from engine.phase import PhaseRule
@@ -20,8 +12,6 @@ from packs.scenes.red_light_green_light.rules.helpers.rlgl_phase_state import rl
 
 
 class RlglLevelUpRule(PhaseRule):
-    """Drives the Level Up phase: increments Game Level, then back to Red Warning."""
-
     def __init__(self) -> None:
         super().__init__(PHASE_LEVEL_UP, rlgl_phase)
 

@@ -1,10 +1,3 @@
-"""RLGL scene Game Over phase rule.
-
-On entry, plays ``elements.fire`` and adds the game-over sting, both on
-``Scope.ALL``, and declares that the phase ends after ``game_over_duration``,
-moving back to Ready.
-"""
-
 from __future__ import annotations
 
 from engine.phase import PhaseRule
@@ -18,8 +11,6 @@ from packs.scenes.red_light_green_light.rules.helpers.rlgl_config import rlgl_co
 
 
 class RlglGameOverRule(PhaseRule):
-    """Drives the Game Over phase: fire + sting, then back to Ready."""
-
     def __init__(self) -> None:
         super().__init__(PHASE_GAME_OVER, rlgl_phase)
 

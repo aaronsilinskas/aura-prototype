@@ -4,10 +4,7 @@ from magic.values import Duration
 
 
 class IgniteSpell(Spell):
-    """Damage over time spell that deals damage per second for a duration.
-
-    Level scaling: Increases the damage per second.
-    """
+    """Damage over time spell that deals damage per second for a duration."""
 
     def __init__(self, damage_per_second: float, duration: float) -> None:
         super().__init__([SpellTags.DEBUFF, ElementTags.FIRE])

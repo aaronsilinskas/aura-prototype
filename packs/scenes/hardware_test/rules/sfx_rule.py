@@ -7,12 +7,6 @@ from packs.scenes.hardware_test.rules.helpers.phases import MODE_SFX
 
 
 class HwTestSfxRule(HwModeRule):
-    """Drives the SFX mode: cyan idle entry effect and Button A test cue.
-
-    On entry, shows a cyan solid on ``Scope.PERSONAL``. Button A plays the
-    test sound/haptic cue on ``Scope.PERSONAL``.
-    """
-
     def __init__(self) -> None:
         super().__init__(MODE_SFX)
 

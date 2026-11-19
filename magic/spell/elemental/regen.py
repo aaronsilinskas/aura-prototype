@@ -4,11 +4,6 @@ from magic.values import Duration
 
 
 class RegenSpell(Spell):
-    """A spell that provides magic regeneration over time.
-
-    Level scaling: Increases the regeneration rate per second.
-    """
-
     def __init__(self, regen_rate: float, duration: float) -> None:
         super().__init__(tags=[SpellTags.BUFF, ElementTags.WATER])
         self._base_regen_rate = regen_rate

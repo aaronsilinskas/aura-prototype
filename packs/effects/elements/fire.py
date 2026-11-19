@@ -18,12 +18,6 @@ _fire_palette = bytes([0, 32, 0, 0,
 
 class FireBuilder(EffectBuilder):
     def __call__(self, name: str, config: EffectConfig) -> Effect:
-        """Classic flickering flame in deep red, orange, and golden yellow —
-        turbulent with bright peaks and dark, smoldering roots.
-
-        Level: more sparks and faster heat produce a taller, brighter, and more
-        turbulent flame.
-        """
         level = effect_level(config)
         return Effect(
             name=name,

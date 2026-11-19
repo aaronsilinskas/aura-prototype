@@ -101,7 +101,6 @@ class ReceptionQualityMeter:
         self._none_result = ReceptionQuality(STATE_NONE, 0.0, COLOR_RED, 0, 0)
 
     def record(self, sequence: int, timestamp: float) -> None:
-        """Record one IR arrival's sequence number and tick timestamp."""
         if self._last_sequence is None:
             gap = 0
         else:

@@ -64,7 +64,6 @@ class _LightningBolt(Layer):
             self.at_strike = False
             return
 
-        # Phase transition
         transitioning_from_idle = self._phase == _PHASE_IDLE
         if transitioning_from_idle:
             self._bolt_offset = random.random()
@@ -80,7 +79,6 @@ class _LightningBolt(Layer):
         self.at_strike = transitioning_from_idle
 
     def sample(self, position: float, pixel_count: int) -> float:
-        """Return the bolt's brightness contribution at ``position`` in ``[0.0, 1.0]``."""
         if self._phase == _PHASE_IDLE:
             return 0.0
         progress = self._phase_elapsed / self._phase_duration if self._phase_duration > 0.0 else 1.0
@@ -89,7 +87,9 @@ class _LightningBolt(Layer):
 
 
 class LightningEffect(AddSamplesRenderer):
-    """Sums its bolts through a palette, emitting ``STRIKE`` when any bolt goes IDLE→STRIKE."""
+    """Sums its bolts through a palette, emitting one ``STRIKE`` per update in which a bolt
+    goes IDLE→STRIKE.
+    """
 
     STRIKE: Final = EffectVerb("strike")
     VERBS: tuple[EffectVerb, ...] = (STRIKE,)
@@ -107,7 +107,6 @@ class LightningEffect(AddSamplesRenderer):
         self._config = config
 
     def update(self, elapsed: float) -> None:
-        """Advance all bolts; emit ``STRIKE`` once if any bolt just struck."""
         super().update(elapsed)
         for bolt in self._bolts:
             if bolt.at_strike:
@@ -117,10 +116,6 @@ class LightningEffect(AddSamplesRenderer):
 
 class LightningBuilder(EffectBuilder):
     def __call__(self, name: str, config: EffectConfig) -> Effect:
-        """Blinding orange flashes striking at random positions and fading out.
-
-        Level: more bolts strike at once, and each strikes more often.
-        """
         level = effect_level(config)
 
         hide_max = 1.5 - (1 - 1 / level)

@@ -1,15 +1,3 @@
-"""RLGL scene Green phase rule.
-
-On entry, drops the gravity estimate (re-seeding it from the first sample of
-this phase rather than carrying a stale orientation across the transition),
-resets the motion EMA and still-timer, shows solid green on
-``Scope.NON_AMBIENT``, and starts the looping green-light music on
-``Scope.PERSONAL``. Motion above the green motion threshold resets the
-still-timer; sustained stillness past ``green_still_timeout`` ends the game.
-On timer expiry, advances to Level Up (level below max) or Win (level at
-max). On exit, stops the music so it never leaks into the next phase.
-"""
-
 from __future__ import annotations
 
 from engine.input import InputEvents
@@ -31,8 +19,6 @@ from packs.scenes.red_light_green_light.rules.helpers.rlgl_phase_state import rl
 
 
 class RlglGreenRule(PhaseRule):
-    """Drives the Green phase: solid green, music, and the stillness gate."""
-
     def __init__(self) -> None:
         super().__init__(PHASE_GREEN, rlgl_phase)
         self.on(InputEvents.Sensors, self._handle)

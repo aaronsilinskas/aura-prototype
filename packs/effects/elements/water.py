@@ -18,12 +18,6 @@ _water_palette = bytes([0, 0, 0, 64,
 
 class WaterBuilder(EffectBuilder):
     def __call__(self, name: str, config: EffectConfig) -> Effect:
-        """A flowing deep-blue-to-cyan flame that drifts along the strip and
-        occasionally reverses direction, like light rippling under moving water.
-
-        Level: the current accelerates and the flame grows more turbulent,
-        producing faster, stronger ripples.
-        """
         level = effect_level(config)
         return Effect(
             name=name,

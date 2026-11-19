@@ -1,13 +1,5 @@
 """IR range transmitter rule — fixed-rate, sequence-numbered IR sends on LINE.
 
-A plain, phase-less ``GameRule`` (the ``element_browser`` shape): on every
-per-tick ``InputEvents.Sensors`` heartbeat it time-gates on ``state.total``
-against ``TransmitterConfig.send_period_seconds``. Once a send period has
-elapsed since the last send, it writes the next sequence number into byte 0
-of a fresh payload (padding bytes carry ``TransmitterConfig.payload_padding``,
-a fixed non-zero marker so the encoded frame is never a degenerate run of
-zeros) and sends it via ``state.network_controls.send_ir`` on ``LINE``.
-
 The sequence counter and last-send time are scene data held in ``GameState``
 (``_SEQUENCE_KEY``/``_LAST_SEND_KEY``), not rule instance state -- this rule
 holds no mutable attributes of its own beyond the ``on()`` registration done

@@ -18,12 +18,6 @@ _ice_palette = bytes([0, 0, 64, 8,
 
 class IceBuilder(EffectBuilder):
     def __call__(self, name: str, config: EffectConfig) -> Effect:
-        """A slow, cold flame that flows and gently scrolls — dark teal at the base
-        blooming into bright cyan and white.
-
-        Level: the flame flows faster with a tighter spread, producing a sharper,
-        more active column.
-        """
         level = effect_level(config)
         return Effect(
             name=name,

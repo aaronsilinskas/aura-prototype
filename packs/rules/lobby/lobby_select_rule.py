@@ -16,13 +16,12 @@ and sets the pack's two required Settings in that pack reference::
 
 ``scopes`` is an ordered list of display Scopes ``[S0, S1, ..., Sk]``;
 ``entries`` is an ordered list of ``{scene, effect, options}`` selectable
-scenes (``options`` is passed straight through to ``set_effect`` -- ``level``
-is just one of its keys, nothing special). Entries whose scene this device
-can't run (``state.scene_controls.can_run``) are left out, so ``N`` counts
-only the playable ones. With the current selection at index ``i`` and ``N``
-entries, scope ``Sj`` always previews ``entries[(i +
-j) % N]``, so ``S0`` shows the scene Button B would launch right now and the
-rest look ahead, wrapping. Button A advances the selection and repaints every
+scenes (``options`` is passed straight through to ``set_effect``). Entries
+whose scene this device can't run (``state.scene_controls.can_run``) are left
+out, so ``N`` counts only the playable ones. With the current selection at
+index ``i`` and ``N`` entries, scope ``Sj`` always previews
+``entries[(i + j) % N]``, so ``S0`` shows the scene Button B would launch right
+now and the rest look ahead, wrapping. Button A advances the selection and repaints every
 scope; Button B reboots into the current selection via
 ``state.scene_controls.reboot_into``.
 """
@@ -65,7 +64,6 @@ class LobbySelectRule(GameRule):
         self.on(InputEvents.Sensors, self._handle)
 
     def _paint(self, config: LobbyConfig, index: int, state: GameState) -> None:
-        """Call ``set_effect`` once per scope, in order, for the look-ahead window at *index*."""
         count = len(config.entries)
         for offset, scope in enumerate(config.scopes):
             entry = config.entries[(index + offset) % count]

@@ -1,10 +1,3 @@
-"""RLGL scene Ready phase rule.
-
-On entry, plays the scene's "ready" effect across the whole device, replacing
-the Game Level's ``Scope.AMBIENT`` progress bar. Any button press starts a new
-game at level 1 and transitions to Red Warning.
-"""
-
 from __future__ import annotations
 
 from engine.input import InputEvents
@@ -27,8 +20,6 @@ _STARTING_LEVEL: Final = 1
 
 
 class RlglReadyRule(PhaseRule):
-    """Drives the Ready phase: plays the ready effect, waits for a button press."""
-
     def __init__(self) -> None:
         super().__init__(PHASE_READY, rlgl_phase)
         self.on(InputEvents.Sensors, self._handle)
@@ -41,11 +32,6 @@ class RlglReadyRule(PhaseRule):
             self._start_game(state)
 
     def _start_game(self, state: GameState) -> None:
-        """Initialise a new game at level 1 and transition to Red Warning.
-
-        Sets the Game Level to 1 and starts the ``Scope.AMBIENT`` progress bar at
-        ``1 / max_level`` (denominator from the ``max_level`` Setting).
-        """
         phase_state = rlgl_phase_state(state)
         phase_state.level = _STARTING_LEVEL
         max_level = rlgl_config(state).max_level

@@ -8,13 +8,6 @@ from packs.scenes.hardware_test.rules.helpers.phases import MODE_RGB
 
 
 class HwTestRgbRule(HwModeRule):
-    """Drives the RGB mode: idle entry effect and Button A brightness cycling.
-
-    On entry, sets ``rgb_level`` to 1 and applies the ``RGB_IDLE`` effect table
-    at level 1. Button A steps ``rgb_level`` 1 → 10 → 1 and re-applies the
-    ``RGB_IDLE`` effect table at the new level.
-    """
-
     def __init__(self) -> None:
         super().__init__(MODE_RGB)
 

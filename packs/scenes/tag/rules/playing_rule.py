@@ -1,23 +1,3 @@
-"""Tag scene Playing phase rule.
-
-On entry, sets hitpoints to the configured starting value and shows a full
-``basic.progress`` bar on ``Scope.PERSONAL``, storing its ``EffectReceipt`` (the
-shared progress receipt this rule owns and the hit reactor re-issues). It also
-issues the full amber ammo bar on ``Scope.Global.BUFF`` and layers the one-shot
-``scene.go`` cue on ``Scope.PERSONAL`` via ``add_effect`` (sound + strong buzz
-marking the instant Playing begins). Button-A shot firing and its felt
-feedback are owned by :class:`TagShootingRule`; this rule retains only the
-phase lifecycle: hitpoints, the progress bar, the ammo bar and the GO cue.
-On entry it also declares that the phase ends once hitpoints reach zero or
-below, going to Game Over.
-
-``Scope.Global.BUFF`` is a single mutually-exclusive "what's currently shown
-for ammo" slot: the amber bar, ``scene.ammo_empty``, and ``scene.reload`` all
-swap each other out via ``set_effect``. On exit, the whole slot is torn down
-via ``stop_effect(Scope.Global.BUFF)`` rather than a stored receipt, since any
-of those effects (or none) may be occupying it at the time.
-"""
-
 from __future__ import annotations
 
 from engine.phase import PhaseRule
@@ -39,7 +19,11 @@ AMMO_COLOR: Final = 0xFFBF00
 
 
 class TagPlayingRule(PhaseRule):
-    """Drives the Playing phase: hitpoints, ammo bar, and game-over transition."""
+    """Owns the Playing phase lifecycle: hitpoints, the hitpoint and ammo bars, and the GO cue.
+
+    ``Global.BUFF`` is torn down with ``stop_effect`` rather than a stored
+    receipt, since any of the ammo effects, or none, may hold it at exit.
+    """
 
     def __init__(self) -> None:
         super().__init__(PHASE_PLAYING, tag_phase)

@@ -3,10 +3,7 @@ from magic.spell.elemental.elements import ElementTags
 
 
 class HealSpell(Spell):
-    """Instantly heals the target for a specified amount.
-
-    Level scaling: Increases the healing amount.
-    """
+    """Instantly heals the target for a specified amount."""
 
     def __init__(self, healing: float) -> None:
         super().__init__([SpellTags.BUFF, ElementTags.LIGHT])

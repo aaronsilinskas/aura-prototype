@@ -4,10 +4,7 @@ from magic.values import Duration
 
 
 class ChargeSpell(Spell):
-    """Increase the effectiveness of healing spells for a duration.
-
-    Level scaling: Increases the healing multiplier.
-    """
+    """Increase the effectiveness of healing spells for a duration."""
 
     def __init__(self, healing_multiplier: float, duration: float) -> None:
         super().__init__([SpellTags.BUFF, ElementTags.LIGHTNING])

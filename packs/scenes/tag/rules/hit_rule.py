@@ -1,25 +1,3 @@
-"""Tag scene hit-handling rule.
-
-A non-owning :class:`InPhaseRule` reactor on the Playing phase: it subscribes
-to ``NetworkEvents.IRReceived`` and turns matching tag packets into hitpoint
-loss while the shared phase machine is in Playing, but it does not own the
-phase's lifecycle. Decodes every received packet (decoding never fails), then
-applies the accuracy-rig gate order:
-
-1. Phase guard — the ``InPhaseRule`` only fires during the Playing phase.
-2. Identity gate — counts only packets matching the configured expected
-   team/player; mismatches are logged and ignored.
-3. Hit — subtracts the decoded ``damage`` from hitpoints, re-issues the
-   shared ``Scope.PERSONAL`` ``basic.progress`` bar (owned by the Playing rule)
-   with the new fraction (clamped to ``[0, 1]`` by the layer), and plays the
-   shared ``scene.hit`` effect on ``Scope.Global.MAIN``.
-
-A genuine self-echo (the device's own freshly-fired packet looping back into
-its own receiver) never reaches this rule — it is suppressed at the hardware
-boundary by the IR transmit gate (see ``hardware.shared.ir_transport``), not
-here. A matching incoming packet that does reach this rule always damages.
-"""
-
 from __future__ import annotations
 
 from engine.network import NetworkEvents
@@ -32,7 +10,13 @@ from packs.scenes.tag.tag_data import decode_tag_data
 
 
 class TagHitRule(InPhaseRule):
-    """Drives hit detection during the Playing phase from received IR packets."""
+    """Turns matching IR tag packets into hitpoint loss during Playing.
+
+    A genuine self-echo (the device's own packet looping back into its
+    receiver) never reaches this rule: the IR transmit gate in
+    ``hardware.shared.ir_transport`` suppresses it, so every matching packet
+    that arrives here damages.
+    """
 
     def __init__(self) -> None:
         super().__init__(PHASE_PLAYING, tag_phase)

@@ -34,12 +34,6 @@ _AXIS_MAP: Final = (
 
 
 class HwTestMagneticRule(HwModeRule):
-    """Drives the Magnetometer mode: idle entry effect and per-tick axis bars.
-
-    Maps magnetometer axes to per-scope ``basic.progress`` bars every tick,
-    independent of button state. Button A has no behaviour in this mode.
-    """
-
     def __init__(self) -> None:
         super().__init__(MODE_MAGNETOMETER)
 
@@ -64,8 +58,8 @@ class HwTestMagneticRule(HwModeRule):
             progress = min(1.0, abs(mag) / MAG_MAX)
             ec.set_effect(scope, "basic.progress", {"color": color, "progress": progress})
 
-        # Throttle console logging to ~2/sec. ``state.total`` is monotonic, so
-        # the last-logged timestamp needs no teardown across mode changes.
+        # ``state.total`` is monotonic, so the last-logged timestamp needs no
+        # teardown across mode changes.
         if (
             "mag_log_last" not in state
             or state.total - state.get("mag_log_last", 0.0) >= MAG_LOG_INTERVAL

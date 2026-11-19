@@ -1,11 +1,3 @@
-"""Tag scene Starting phase rule.
-
-On entry, sets the looping warning-pulse effect once and declares that the
-phase ends after the countdown, ``count x duration`` seconds (timed as a
-whole, not by listening for individual peaks), going to Playing. The pulse is
-stopped on the way out.
-"""
-
 from __future__ import annotations
 
 from engine.phase import PhaseRule
@@ -19,7 +11,11 @@ from packs.scenes.tag.rules.helpers.tag_config import tag_config
 
 
 class TagStartingRule(PhaseRule):
-    """Drives the Starting phase: warning countdown into Playing."""
+    """Plays the warning countdown, then moves to Playing.
+
+    The countdown is timed as a whole (``count x duration``) rather than by
+    listening for individual pulse peaks.
+    """
 
     def __init__(self) -> None:
         super().__init__(PHASE_STARTING, tag_phase)

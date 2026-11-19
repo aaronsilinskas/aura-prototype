@@ -11,19 +11,6 @@ from packs.scenes.hardware_test.rules.helpers.phases import MODE_IR
 
 
 class HwTestIrRule(HwModeRule):
-    """Drives the IR mode: white idle entry effect, send + receive flash.
-
-    On entry, shows a white solid on ``Scope.ALL``. Button A transmits
-    ``HW_TEST_PAYLOAD`` via the LINE IR emitter and fires the
-    ``scene.sfx_test`` "sent" cue on ``Scope.PERSONAL``. Receiving an IR
-    packet flashes ``Scope.DIRECTIONAL`` green and records the
-    receipt/timestamp so the shared ``HwModeRule`` flash-expiry can restore
-    the idle effect.
-
-    On a device without the LINE emitter, the entry effect is red instead
-    and Button A sends nothing.
-    """
-
     def __init__(self) -> None:
         super().__init__(MODE_IR, ir_emitter_capability(LINE))
         self.on(NetworkEvents.IRReceived, self._handle_ir_received)

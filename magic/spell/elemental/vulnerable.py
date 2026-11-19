@@ -6,8 +6,6 @@ from magic.values import Duration
 class VulnerableSpell(Spell):
     """Removes any existing or new shields while this spell is active.
     If no shields are removed, increases damage taken for a duration.
-
-    Level scaling: Increases the damage multiplier.
     """
 
     def __init__(self, damage_multiplier: float, duration: float) -> None:

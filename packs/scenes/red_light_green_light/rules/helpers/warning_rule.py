@@ -1,10 +1,3 @@
-"""The rule behind both RLGL warning phases, Red Warning and Green Warning.
-
-On entry, shows the warning sting (scaled to the current Game Level's pulse
-duration) on ``Scope.NON_AMBIENT`` and declares that the phase ends after that
-level's warning duration, moving to the light it warns of.
-"""
-
 from __future__ import annotations
 
 from engine.phase import PhaseKey, PhaseRule
@@ -15,7 +8,7 @@ from packs.scenes.red_light_green_light.rules.helpers.rlgl_phase_state import rl
 
 
 class RlglWarningRule(PhaseRule):
-    """Drives one warning phase: warning sting, then into *next_phase*."""
+    """The rule behind both warning phases: the warning sting, then *next_phase*."""
 
     def __init__(self, phase: PhaseKey, next_phase: PhaseKey) -> None:
         super().__init__(phase, rlgl_phase)

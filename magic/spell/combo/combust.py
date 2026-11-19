@@ -4,12 +4,8 @@ from magic.spell.elemental.ignite import IgniteSpell
 
 
 class CombustCombination(SpellCombination):
-    """Combines multiple Ignite spells into a single more powerful Ignite.
-
-    When two or more Ignite spells are present on the Aura, this combination
-    removes all of them and creates a new Ignite spell with:
-    - Total damage per second: Sum of all individual Ignite damage values
-    - Duration: Maximum duration among all Ignite spells
+    """Merges two or more Ignite spells into one with their summed damage per second
+    and the longest duration.
     """
 
     def check(self, aura: Aura) -> bool:

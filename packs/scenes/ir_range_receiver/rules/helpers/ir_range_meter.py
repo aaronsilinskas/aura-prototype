@@ -1,9 +1,7 @@
-"""``ir_range_meter`` -- the per-scene ``ReceptionQualityMeter`` accessor.
+"""The per-scene ``ReceptionQualityMeter`` accessor.
 
 Kept separate from ``reception_quality_meter.py`` so that module stays a pure,
-``GameState``-free classifier. Builds the meter once from the scene's cached
-:class:`IrRangeConfig` and caches the instance under a single ``GameState``
-key, mirroring the ``rlgl_config``/``tag_config`` accessor precedent.
+``GameState``-free classifier.
 """
 
 from __future__ import annotations

@@ -4,10 +4,7 @@ from magic.values import Duration
 
 
 class WeakenSpell(Spell):
-    """Reduces the level of spells cast by the target for a duration.
-
-    Level scaling: Increases the level reduction.
-    """
+    """Reduces the level of spells cast by the target for a duration."""
 
     def __init__(self, reduction: float, duration: float) -> None:
         super().__init__(tags=[SpellTags.DEBUFF, ElementTags.WATER])

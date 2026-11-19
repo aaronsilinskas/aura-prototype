@@ -6,4 +6,3 @@ if TYPE_CHECKING:
     from typing import Final
 
 NAMESPACE: Final = "debug"
-"""The ``debug`` pack's Settings namespace, shared by its rules."""

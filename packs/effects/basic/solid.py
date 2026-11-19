@@ -23,11 +23,10 @@ class Solid(EffectPixels):
 
 
 class SolidBuilder(EffectBuilder):
-    """Builds a :class:`Solid` from an ``EffectConfig``.
+    """Builds a :class:`Solid` from the ``color`` option.
 
-    Reads ``config.get_option("color", 0xFFFFFF)`` for the raw unscaled color.
-    The ``brightness`` option is silently ignored; brightness is an output-level
-    concern applied by ``MatrixEffectOutput`` at render time.
+    The ``brightness`` option is ignored: ``MatrixEffectOutput`` applies
+    brightness at render time.
     """
 
     def __call__(self, name: str, config: EffectConfig) -> Effect:

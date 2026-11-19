@@ -1,21 +1,3 @@
-"""ir_range_receiver scene rule -- paints IR link quality as a pixel meter.
-
-A single scene-local plain ``GameRule`` (the ``element_browser`` shape -- no
-phase machine): it records every ``NetworkEvents.IRReceived`` arrival and, on
-the per-tick ``InputEvents.Sensors`` heartbeat, asks the pure
-``ReceptionQualityMeter`` to recompute reception quality and applies its
-silence timeout. The heartbeat is required for silence detection --
-``IRReceived`` alone can never signal "packets stopped", since no event fires
-when transmission goes quiet.
-
-Rendering is a single effect on ``Scope.NON_AMBIENT``, re-issued only when the
-displayed result (state + progress) changes -- an already-issued effect
-persists and ``basic.progress`` bakes its fill in at construction, so a
-partial-state tick whose reception rate moved must still re-issue for the bar
-to visibly shrink or grow; the change-guard is an optimization against
-redundant identical calls, not a correctness requirement.
-"""
-
 from __future__ import annotations
 
 from engine.engine import GameRule
@@ -39,7 +21,13 @@ _PRINT_INTERVAL: Final = 1.0
 
 
 class IrRangeReceiverRule(GameRule):
-    """Renders a green/yellow/red pixel meter from IR reception quality."""
+    """Renders a green/yellow/red pixel meter from IR reception quality.
+
+    The ``Sensors`` heartbeat drives the meter's silence timeout: no event fires
+    when transmission goes quiet. The effect is re-issued whenever the displayed
+    state or progress changes, because ``basic.progress`` bakes its fill in at
+    construction.
+    """
 
     def __init__(self) -> None:
         self.on(NetworkEvents.IRReceived, self._on_ir_received)

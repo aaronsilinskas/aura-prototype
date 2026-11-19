@@ -26,12 +26,7 @@ _PHASE_FADE = 2
 
 
 class _AirBreeze(Layer):
-    """One breeze: IDLE → SWEEP (accelerate + fade-in) → FADE (decelerate + fade-out) → repeat.
-
-    Position scrolls continuously during SWEEP and FADE; the shape is sampled at
-    ``(pixel_pos + base_offset + scroll_offset) % 1.0`` scaled by the current
-    multiplier.
-    """
+    """One breeze: IDLE → SWEEP (accelerate + fade-in) → FADE (decelerate + fade-out) → repeat."""
 
     __slots__ = [
         "_base_offset",
@@ -70,7 +65,6 @@ class _AirBreeze(Layer):
         self._sweep_dur_min = sweep_dur_min
         self._sweep_dur_max = sweep_dur_max
 
-        # Simulation state
         self._base_offset = 0.0
         self._scroll_offset = 0.0
         self._speed = 0.0
@@ -102,7 +96,6 @@ class _AirBreeze(Layer):
         self._phase = _PHASE_FADE
         self._phase_elapsed = 0.0
         self._phase_duration = random.uniform(0.75, 1.25)
-        # Carry current speed and multiplier as start values for the fade
         self._speed_start = self._speed
         self._speed_end = 0.0
         self._mult_start = self._multiplier
@@ -121,7 +114,6 @@ class _AirBreeze(Layer):
                 self._start_sweep()
             return
 
-        # SWEEP or FADE: lerp speed and multiplier by progress
         progress = self._phase_elapsed / self._phase_duration if self._phase_duration > 0.0 else 1.0
         if progress > 1.0:
             progress = 1.0
@@ -137,7 +129,6 @@ class _AirBreeze(Layer):
                 self._start_idle()
 
     def sample(self, position: float, pixel_count: int) -> float:
-        """Return this breeze's brightness contribution at ``position`` in ``[0.0, 1.0]``."""
         if self._phase == _PHASE_IDLE:
             return 0.0
         pos = (position + self._base_offset + self._scroll_offset) % 1.0
@@ -146,12 +137,6 @@ class _AirBreeze(Layer):
 
 class AirBuilder(EffectBuilder):
     def __call__(self, name: str, config: EffectConfig) -> Effect:
-        """Sweeping green-white breezes that drift across the strip, each fading
-        in as it accelerates and fading out again as it slows.
-
-        Level: more breezes sweep at once, each brighter and wider, with shorter
-        gaps between sweeps.
-        """
         level = effect_level(config)
 
         breeze_count = 1 + level // 5
