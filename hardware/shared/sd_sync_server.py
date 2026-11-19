@@ -16,6 +16,7 @@ from hardware.shared.sd_sync_protocol import (
     decode_frame,
     encode_frame,
     encode_listing,
+    expect_ack,
 )
 
 TYPE_CHECKING = False
@@ -34,20 +35,6 @@ class _CrcMismatchError(Exception):
     aborting that write before its rename (ADR-0011). Caught by
     :meth:`SdSyncServer.serve_push`, never escapes this module.
     """
-
-
-def _expect(transport: Transport, kind: str, text: str) -> None:
-    """Consume the reply a stop-and-wait step waits for, refusing to go past a wrong one.
-
-    Raises:
-        ValueError: The peer broke the protocol, so the exchange cannot
-            safely continue.
-    """
-    frame = decode_frame(transport.recv())
-    if frame.kind != kind or frame.text != text:
-        raise ValueError(
-            f"expected SD-sync frame {kind!r} {text!r}, got {frame.kind!r} {frame.text!r}"
-        )
 
 
 class _ReplayTransport(Transport):
@@ -162,7 +149,7 @@ class SdSyncServer:
         for seq, chunk in enumerate(chunks):
             crc = binascii.crc32(chunk, crc)
             transport.send(encode_frame(Frame("chunk", str(seq), chunk)))
-            _expect(transport, "ack", str(seq))
+            expect_ack(transport, seq)
 
         transport.send(encode_frame(Frame("done", str(crc))))
 

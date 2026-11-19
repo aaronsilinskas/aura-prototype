@@ -1,9 +1,10 @@
-"""SD-sync wire protocol — frame representation shared by client and server.
+"""SD-sync wire protocol — frames, line framing and the ack check shared by both ends.
 
 Every request, response, and streamed file chunk is one **frame**: a header of
 ``kind`` and free-form ``text``, plus optional payload bytes, base64-encoded as
-a single line. ``CHUNK_SIZE`` bounds how much of a file one frame carries. See
-ADR-0011.
+a single line. On a byte stream each line ends with ``FRAME_DELIMITER``, which
+base64 never produces. ``CHUNK_SIZE`` bounds how much of a file one frame
+carries. See ADR-0011.
 """
 
 from __future__ import annotations
@@ -13,21 +14,27 @@ import binascii
 TYPE_CHECKING = False
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
     from typing import Final
 
 __all__ = [
     "CHUNK_SIZE",
+    "FRAME_DELIMITER",
     "Frame",
+    "LineFramer",
     "Transport",
     "decode_frame",
     "decode_listing",
     "encode_frame",
     "encode_listing",
+    "expect_ack",
+    "frame_line",
     "iter_chunks",
 ]
 
 CHUNK_SIZE: Final = 512
+FRAME_DELIMITER: Final = b"\n"
+_READ_SIZE: Final = 64
 
 
 class Frame:
@@ -81,6 +88,47 @@ def decode_frame(line: bytes) -> Frame:
     header, _, payload = raw.partition(b"\n")
     kind, _, text = header.decode("utf-8").partition(" ")
     return Frame(kind, text, payload)
+
+
+def frame_line(line: bytes) -> bytes:
+    """Return *line* terminated with ``FRAME_DELIMITER``, ready to write to a byte stream."""
+    return line + FRAME_DELIMITER
+
+
+class LineFramer:
+    """Splits a byte stream with no message boundaries of its own into frame lines.
+
+    Bytes read past a delimiter are kept for the next :meth:`read_line`, so
+    two lines arriving in one read are returned one per call.
+    """
+
+    def __init__(self) -> None:
+        self._buffered = b""
+
+    def read_line(self, read: Callable[[int], bytes | None]) -> bytes:
+        """Return the next line without its delimiter, calling *read* until one is buffered.
+
+        *read* takes a maximum byte count and returns whatever is available,
+        possibly nothing; an empty read is retried in a tight loop.
+        """
+        while FRAME_DELIMITER not in self._buffered:
+            chunk = read(_READ_SIZE)
+            if chunk:
+                self._buffered += chunk
+        line, _, self._buffered = self._buffered.partition(FRAME_DELIMITER)
+        return line
+
+
+def expect_ack(transport: Transport, seq: int, error: type[ValueError] = ValueError) -> None:
+    """Consume chunk *seq*'s ack, refusing to stream past any other reply.
+
+    Raises:
+        ValueError: The reply was not ``ack`` carrying *seq*, so the exchange
+            cannot safely continue. *error* picks the subclass raised.
+    """
+    frame = decode_frame(transport.recv())
+    if frame.kind != "ack" or frame.text != str(seq):
+        raise error(f"expected SD-sync frame 'ack' {str(seq)!r}, got {frame.kind!r} {frame.text!r}")
 
 
 def encode_listing(entries: list[tuple[str, int]]) -> bytes:

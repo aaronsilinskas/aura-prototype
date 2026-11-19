@@ -1,14 +1,13 @@
 """UsbCdcTransport -- the live SD-sync ``Transport`` adapter over a USB-CDC data channel.
 
-Frames :mod:`hardware.shared.sd_sync_protocol` lines with a trailing newline
-delimiter -- ``encode_frame`` output is plain base64 and so never contains one
--- so a byte stream with no message boundaries of its own (like a serial port)
-can still exchange one frame per :meth:`~UsbCdcTransport.send`/:meth:`~UsbCdcTransport.recv`.
+Frames lines with :mod:`hardware.shared.sd_sync_protocol`'s ``LineFramer``, so
+a byte stream with no message boundaries of its own can still exchange one
+frame per :meth:`~UsbCdcTransport.send`/:meth:`~UsbCdcTransport.recv`.
 """
 
 from __future__ import annotations
 
-from hardware.shared.sd_sync_protocol import Transport
+from hardware.shared.sd_sync_protocol import LineFramer, Transport, frame_line
 
 TYPE_CHECKING = False
 
@@ -16,8 +15,6 @@ if TYPE_CHECKING:
     import usb_cdc
 
 __all__ = ["UsbCdcTransport"]
-
-_READ_SIZE = 64
 
 
 class UsbCdcTransport(Transport):
@@ -34,23 +31,17 @@ class UsbCdcTransport(Transport):
         # nothing) so it can poll for a newline across short frames instead.
         serial.timeout = 0
         self._serial = serial
-        self._buffered = b""
+        self._framer = LineFramer()
 
     def send(self, line: bytes) -> None:
-        """Write *line* followed by the newline terminator :meth:`recv` looks for."""
-        self._serial.write(line + b"\n")
+        """Write *line* followed by the delimiter :meth:`recv` looks for."""
+        self._serial.write(frame_line(line))
 
     def recv(self) -> bytes:
-        """Return the next newline-terminated line, with the terminator stripped.
+        """Return the next line, with its delimiter stripped.
 
-        A stream that returns no bytes yet (a non-blocking ``read`` with
-        nothing waiting) is retried in a tight loop -- acceptable for this
+        Polling a non-blocking read in a tight loop is acceptable for this
         single-connection device-side loop, which has nothing else to do while
         waiting for the next request.
         """
-        while b"\n" not in self._buffered:
-            chunk = self._serial.read(_READ_SIZE)
-            if chunk:
-                self._buffered += chunk
-        line, _, self._buffered = self._buffered.partition(b"\n")
-        return line
+        return self._framer.read_line(self._serial.read)

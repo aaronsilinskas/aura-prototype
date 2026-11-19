@@ -416,12 +416,15 @@ _Avoid_: opening the host file before the server confirms the pull will proceed 
 ### SD-sync `Transport`
 The board-free port `SdSyncClient`/`SdSyncServer` exchange base64-framed lines through, one `Frame` at a time. Live adapters are `UsbCdcTransport` (device) and `SerialTransport` (host); an in-memory loopback stands in for CI.
 
+### LineFramer
+The board-free splitter in `sd_sync_protocol` that turns a byte stream into SD-sync frame lines, each ended by `FRAME_DELIMITER` (a newline, which base64 never produces). Both live transports use it, with `frame_line` on the sending side.
+
 ### UsbCdcTransport
-The live device-side `Transport` adapter, newline-framing SD-sync lines over a serial-like stream. Duck-typed against any `read`/`write` stream — it imports no `usb_cdc`, so it is CPython-testable against a fake stream.
-_Avoid_: importing `usb_cdc` into this module (the device-only wiring lives in `examples/sd_sync.py`); assuming the wire grammar is a stable contract (it's a free implementation detail, not asserted in tests)
+The live device-side `Transport` adapter, framing SD-sync lines over a serial-like stream with the shared `LineFramer`. Duck-typed against any `read`/`write` stream — it imports no `usb_cdc`, so it is CPython-testable against a fake stream.
+_Avoid_: importing `usb_cdc` into this module (the device-only wiring lives in `examples/sd_sync.py`); splitting lines itself (both transports frame through `sd_sync_protocol`, so the two ends can't drift); assuming the wire grammar is a stable contract (it may change, but in `sd_sync_protocol` for both ends at once; a test pins the bytes so a change is deliberate)
 
 ### SerialTransport
-The live host-side SD-sync `Transport`, newline-framing lines the same way as `UsbCdcTransport` but over a host serial port. Byte-framed over the **data channel**, distinct from `deploy_watch`'s UTF-8 **console channel**.
+The live host-side SD-sync `Transport`, framing lines with the same shared `LineFramer` as `UsbCdcTransport` but over a host serial port. Byte-framed over the **data channel**, distinct from `deploy_watch`'s UTF-8 **console channel**.
 _Avoid_: reusing `deploy_watch`'s `iter_serial_lines` for SD-sync (it decodes UTF-8 and targets the console channel, not the byte-framed data channel)
 
 ### Console channel

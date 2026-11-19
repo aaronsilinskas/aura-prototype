@@ -26,6 +26,7 @@ from hardware.shared.sd_sync_protocol import (
     decode_frame,
     decode_listing,
     encode_frame,
+    expect_ack,
 )
 
 __all__ = [
@@ -217,24 +218,12 @@ class SdSyncClient:
                     break
                 crc = binascii.crc32(chunk, crc)
                 self._transport.send(encode_frame(Frame("chunk", str(seq), chunk)))
-                self._expect_ack(seq)
+                expect_ack(self._transport, seq, SdSyncProtocolError)
                 seq += 1
 
         self._transport.send(encode_frame(Frame("done", str(crc))))
         response = decode_frame(self._transport.recv())
         return response.text == "ok"
-
-    def _expect_ack(self, seq: int) -> None:
-        """Consume chunk *seq*'s ack, refusing to stream past any other reply.
-
-        Raises:
-            SdSyncProtocolError: The reply was not ``ack`` carrying *seq*.
-        """
-        frame = decode_frame(self._transport.recv())
-        if frame.kind != "ack" or frame.text != str(seq):
-            raise SdSyncProtocolError(
-                f"expected SD-sync frame 'ack' {str(seq)!r}, got {frame.kind!r} {frame.text!r}"
-            )
 
 
 def _remove_if_exists(path: str) -> None:

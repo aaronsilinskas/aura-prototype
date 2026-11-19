@@ -8,10 +8,9 @@ the SD-sync protocol -- and their device names alone can't tell them apart.
 distinguishes the two CDC interfaces (including a macOS composite-CDC
 workaround).
 
-:class:`SerialTransport` frames protocol lines with a trailing newline, the
-same framing the device side uses, since ``encode_frame``'s base64 output
-never contains one. It decodes nothing: SD-sync frames are protocol bytes,
-not REPL text.
+:class:`SerialTransport` frames protocol lines with the shared ``LineFramer``
+from :mod:`hardware.shared.sd_sync_protocol`. It decodes nothing: SD-sync
+frames are protocol bytes, not REPL text.
 """
 
 from collections.abc import Sequence
@@ -19,7 +18,7 @@ from typing import Final
 
 from adafruit_board_toolkit import circuitpython_serial
 
-from hardware.shared.sd_sync_protocol import Transport
+from hardware.shared.sd_sync_protocol import LineFramer, Transport, frame_line
 from scripts.deploy_watch import SerialHandle, open_serial_with_retry
 
 TYPE_CHECKING = False
@@ -29,7 +28,6 @@ if TYPE_CHECKING:
 __all__ = ["SdSyncPortError", "SerialTransport", "find_data_port", "open_serial_transport"]
 
 _DEFAULT_BAUD: Final = 115200
-_READ_SIZE: Final = 64
 
 
 class SdSyncPortError(Exception):
@@ -68,23 +66,15 @@ class SerialTransport(Transport):
 
     def __init__(self, handle: SerialHandle) -> None:
         self._handle = handle
-        self._buffered = b""
+        self._framer = LineFramer()
 
     def send(self, line: bytes) -> None:
-        """Write *line* followed by the newline terminator :meth:`recv` looks for."""
-        self._handle.ser.write(line + b"\n")
+        """Write *line* followed by the delimiter :meth:`recv` looks for."""
+        self._handle.ser.write(frame_line(line))
 
     def recv(self) -> bytes:
-        """Return the next newline-terminated line, with the terminator stripped.
-
-        Bytes read past the newline are kept for the next call.
-        """
-        while b"\n" not in self._buffered:
-            chunk = self._handle.ser.read(_READ_SIZE)
-            if chunk:
-                self._buffered += chunk
-        line, _, self._buffered = self._buffered.partition(b"\n")
-        return line
+        """Return the next line, with its delimiter stripped."""
+        return self._framer.read_line(self._handle.ser.read)
 
 
 def open_serial_transport(port: str, baud: int = _DEFAULT_BAUD) -> SerialTransport:
