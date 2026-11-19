@@ -27,6 +27,8 @@ dev = [
     "pytest-cov>=7.0.0",
     "pytest-mock>=3.15.1",
     "ruff>=0.17.5",
+    # Tests read pyproject.toml; tomllib is stdlib only from 3.11.
+    "tomli>=2.0; python_version < '3.11'",
     "types-pyserial>=3.5.0.20261104",
 ]
 
