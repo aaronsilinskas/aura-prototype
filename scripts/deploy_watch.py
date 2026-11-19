@@ -27,6 +27,7 @@ import argparse
 import sys
 import time
 from collections.abc import Callable, Iterable, Sequence
+from enum import Enum, auto
 from pathlib import Path
 from typing import IO, Final, Protocol
 
@@ -72,10 +73,21 @@ class SplitWriter:
         self._secondary.flush()
 
 
+class WatchReason(Enum):
+    """How a deploy-watch run ended, which decides its exit code."""
+
+    MATCHED = auto()
+    """A line containing the ``--until`` marker was found."""
+    TIMED_OUT = auto()
+    STREAM_ENDED = auto()
+    BANNER_MISSING = auto()
+    """The start anchor never arrived, so the watch never started."""
+
+
 class WatchResult:
     __slots__ = ("reason",)
 
-    def __init__(self, reason: str) -> None:
+    def __init__(self, reason: WatchReason) -> None:
         self.reason = reason
 
 
@@ -117,10 +129,8 @@ def watch_stream(
         out: Output stream for echoing lines. Defaults to ``sys.stdout``.
 
     Returns:
-        A ``WatchResult`` whose ``reason`` is one of:
-        ``"matched"`` — a line containing *until* was found;
-        ``"timed_out"`` — *timeout* elapsed before a match;
-        ``"stream_ended"`` — the iterable was exhausted.
+        A :class:`WatchResult` saying why the watch stopped; never
+        :attr:`WatchReason.BANNER_MISSING`.
     """
     if out is None:
         out = sys.stdout
@@ -129,7 +139,7 @@ def watch_stream(
 
     for line in lines:
         if timeout is not None and clock() - start >= timeout:
-            return WatchResult("timed_out")
+            return WatchResult(WatchReason.TIMED_OUT)
 
         if line is None:
             continue
@@ -137,33 +147,28 @@ def watch_stream(
         out.write(line + "\n")
 
         if until is not None and until in line:
-            return WatchResult("matched")
+            return WatchResult(WatchReason.MATCHED)
 
     if timeout is not None and clock() - start >= timeout:
-        return WatchResult("timed_out")
+        return WatchResult(WatchReason.TIMED_OUT)
 
-    return WatchResult("stream_ended")
+    return WatchResult(WatchReason.STREAM_ENDED)
 
 
-def exit_code_for(reason: str, *, until: str | None) -> int:
-    """Map a WatchResult reason to a process exit code.
+def exit_code_for(reason: WatchReason, *, until: str | None) -> int:
+    """Map why a watch stopped to the process exit code in the module docstring's table.
 
     Args:
-        reason: The ``WatchResult.reason`` string.
+        reason: Why the watch stopped.
         until: The ``--until`` value; ``None`` if not supplied.
-
-    Returns:
-        0 — matched, or ended/timed-out without an --until target.
-        2 — timed out or stream ended before the marker was matched.
-        3 — soft-reboot banner never arrived (banner_missing).
     """
-    if reason == "banner_missing":
-        return 3
-    if reason == "matched":
-        return 0
-    if until is None:
-        return 0
-    return 2
+    match reason:
+        case WatchReason.BANNER_MISSING:
+            return 3
+        case WatchReason.MATCHED:
+            return 0
+        case WatchReason.TIMED_OUT | WatchReason.STREAM_ENDED:
+            return 0 if until is None else 2
 
 
 class ConsolePortError(Exception):
@@ -448,7 +453,7 @@ def main() -> None:
                 "The device may have hung or missed the reload.",
                 file=sys.stderr,
             )
-            sys.exit(exit_code_for("banner_missing", until=args.until))
+            sys.exit(exit_code_for(WatchReason.BANNER_MISSING, until=args.until))
 
         watch_out: TextSink = (
             SplitWriter(sys.stdout, output_file) if output_file is not None else sys.stdout

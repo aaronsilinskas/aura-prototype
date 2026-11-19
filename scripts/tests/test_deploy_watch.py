@@ -20,6 +20,7 @@ from scripts.deploy_watch import (
     ConsolePortError,
     SerialHandle,
     SplitWriter,
+    WatchReason,
     discard_until,
     exit_code_for,
     find_console_port,
@@ -55,7 +56,7 @@ def fixed_clock(start: float = 0.0, step: float = 1.0) -> Callable[[], float]:
 def test_watch_stream_returns_stream_ended_when_iterable_exhausted() -> None:
     out = io.StringIO()
     result = watch_stream(lines("hello", "world"), out=out)
-    assert result.reason == "stream_ended"
+    assert result.reason is WatchReason.STREAM_ENDED
 
 
 def test_watch_stream_echoes_lines_in_order() -> None:
@@ -67,13 +68,13 @@ def test_watch_stream_echoes_lines_in_order() -> None:
 def test_watch_stream_stream_ended_with_no_lines() -> None:
     out = io.StringIO()
     result = watch_stream(lines(), out=out)
-    assert result.reason == "stream_ended"
+    assert result.reason is WatchReason.STREAM_ENDED
 
 
 def test_watch_stream_returns_matched_when_until_substring_found() -> None:
     out = io.StringIO()
     result = watch_stream(lines("starting up", "READY", "more output"), until="READY", out=out)
-    assert result.reason == "matched"
+    assert result.reason is WatchReason.MATCHED
 
 
 def test_watch_stream_stops_echoing_after_matched_line() -> None:
@@ -91,13 +92,13 @@ def test_watch_stream_echoes_matched_line_itself() -> None:
 def test_watch_stream_matches_substring_not_full_line() -> None:
     out = io.StringIO()
     result = watch_stream(lines("error: FATAL crash"), until="FATAL", out=out)
-    assert result.reason == "matched"
+    assert result.reason is WatchReason.MATCHED
 
 
 def test_watch_stream_no_match_returns_stream_ended() -> None:
     out = io.StringIO()
     result = watch_stream(lines("line1", "line2"), until="MISSING", out=out)
-    assert result.reason == "stream_ended"
+    assert result.reason is WatchReason.STREAM_ENDED
 
 
 def test_watch_stream_returns_timed_out_on_idle_only_stream_when_timeout_elapses() -> None:
@@ -108,7 +109,7 @@ def test_watch_stream_returns_timed_out_on_idle_only_stream_when_timeout_elapses
         clock=fixed_clock(0.0, 1.0),
         out=out,
     )
-    assert result.reason == "timed_out"
+    assert result.reason is WatchReason.TIMED_OUT
 
 
 def test_watch_stream_timed_out_with_until_set_but_not_matched() -> None:
@@ -120,7 +121,7 @@ def test_watch_stream_timed_out_with_until_set_but_not_matched() -> None:
         clock=fixed_clock(0.0, 2.0),
         out=out,
     )
-    assert result.reason == "timed_out"
+    assert result.reason is WatchReason.TIMED_OUT
 
 
 def test_watch_stream_none_items_are_not_echoed() -> None:
@@ -143,7 +144,7 @@ def test_watch_stream_matched_before_timeout() -> None:
         clock=fixed_clock(0.0, 0.0),
         out=out,
     )
-    assert result.reason == "matched"
+    assert result.reason is WatchReason.MATCHED
 
 
 def test_watch_stream_timed_out_when_timeout_elapses_after_stream_exhausted() -> None:
@@ -154,35 +155,35 @@ def test_watch_stream_timed_out_when_timeout_elapses_after_stream_exhausted() ->
         clock=fixed_clock(0.0, 0.6),
         out=out,
     )
-    assert result.reason == "timed_out"
+    assert result.reason is WatchReason.TIMED_OUT
 
 
 def test_exit_code_for_stream_ended_with_no_until_is_zero() -> None:
-    assert exit_code_for("stream_ended", until=None) == 0
+    assert exit_code_for(WatchReason.STREAM_ENDED, until=None) == 0
 
 
 def test_exit_code_for_matched_is_zero() -> None:
-    assert exit_code_for("matched", until="TEXT") == 0
+    assert exit_code_for(WatchReason.MATCHED, until="TEXT") == 0
 
 
 def test_exit_code_for_timed_out_with_no_until_is_zero() -> None:
-    assert exit_code_for("timed_out", until=None) == 0
+    assert exit_code_for(WatchReason.TIMED_OUT, until=None) == 0
 
 
 def test_exit_code_for_timed_out_with_until_set_is_two() -> None:
-    assert exit_code_for("timed_out", until="TEXT") == 2
+    assert exit_code_for(WatchReason.TIMED_OUT, until="TEXT") == 2
 
 
 def test_exit_code_for_stream_ended_with_until_set_is_two() -> None:
-    assert exit_code_for("stream_ended", until="MARKER") == 2
+    assert exit_code_for(WatchReason.STREAM_ENDED, until="MARKER") == 2
 
 
 def test_exit_code_for_banner_missing_is_three() -> None:
-    assert exit_code_for("banner_missing", until=None) == 3
+    assert exit_code_for(WatchReason.BANNER_MISSING, until=None) == 3
 
 
 def test_exit_code_for_banner_missing_with_until_set_is_three() -> None:
-    assert exit_code_for("banner_missing", until="MARKER") == 3
+    assert exit_code_for(WatchReason.BANNER_MISSING, until="MARKER") == 3
 
 
 def test_discard_until_returns_true_when_marker_found_before_deadline() -> None:
