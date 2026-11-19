@@ -74,16 +74,14 @@ class SplitWriter:
 
 
 class WatchReason(Enum):
-    """Why a watch stopped."""
+    """How a deploy-watch run ended, which decides its exit code."""
 
     MATCHED = auto()
     """A line containing the ``--until`` marker was found."""
     TIMED_OUT = auto()
-    """The timeout elapsed before a match."""
     STREAM_ENDED = auto()
-    """The line stream was exhausted."""
     BANNER_MISSING = auto()
-    """The soft-reboot banner never arrived, so the watch never started."""
+    """The start anchor never arrived, so the watch never started."""
 
 
 class WatchResult:
@@ -131,7 +129,8 @@ def watch_stream(
         out: Output stream for echoing lines. Defaults to ``sys.stdout``.
 
     Returns:
-        A ``WatchResult`` saying why the watch stopped; never ``BANNER_MISSING``.
+        A :class:`WatchResult` saying why the watch stopped; never
+        :attr:`WatchReason.BANNER_MISSING`.
     """
     if out is None:
         out = sys.stdout
