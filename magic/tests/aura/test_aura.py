@@ -11,7 +11,7 @@ from magic.aura import (
 )
 from magic.spell.elemental.earth_shield import EarthShieldSpell
 from magic.spell.elemental.slice import SliceSpell
-from magic.tests.helpers import AuraFixture, MockEventListener
+from magic.tests.helpers import AuraFixture, MockEventListener, NoopSpell
 from magic.values import ValueModifier
 
 
@@ -94,6 +94,30 @@ def test_listeners_hear_a_spent_spell_removed_in_the_update_that_spent_it(
 
     removed = [e.spell for _, e in listener.events if isinstance(e, RemoveSpellEvent)]
     assert shield in removed
+
+
+def test_update_runs_each_spells_update_once_even_when_a_spell_is_spent(
+    fixture: AuraFixture,
+) -> None:
+    aura = fixture.aura
+
+    class CountingSpell(NoopSpell):
+        def __init__(self) -> None:
+            super().__init__(tags=[])
+            self.updates = 0
+
+        def update(self, aura: Aura, elapsed_time: float) -> bool:
+            self.updates += 1
+            return False
+
+    counting = CountingSpell()
+    aura.add_spell(counting)
+    aura.add_spell(EarthShieldSpell(reduction=0.5, max_hits=1, duration=10.0))
+    aura.add_spell(SliceSpell(damage=1.0))
+
+    aura.update(0.1)
+
+    assert counting.updates == 1
 
 
 def test_handle_event_applies_damage_event(fixture: AuraFixture) -> None:
