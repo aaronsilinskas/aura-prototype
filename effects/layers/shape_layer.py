@@ -19,7 +19,7 @@ class ShapeLayer(Layer):
         """No-op — shape functions are stateless."""
 
     def sample(self, position: float, pixel_count: int) -> float:
-        """Return the shape value at ``position``, clamped to ``[0.0, 1.0]``.
+        """Return the shape value at ``position``, capped at ``1.0``.
 
         ``pixel_count`` is accepted for interface uniformity but is not used.
         """

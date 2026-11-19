@@ -4,8 +4,7 @@ Holds the scene's twelve Settings, declared in its ``scene.json``.
 
 ``rlgl_config`` is a :class:`engine.state.StateSlot` callable accessor: it lazily
 builds the config from ``state.settings`` on first use and caches it under a single
-``GameState`` key, mirroring the ``current_mode(state)`` precedent in the
-hardware_test scene.  Game Level is read separately each tick (it changes during play), so
+``GameState`` key.  Game Level is read separately each tick (it changes during play), so
 the level-scaled methods below take ``level`` as a parameter and the config
 itself stays immutable and level-agnostic.
 """

@@ -49,8 +49,7 @@ class PhaseScroll(Scroll):
     Each phase lasts ``min_phase``–``max_phase`` seconds. At the end of each
     phase a new target speed is chosen (``±speed``). The current speed lerps
     smoothly from the previous phase's terminal value to the new target over
-    the next phase, matching the ``AccelerateStep`` behaviour in the
-    step-based water effect.
+    the next phase.
     """
 
     __slots__ = [

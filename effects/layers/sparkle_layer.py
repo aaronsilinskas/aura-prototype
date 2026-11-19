@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 
 class SparkleLayer(Layer):
-    """Pure sparkle simulation — no rendering, no palette, no EffectStep overhead.
+    """Pure sparkle simulation — no rendering, no palette.
 
     Maintains a fixed number of sparkle slots, each cycling through idle →
     fade-in → fade-out phases. Call ``update(elapsed)`` each frame, then
@@ -21,11 +21,7 @@ class SparkleLayer(Layer):
     contribution at that position.
 
     ``spawn_delay_rate`` is a ``DynamicValue`` — a plain float or zero-argument
-    callable — re-evaluated each time a slot resets to idle, matching the
-    contract used by ``SparkleStep``.
-
-    The algorithm is identical to ``SparkleStep``, enabling fair visual
-    comparison between the two design approaches.
+    callable — re-evaluated each time a slot resets to idle.
     """
 
     PHASE_IDLE: Final = 0
@@ -104,10 +100,7 @@ class SparkleLayer(Layer):
             phase[i] = p
 
     def sample(self, position: float, pixel_count: int) -> float:
-        """Return the additive sparkle contribution at ``position``.
-
-        Uses the same one-pixel linear falloff as ``SparkleStep``.
-        """
+        """Return the additive sparkle contribution at ``position`` (one-pixel linear falloff)."""
         result = 0.0
         pixel_pos = position * pixel_count
         intensity = self._intensity

@@ -435,7 +435,8 @@ class EffectManager(EffectControls, EffectAdmin):
         """Layer this effect alongside any running effects in scope.
 
         If nothing is running in scope, behaves like set_effect.
-        The driver determines how layered effects are composited (e.g. splitting an LED strip).
+        Each key's ``MergeStrategy`` determines how layered effects are composited
+        (e.g. ``SplitMerge`` splitting an LED strip).
         """
         scope_key_set = set(scope.keys)
         entry = self._build_effect(scope_key_set, name, options)

@@ -1,10 +1,10 @@
 """Normalize every distributed sounds/ folder to the CircuitPython audio format.
 
-Target format: 11025 Hz, mono, 16-bit signed, peak-normalized to 0 dBFS.
+Target format: 11025 Hz, mono, 16-bit signed, peak-normalized to -0.1 dBFS.
 
 Each file is measured for its peak level first, then the exact gain needed to
-bring that peak to 0 dBFS is applied.  This ensures every clip plays at the
-maximum possible volume without clipping.
+bring that peak to -0.1 dBFS is applied, so every clip plays near full volume
+without clipping.
 
 Sounds live distributed across the tree -- one ``sounds/`` folder per effect
 pack (``packs/effects/<pack>/sounds/``) and per scene
@@ -144,7 +144,7 @@ def normalize(root: Path, dry_run: bool = False) -> int:
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Peak-normalize every distributed sounds/ folder's WAV files to "
-        "0 dBFS at 11025 Hz mono 16-bit signed."
+        f"{-_HEADROOM_DB} dBFS at {_SAMPLE_RATE} Hz, {_CHANNELS}-channel {_SAMPLE_FMT}."
     )
     parser.add_argument(
         "--root",
