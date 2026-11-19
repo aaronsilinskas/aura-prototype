@@ -1,6 +1,4 @@
-"""Open a line, run the build, close it: narration primitive.
-
-A component builder narrating its own construction to a :class:`~engine.log.Logger`
+"""A component builder narrating its own construction to a :class:`~engine.log.Logger`
 otherwise hand-threads the same three calls every time: ``begin`` a line describing
 what it is about to build, run the build, then ``end`` the line with a success detail
 or ``fail`` it on an exception. :func:`narrate_step` and :func:`narrate_skip` own that

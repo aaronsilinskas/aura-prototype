@@ -1,4 +1,4 @@
-"""Config loader and parser for ``aura-device.json``."""
+"""Config loader and parser for aura-device.json."""
 
 from __future__ import annotations
 
@@ -453,7 +453,10 @@ class DeviceConfig:
         ``False``, the same shape ``parse_device_config`` produces for a
         declared-but-disabled section. A component that is absent on this
         config is a no-op -- it stays absent. ``i2c``, ``spi``, ``buttons``,
-        and ``neopixel_current_budget`` are never touched.
+        and ``neopixel_current_budget`` are never touched: buses are
+        infrastructure for the kept component, not competition with it,
+        ``buttons`` has no ``enabled`` flag, and the budget is parse-time
+        policy that builds nothing.
 
         Args:
             keep: The one isolatable component to leave untouched, e.g.
@@ -528,7 +531,10 @@ def _parse_brightness(mapping: dict, key: str, field: str) -> float:
 
 
 def _parse_count(mapping: dict, key: str, field: str) -> int:
-    """Return the required pixel count at *key* in *mapping*; *key* must be present.
+    """Return the required pixel count at *key* in *mapping*.
+
+    Args:
+        mapping: The raw config mapping to read *key* from; *key* must be present.
 
     Raises:
         ValueError: If the value is not an ``int`` (``bool`` included) or is
@@ -1061,6 +1067,8 @@ def parse_device_config(mapping: dict) -> DeviceConfig:
     if "sdcard" in mapping:
         sdcard = _parse_sdcard(mapping["sdcard"], spi)
 
+    # Keys match `DeviceConfig`'s `accelerometer`/`magnetometer`/`haptics`
+    # kwargs exactly, so the dict splats straight into the constructor call below.
     i2c_devices: dict[str, I2CDeviceConfig | None] = dict.fromkeys(_I2C_DEVICE_SECTIONS)
     for section in _I2C_DEVICE_SECTIONS:
         if section in mapping:

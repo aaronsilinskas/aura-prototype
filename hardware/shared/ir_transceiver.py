@@ -91,7 +91,6 @@ class InfraredTransceiver(PolledPart):
 
     @property
     def receives(self) -> bool:
-        """Whether a receiver is wired."""
         return self._receiver is not None
 
     def send(self, data: bytes, emitter: str) -> None:

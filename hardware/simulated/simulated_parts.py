@@ -252,6 +252,7 @@ class SimulatedAccelerometer:
         self._held = _AT_REST
         self._sway_strength = DEFAULT_SWAY_STRENGTH
         self._sway_from: float | None = None
+        """When the sway started, or ``None`` while the device is not moving."""
 
     @property
     def acceleration(self) -> tuple[float, float, float]:
@@ -274,7 +275,7 @@ class SimulatedAccelerometer:
 
 
 class SimulatedMagnetometer:
-    """A magnetometer reading a held raw field ``(x, y, z)`` in µT."""
+    """A magnetometer reading a held raw field ``(x, y, z)`` in µT; zero until set."""
 
     def __init__(self) -> None:
         self.magnetic = (0.0, 0.0, 0.0)
@@ -334,6 +335,7 @@ class SimulatedParts(DeviceParts):
 
     @property
     def scripted_accelerometer(self) -> SimulatedAccelerometer | None:
+        """The accelerometer the device scripts; ``None`` until a boot first builds one."""
         return self._kept.accelerometer
 
     def accelerometer(
@@ -347,6 +349,7 @@ class SimulatedParts(DeviceParts):
 
     @property
     def scripted_magnetometer(self) -> SimulatedMagnetometer | None:
+        """The magnetometer the device scripts; ``None`` until a boot first builds one."""
         return self._kept.magnetometer
 
     def magnetometer(

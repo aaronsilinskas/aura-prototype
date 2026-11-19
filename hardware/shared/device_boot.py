@@ -1,4 +1,4 @@
-"""Loader for ``aura-boot.json``."""
+"""Loader for aura-boot.json."""
 
 from __future__ import annotations
 

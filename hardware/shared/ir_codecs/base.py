@@ -111,10 +111,19 @@ class InfraredDecoder:
 
     @property
     def last_error_margin(self) -> int | None:
+        """Worst-case timing deviation (µs) from the last decoded packet.
+
+        Returns ``None`` before any packet has been successfully decoded.
+        """
         return self._last_error_margin
 
     @property
     def last_signal_strength(self) -> float | None:
+        """Normalised signal quality (0.0–1.0) from the last decoded packet.
+
+        An error margin of 0 or ≤ 30 % of the error threshold yields 1.0.
+        Returns ``None`` before any packet has been decoded.
+        """
         if self._last_error_margin is None:
             return None
         if self._last_error_margin == 0:

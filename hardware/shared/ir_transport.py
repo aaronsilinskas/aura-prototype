@@ -146,11 +146,17 @@ class _InfraredTransmitter:
         start-of-write — never per-tick.
 
     Gate timing:
-      - If the writer is still busy (e.g. DMA in flight) the flag stays armed
-        until the next :meth:`poll` or write start that observes idle releases
-        it. Each ``begin_transmit`` thus pairs with exactly one
-        ``end_transmit``, even when a :meth:`send` follows a finished write
-        with no :meth:`poll` between.
+      - Starting a write first releases any gate a finished write left
+        armed, then calls :meth:`_IrTransmitGate.begin_transmit`, encodes,
+        calls :meth:`PulseWriter.write_pulses`, arms the deferred-release
+        flag, then calls :meth:`_release_gate_when_idle`. If the writer is
+        already idle (a blocking writer finished synchronously)
+        :meth:`_IrTransmitGate.end_transmit` fires immediately. If the writer
+        is still busy (e.g. DMA in flight) the flag stays armed until the next
+        :meth:`poll` or write start that observes idle releases it, via the
+        same :meth:`_release_gate_when_idle`. Each ``begin_transmit`` thus
+        pairs with exactly one ``end_transmit``, even when a :meth:`send`
+        follows a finished write with no :meth:`poll` between.
 
     Error semantics:
       - An encode error raised while kicking off a write from :meth:`send`
@@ -196,7 +202,12 @@ class _InfraredTransmitter:
         self._encoder = encoder
 
     def send(self, data: bytes) -> None:
-        """Start transmitting *data* if idle, else append it to the FIFO queue."""
+        """Start transmitting *data* if idle, else append it to the FIFO queue.
+
+        While a write is outstanding, *data* is appended to an unbounded FIFO
+        queue of buffered payloads — nothing already queued is overwritten. No
+        encoding happens for a queued payload until it is started.
+        """
         if self._writer.is_busy():
             self._pending_queue.append(data)
             return
@@ -394,7 +405,9 @@ class _InfraredReceiver:
     def _drain_discard_all(self) -> None:
         """Drain every available pulse from every reader, discarding each.
 
-        Resets every decoder so no in-progress decode survives.
+        Increments ``pulses_dropped_transmitting`` per pulse (not
+        ``pulses_seen``) and resets every decoder so no in-progress decode
+        survives. Allocates nothing.
         """
         readers = self._readers
         decoders = self._decoders

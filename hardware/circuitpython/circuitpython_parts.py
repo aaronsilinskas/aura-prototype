@@ -1,6 +1,7 @@
 """CircuitPythonParts — the Device assembly's ``DeviceParts`` adapter on a CircuitPython board.
 
-Every per-part driver library is imported inside the part that builds it, so a
+Deploy-watch only: imports board, busio, digitalio and microcontroller. Every
+per-part driver library is imported inside the part that builds it, so a
 config that doesn't need a part never requires its library to be installed.
 """
 
@@ -311,6 +312,7 @@ class CircuitPythonParts(DeviceParts):
 
     def haptic_output(self, haptics: I2CDeviceConfig, i2c: busio.I2C) -> Drv2605EffectOutput:
         driver = _setup_drv2605(i2c, haptics.address)
+        # Imported after _setup_drv2605: this module imports adafruit_drv2605 at load time.
         from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
 
         return Drv2605EffectOutput(driver)

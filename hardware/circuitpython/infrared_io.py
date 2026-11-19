@@ -43,7 +43,12 @@ class PulseInReader(PulseReader):
         self.buffer_full_on_poll: int = 0
 
     def read_pulse(self) -> int | None:
-        """Return the oldest available pulse duration in µs, or ``None``."""
+        """Return the oldest available pulse duration in µs, or ``None``.
+
+        Removes the returned pulse from the ``PulseIn`` buffer.  Non-blocking —
+        returns ``None`` immediately when the buffer is empty.  Increments
+        ``buffer_full_on_poll`` when the buffer is found at ``maxlen``.
+        """
         pulsein = self._pulsein
         count = len(pulsein)
         if count == 0:

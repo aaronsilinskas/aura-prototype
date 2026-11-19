@@ -177,11 +177,15 @@ class SdSyncServer:
     def serve_push(self, transport: Transport) -> None:
         """Receive one ``push`` request on *transport* and serve it to completion.
 
-        Mirrors :meth:`serve_pull` in the opposite direction. The client's
-        closing ``done`` frame carries its whole-file CRC-32; this server
-        compares the two before the write finalizes, replying
-        ``"crc_mismatch"`` when they don't -- in which case :meth:`write`'s
-        underlying atomic replace never runs, so the previous content on SD is left untouched.
+        Mirrors :meth:`serve_pull` in the opposite direction. Replies
+        ``"no_storage"`` when this server was built with no storage,
+        otherwise replies ``"ok"`` and then receives the file as a sequence
+        of chunk frames. The client's closing ``done`` frame carries its
+        whole-file CRC-32; this server accumulates its own the same way and
+        compares the two before the write finalizes, replying ``"ok"`` when
+        they match (the new content is committed) or ``"crc_mismatch"`` when
+        they don't -- in which case :meth:`write`'s underlying atomic replace
+        never runs, so the previous content on SD is left untouched.
 
         Args:
             transport: The port to receive the request from and reply on.
@@ -226,6 +230,10 @@ class SdSyncServer:
 
     def serve_list(self, transport: Transport) -> None:
         """Receive one ``list`` request on *transport* and reply with its enumeration.
+
+        Replies ``"no_storage"`` when this server was built with no storage.
+        Otherwise replies ``"ok"`` with the enumeration from :meth:`list`
+        serialized into the response frame's payload.
 
         Args:
             transport: The port to receive the request from and reply on.

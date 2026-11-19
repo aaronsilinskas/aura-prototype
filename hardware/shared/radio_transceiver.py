@@ -36,8 +36,8 @@ class RadioTransceiver(PolledPart):
     def send(self, data: bytes) -> None:
         """Fire-and-forget *data* over the transport's single channel.
 
-        Silent no-op when no transport is wired: a device with no radio
-        peripheral drops game-triggered sends rather than raising.
+        Silent no-op when no transport is wired, the same way a device with no
+        radio peripheral simply drops game-triggered sends rather than raising.
         """
         if self._transport is not None:
             self._transport.send(data)

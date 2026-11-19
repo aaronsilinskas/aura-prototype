@@ -112,6 +112,8 @@ def make_state_machine(pin: microcontroller.Pin) -> rp2pio.StateMachine:
     import rp2pio
 
     program = adafruit_pioasm.Program(_PIO_SOURCE)
+    # rp2pio.StateMachine takes the assembled program and frequency as
+    # positional-only args (they precede the keyword-only `*`).
     return rp2pio.StateMachine(
         program.assembled,
         _SM_HZ,
