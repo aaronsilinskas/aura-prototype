@@ -136,7 +136,7 @@ class UnknownDeclaredPackError(SceneDeclarationError):
 class IncompatiblePackError(SceneDeclarationError):
     """A scene requires a pack version the installed one does not satisfy.
 
-    Compatible means an equal major and an installed minor at least the required one.
+    See ADR-0017.
     """
 
     def __init__(self, scene: str, pack: str, installed: Version, required: Version) -> None:

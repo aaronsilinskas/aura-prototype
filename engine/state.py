@@ -186,8 +186,7 @@ class SceneReboot:
 class NetworkControls:
     """Abstract interface for network transmit operations called from within game rules.
 
-    Transmits are always broadcast — no recipient parameter; player identity is
-    encoded in the payload if needed.
+    Transmits are always broadcast (ADR-0015).
     """
 
     __slots__ = ()
@@ -257,8 +256,7 @@ class EffectReceipt:
 class MergeStrategy:
     """Per-scope policy compositing a scope's layered effect buffers into one region buffer.
 
-    This project's ``Protocol`` substitute: a plain base class whose methods
-    only raise ``NotImplementedError``. Subclasses hold no per-instance state,
+    A port (ADR-0012). Subclasses hold no per-instance state,
     so each ships as a module-level singleton (``SPLIT``, ``ADDITIVE`` in
     ``engine.effects.merge``). Lives here rather than in ``engine.effects.merge``
     because that module imports ``EffectReceipt`` from this one; defining the

@@ -4,8 +4,7 @@ Provides the public ``PulseReader`` / ``PulseWriter`` ports the platform
 adapters implement, and the module-private transmitter, receiver and IR
 transmit gate that only ``InfraredTransceiver`` builds and drives.
 
-``PulseReader`` and ``PulseWriter`` are plain base classes (not
-``typing.Protocol``, which is unavailable on constrained runtimes).
+``PulseReader`` and ``PulseWriter`` are plain base classes (ADR-0012).
 """
 
 from array import array

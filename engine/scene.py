@@ -94,8 +94,7 @@ class SceneLocalRegistry:
 class PackReference:
     """One entry of a scene's ``effect_packs`` or ``rule_packs``.
 
-    *version* is the minimum compatible version: the installed pack must have
-    the same major and at least this minor. *settings* holds the scene's
+    *version* is the minimum compatible version (ADR-0017). *settings* holds the scene's
     Setting overrides for a Rule pack, exactly as written in ``scene.json``;
     the scan checks them when it resolves the scene's Settings. An effect
     pack's reference takes no overrides, so its *settings* is always empty.

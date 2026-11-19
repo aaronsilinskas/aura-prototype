@@ -2,8 +2,7 @@
 
 Mounts the SD card (via ``build_hardware``'s ``SdCardStorage``) and services
 the SD-sync protocol (:class:`~hardware.shared.sd_sync_server.SdSyncServer`)
-over the USB-CDC *data* channel ``boot.py`` opens, kept separate from the
-console/REPL channel so file traffic never collides with REPL I/O.
+over the USB-CDC *data* channel ``boot.py`` opens (ADR-0011).
 ``SdSyncServer.serve_one`` dispatches each request by its own verb, so one
 connection carries a mix of ``pull``/``push``/``list`` without reconnecting.
 
@@ -21,8 +20,7 @@ An ``aura-device.json`` with an ``sdcard`` section promises a card is present,
 so if it fails to mount ``build_hardware`` raises and this app reports it over
 the console and idles rather than crashing into the REPL. This differs from a
 device with *no* ``sdcard`` section, which boots normally and replies
-``"no_storage"`` to every request (handled by ``SdSyncServer`` itself) -- a
-card-less device is a routine configuration, not a fault.
+``"no_storage"`` to every request (handled by ``SdSyncServer`` itself).
 
 Installation
 ------------

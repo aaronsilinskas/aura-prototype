@@ -1,9 +1,7 @@
 """SdSyncServer, the device side of the SD-sync protocol.
 
 Card-less (``storage is None``, i.e. no ``sdcard`` section in ``aura-device.json``)
-makes every verb reply with a clear ``"no_storage"`` response instead of raising
--- a request for a file is a normal, expected event on a card-less device, not a
-programming error.
+makes every verb reply ``"no_storage"`` instead of raising (ADR-0011).
 """
 
 from __future__ import annotations
@@ -31,10 +29,9 @@ __all__ = ["SdSyncServer"]
 class _CrcMismatchError(Exception):
     """Internal signal: a push's declared whole-file CRC didn't match the received bytes.
 
-    Raised from inside :meth:`SdSyncServer._receive_pushed_chunks` while it is
-    still being iterated by :meth:`~hardware.shared.device_storage.DeviceStorage.write_chunks`
-    -- the exception aborts that write before it reaches its rename step, so a
-    corrupt transfer never replaces the file already on disk. Caught by
+    Raised inside the iteration that
+    :meth:`~hardware.shared.device_storage.DeviceStorage.write_chunks` drives,
+    aborting that write before its rename (ADR-0011). Caught by
     :meth:`SdSyncServer.serve_push`, never escapes this module.
     """
 
@@ -98,8 +95,7 @@ class SdSyncServer:
     def read(self, sd_path: str) -> Iterator[bytes] | None:
         """Stream *sd_path*'s contents in wire-sized chunks, or ``None`` if never written.
 
-        The file is read chunk-by-chunk off disk, never buffered whole, so
-        transfer memory is bounded by one chunk rather than by the file.
+        Read chunk by chunk off disk, never buffered whole (ADR-0011).
 
         Args:
             sd_path: The file's path, relative to the SD mount root.
@@ -136,13 +132,9 @@ class SdSyncServer:
         """Receive one ``pull`` request on *transport* and serve it to completion.
 
         Replies ``"no_storage"`` when this server was built with no storage,
-        or ``"not_found"`` when *sd_path* was never written -- in-band
-        responses rather than a raised exception, since either is a routine
-        outcome from the client's perspective. Otherwise replies ``"ok"``,
-        then streams the file as a sequence of chunks, waiting for the
-        client's ``ack`` of each chunk's sequence number before sending the
-        next (stop-and-wait), and finishes with a ``done`` frame carrying the
-        whole file's incremental CRC-32 for the client to verify.
+        or ``"not_found"`` when *sd_path* was never written. Otherwise replies
+        ``"ok"``, streams the file stop-and-wait, and ends with a ``done``
+        frame carrying the whole file's CRC-32 (ADR-0011).
 
         Args:
             transport: The port to receive the request from and reply on.
@@ -179,13 +171,10 @@ class SdSyncServer:
 
         Mirrors :meth:`serve_pull` in the opposite direction. Replies
         ``"no_storage"`` when this server was built with no storage,
-        otherwise replies ``"ok"`` and then receives the file as a sequence
-        of chunk frames. The client's closing ``done`` frame carries its
-        whole-file CRC-32; this server accumulates its own the same way and
-        compares the two before the write finalizes, replying ``"ok"`` when
-        they match (the new content is committed) or ``"crc_mismatch"`` when
-        they don't -- in which case :meth:`write`'s underlying atomic replace
-        never runs, so the previous content on SD is left untouched.
+        otherwise ``"ok"``, then receives the chunks. After the client's
+        ``done`` frame it replies ``"ok"`` when the CRC-32 matches (the write
+        commits) or ``"crc_mismatch"`` when it doesn't (the card's previous
+        content is untouched). See ADR-0011.
 
         Args:
             transport: The port to receive the request from and reply on.
@@ -210,12 +199,9 @@ class SdSyncServer:
     def _receive_pushed_chunks(self, transport: Transport) -> Iterator[bytes]:
         """Yield each pushed chunk, acking stop-and-wait, until the closing ``done`` frame.
 
-        Accumulates the same incremental CRC-32 :meth:`serve_pull` sends and
-        compares it against the client's declared CRC carried on the ``done``
-        frame: a match returns normally, letting :meth:`write`'s streaming
-        write finalize; a mismatch raises :class:`_CrcMismatchError` from *inside*
-        the iteration that :meth:`write` is driving, which aborts that write
-        before its rename step runs (see :meth:`serve_push`).
+        A CRC-32 that doesn't match the one on ``done`` raises
+        :class:`_CrcMismatchError` from *inside* the iteration :meth:`write`
+        drives, aborting that write before its rename.
         """
         crc = 0
         while True:
