@@ -62,11 +62,11 @@ class _CrcMismatchError(Exception):
 
 
 def _expect(transport: Transport, kind: str, text: str) -> None:
-    """Receive the next frame on *transport*, raising unless its kind and text match.
+    """Consume the reply a stop-and-wait step waits for, refusing to go past a wrong one.
 
     Raises:
-        ValueError: The frame is not ``kind`` with ``text`` -- the peer broke
-            the protocol, so the exchange cannot safely continue.
+        ValueError: The peer broke the protocol, so the exchange cannot
+            safely continue.
     """
     frame = decode_frame(transport.recv())
     if frame.kind != kind or frame.text != text:
