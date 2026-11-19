@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, call
 
+import pytest
+
 from effects.effect import PixelBuffer
 
 
@@ -38,6 +40,13 @@ def test_scopes_contains_the_configured_scope_key() -> None:
 def test_scope_is_a_leaf_with_one_routing_key() -> None:
     output, _ = _make_output()
     assert len(output.scopes[0].keys) == 1
+
+
+def test_an_empty_scope_pixels_mapping_is_rejected_by_name() -> None:
+    from hardware.circuitpython.neopixel_output import NeoPixelEffectOutput
+
+    with pytest.raises(ValueError, match="scope_pixels"):
+        NeoPixelEffectOutput(_make_strip(5), {})
 
 
 def test_min_resolution_equals_strip_count() -> None:

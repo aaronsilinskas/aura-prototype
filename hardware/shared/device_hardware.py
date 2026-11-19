@@ -11,6 +11,11 @@ from hardware.shared.polled_part import PolledPart
 from hardware.shared.polled_sensor import PolledSensor
 from hardware.shared.radio_transceiver import RadioTransceiver
 
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from engine.input import AccelerationData, MagneticData
+
 __all__ = ["DeviceHardware"]
 
 
@@ -63,8 +68,8 @@ class DeviceHardware:
         self,
         outputs: list[EffectOutput],
         buttons: DebouncedButtons,
-        accelerometer: PolledSensor | None,
-        magnetometer: PolledSensor | None,
+        accelerometer: PolledSensor[AccelerationData] | None,
+        magnetometer: PolledSensor[MagneticData] | None,
         network_controls: NetworkControls,
         ir: InfraredTransceiver | None,
         radio: RadioTransceiver | None,
@@ -74,8 +79,8 @@ class DeviceHardware:
     ) -> None:
         self.outputs: list[EffectOutput] = outputs
         self.buttons: DebouncedButtons = buttons
-        self.accelerometer: PolledSensor | None = accelerometer
-        self.magnetometer: PolledSensor | None = magnetometer
+        self.accelerometer: PolledSensor[AccelerationData] | None = accelerometer
+        self.magnetometer: PolledSensor[MagneticData] | None = magnetometer
         self.network_controls: NetworkControls = network_controls
         self.ir: InfraredTransceiver | None = ir
         self.radio: RadioTransceiver | None = radio

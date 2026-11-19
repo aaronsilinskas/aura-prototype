@@ -58,6 +58,7 @@ if TYPE_CHECKING:
 
     GatedSection = TypeVar("GatedSection", bound="_Gated")
     T = TypeVar("T")
+    Reading = TypeVar("Reading", AccelerationData, MagneticData)
 
 
 __all__ = ["assemble_device", "button_label", "open_i2c"]
@@ -177,8 +178,8 @@ def _polled_sensor(
     section: I2CDeviceConfig | None,
     describe: Callable[[I2CDeviceConfig], str],
     read_part: Callable[[I2CDeviceConfig, Bus], Callable[[], tuple[float, float, float]]],
-    reading: AccelerationData | MagneticData,
-) -> PolledSensor | None:
+    reading: Reading,
+) -> PolledSensor[Reading] | None:
     """Build the I2C sensor ``name`` as a **PolledSensor** over ``reading``, gated like any section.
 
     ``read_part`` is the ``DeviceParts`` method building its raw read; the
@@ -202,8 +203,8 @@ def _append_built(polled: list[PolledPart], part: PolledPart | None) -> None:
 
 def _capabilities(
     buttons: DebouncedButtons,
-    accelerometer: PolledSensor | None,
-    magnetometer: PolledSensor | None,
+    accelerometer: PolledSensor[AccelerationData] | None,
+    magnetometer: PolledSensor[MagneticData] | None,
     radio: RadioTransceiver | None,
     storage: DeviceStorage | None,
     ir: InfraredTransceiver | None,

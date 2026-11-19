@@ -6,7 +6,7 @@ from engine.phase import InPhaseRule
 from engine.state import GameState, Scope
 from packs.scenes.tag.rules.helpers.phases import PHASE_PLAYING, tag_phase
 from packs.scenes.tag.rules.helpers.tag_config import TagConfig, tag_config
-from packs.scenes.tag.rules.helpers.tag_state import TagState, tag_state
+from packs.scenes.tag.rules.helpers.tag_state import Reload, TagState, tag_state
 from packs.scenes.tag.rules.playing_rule import AMMO_COLOR
 from packs.scenes.tag.tag_data import TagData, encode_tag_data
 
@@ -27,17 +27,19 @@ class TagShootingRule(InPhaseRule):
         tag = tag_state(state)
         config = tag_config(state)
 
-        reload_started_at = tag.shot.reload_started_at
-        if reload_started_at is not None:
-            self._handle_reload(event, state, tag, config, reload_started_at)
+        reload = tag.shot.reload
+        if reload is not None:
+            self._handle_reload(event, state, tag, config, reload)
             return
 
         if event.buttons.is_pressed("A"):
             if tag.shot.ammo == 0:
                 state.effect_controls.add_effect(Scope.DIRECTIONAL, "scene.dry_fire", {})
-                tag.shot.reload_started_at = state.total
-                tag.shot.reload_receipt = state.effect_controls.set_effect(
-                    Scope.Global.BUFF, "scene.reload", {"duration": config.reload_duration}
+                tag.shot.reload = Reload(
+                    state.total,
+                    state.effect_controls.set_effect(
+                        Scope.Global.BUFF, "scene.reload", {"duration": config.reload_duration}
+                    ),
                 )
             elif self._can_fire(state, tag, config):
                 self._fire_shot(state, tag, config)
@@ -48,34 +50,33 @@ class TagShootingRule(InPhaseRule):
         state: GameState,
         tag: TagState,
         config: TagConfig,
-        reload_started_at: float,
+        reload: Reload,
     ) -> None:
-        reload_complete = state.total - reload_started_at >= config.reload_duration
+        reload_complete = state.total - reload.started_at >= config.reload_duration
         if reload_complete:
-            self._complete_reload(state, tag, config)
+            self._complete_reload(state, tag, config, reload)
         elif event.buttons.is_down("A"):
             return
         else:
-            self._cancel_reload(state, tag)
+            self._cancel_reload(state, tag, reload)
 
-    def _complete_reload(self, state: GameState, tag: TagState, config: TagConfig) -> None:
+    def _complete_reload(
+        self, state: GameState, tag: TagState, config: TagConfig, reload: Reload
+    ) -> None:
         tag.shot.ammo = config.max_ammo
         state.effect_controls.set_effect(
             Scope.Global.BUFF, "basic.progress", {"progress": 1.0, "color": AMMO_COLOR}
         )
         state.effect_controls.add_effect(Scope.Global.BUFF, "scene.reload_complete", {})
-        self._end_reload(tag)
+        self._end_reload(tag, reload)
 
-    def _cancel_reload(self, state: GameState, tag: TagState) -> None:
+    def _cancel_reload(self, state: GameState, tag: TagState, reload: Reload) -> None:
         state.effect_controls.set_effect(Scope.Global.BUFF, "scene.ammo_empty", {})
-        self._end_reload(tag)
+        self._end_reload(tag, reload)
 
-    def _end_reload(self, tag: TagState) -> None:
-        tag.shot.reload_started_at = None
-        reload_receipt = tag.shot.reload_receipt
-        assert reload_receipt is not None  # set together with reload_started_at
-        reload_receipt.stop()
-        tag.shot.reload_receipt = None
+    def _end_reload(self, tag: TagState, reload: Reload) -> None:
+        reload.receipt.stop()
+        tag.shot.reload = None
 
     def _can_fire(self, state: GameState, tag: TagState, config: TagConfig) -> bool:
         if tag.shot.ammo <= 0:

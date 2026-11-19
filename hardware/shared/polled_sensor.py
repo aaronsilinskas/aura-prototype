@@ -10,7 +10,9 @@ TYPE_CHECKING = False
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-    from typing import Final
+    from typing import Final, TypeVar
+
+    Reading = TypeVar("Reading", AccelerationData, MagneticData)
 
 __all__ = ["RECOVERY_READS", "PolledSensor"]
 
@@ -18,7 +20,7 @@ __all__ = ["RECOVERY_READS", "PolledSensor"]
 RECOVERY_READS: Final = 50
 
 
-class PolledSensor(PolledPart):
+class _PolledSensorBase(PolledPart):
     """Refreshes one sensor's reading from its raw read source, once per ``update(elapsed)``.
 
     *read* is a :class:`~hardware.shared.device_parts.DeviceParts` raw read
@@ -30,10 +32,8 @@ class PolledSensor(PolledPart):
     ``reading`` is the *reading* buffer passed in, the same object for the
     sensor's whole life, so a sensor event can hold it once and see every
     update. It keeps whatever values it was given until the first successful
-    read. It is typed as either buffer because ``PolledSensor`` is not
-    generic over its reading (ADR-0007 gives the checker-only idiom that
-    would make it so); a caller needing one narrows it once, where it builds
-    the sensor event.
+    read. Use it as ``PolledSensor``; the checker sees a generic subclass that
+    types ``reading`` as the buffer passed in.
 
     Failures are logged to *logger* on transitions only, labelled with
     *label*: one line carrying the error when a healthy sensor's read fails,
@@ -88,3 +88,21 @@ class PolledSensor(PolledPart):
                 self.failed_reads = 0
                 self._reads_since_failing = 0
                 self._good_run = 0
+
+
+if TYPE_CHECKING:
+    from typing import Generic
+
+    class PolledSensor(_PolledSensorBase, Generic[Reading]):
+        reading: Reading
+
+        def __init__(
+            self,
+            read: Callable[[], tuple[float, float, float]],
+            reading: Reading,
+            label: str,
+            logger: Logger,
+        ) -> None: ...
+
+else:
+    PolledSensor = _PolledSensorBase

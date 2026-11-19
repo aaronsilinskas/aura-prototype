@@ -28,7 +28,10 @@ class NeoPixelEffectOutput(EffectOutput):
         strip: Strip object supporting ``strip[i] = color`` (packed RGB int)
             and ``strip.show()``.
         scope_pixels: Mapping of scope key to a ``range`` of pixel indices
-            within the strip.  Must be non-empty.
+            within the strip.
+
+    Raises:
+        ValueError: *scope_pixels* is empty.
     """
 
     __slots__ = ("_scope_pixels", "_strip")
@@ -38,6 +41,8 @@ class NeoPixelEffectOutput(EffectOutput):
         strip: neopixel.NeoPixel,
         scope_pixels: dict[str, range],
     ) -> None:
+        if not scope_pixels:
+            raise ValueError("NeoPixelEffectOutput needs at least one scope in scope_pixels")
         super().__init__()
         self._strip = strip
         self._scope_pixels: dict[str, range] = scope_pixels
