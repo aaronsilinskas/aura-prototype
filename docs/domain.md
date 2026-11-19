@@ -227,7 +227,7 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `DeviceSceneReboot` | `hardware/shared/device_reboot.py` | Live `SceneReboot` adapter; records the switch through `PersistedScene`, then calls its injected `reset`, and does neither on a card-less device (`build_scene_boot` wires it; `run_scene` passes `microcontroller.reset`) |
 | `PersistedScene` | `hardware/shared/persisted_scene.py` | Board-free owner of the **Persisted scene** record on the card, the only code naming its `persisted_scene.` keys; a client of the boot's one `DeviceStateStore` (ADR-0009). Applies a Scene deploy token, reports the boot candidates and the previous scene, records a Reboot or a return, each in one write |
 | `DeviceStateStore` | `hardware/shared/device_state.py` | Board-free, general key/value store over the card's `aura-state.json`; one per boot, built by `build_scene_boot` |
-| `SdSyncServer` | `hardware/shared/sd_sync_server.py` | Board-free device side of the SD-sync protocol |
+| `SdSyncServer` | `hardware/shared/sd_sync_server.py` | Board-free device side of the SD-sync protocol (ADR-0011) |
 | `SdSyncClient` | `scripts/sd_sync_client.py` | Board-free (CPython-only) host side of the SD-sync protocol |
 | `Transport` (SD sync) | `hardware/shared/sd_sync_protocol.py` | Board-free port `SdSyncClient`/`SdSyncServer` exchange base64-framed lines through; live adapters `UsbCdcTransport` (device) / `SerialTransport` (host) |
 | `UsbCdcTransport` | `hardware/circuitpython/usb_cdc_transport.py` | Live `Transport` framing SD-sync lines with a newline delimiter over any `read`/`write` stream (on-device, `usb_cdc.data`); needs no `usb_cdc` import itself, so it is CPython-testable against a fake stream |
@@ -248,7 +248,7 @@ Code-facing terms are defined in [`GLOSSARY.md`](../GLOSSARY.md) — the single 
 
 All code that ships to a device (`effects/`, `engine/`, `magic/`, `packs/`, `hardware/shared/`, `app/`; see the **Ship list**) must run on CPython, CircuitPython 10.x, and MicroPython; only `hardware/circuitpython/` and `app/run_scene.py` may import CircuitPython-only modules. The general CircuitPython/MicroPython rules (no `dataclasses`, `typing.Protocol` unavailable, guarded `typing` imports, no per-frame hot-path allocation) live in the **code-quality skill's embedded-python guidance** (the `embedded-python.md` reference file) — follow it. If that skill isn't installed locally, look it up and copy that file's rules before working on device code. Project-specific deltas on top:
 
-- **`typing.Protocol` substitute** — use plain base classes with `raise NotImplementedError`; subclass explicitly for type-checker compatibility
+- **`typing.Protocol` substitute** — use plain base classes with `raise NotImplementedError`; subclass explicitly for type-checker compatibility (ADR-0012)
 - **`PaletteLUT256` is pre-computed** — never construct inside a render loop
 - **Line limit: 100 characters** — enforced by `ruff` pre-commit hook (also `ruff format`)
 
