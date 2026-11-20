@@ -37,9 +37,7 @@ class GameRule:
         if not hasattr(self, "_event_handlers"):
             self._event_handlers: dict[type, Callable[..., None]] = {}
         if event_type in self._event_handlers:
-            raise ValueError(
-                f"{type(self).__name__} already has a handler for {event_type.__name__}"
-            )
+            raise self._duplicate_handler(event_type)
         self._event_handlers[event_type] = handler
 
     def handle_event(self, event: Event, state: GameState) -> None:
@@ -48,3 +46,12 @@ class GameRule:
             handler = handlers.get(type(event))
             if handler is not None:
                 handler(event, state)
+
+    def _handles(self, event_type: type) -> bool:
+        """Return whether this rule has a handler registered for *event_type*."""
+        handlers = getattr(self, "_event_handlers", None)
+        return handlers is not None and event_type in handlers
+
+    def _duplicate_handler(self, event_type: type) -> ValueError:
+        """Return the error for a second handler registered for *event_type*."""
+        return ValueError(f"{type(self).__name__} already has a handler for {event_type.__name__}")

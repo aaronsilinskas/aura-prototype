@@ -470,10 +470,14 @@ def test_constructing_a_second_owner_for_a_phase_raises_naming_the_phase() -> No
         _LifecycleRule(_PHASE_A, "two", phase_slot=slot)
 
 
-def test_registering_a_second_handler_for_an_event_type_on_a_phase_rule_raises() -> None:
-    rule = _LifecycleRule(_PHASE_A, "a", phase_slot=PhaseSlot(_MACHINE_KEY, _PHASE_A))
+def test_registering_a_second_handler_on_a_phase_rule_raises_naming_rule_and_type() -> None:
+    class _TwicePhaseRule(PhaseRule):
+        pass
 
-    with pytest.raises(ValueError, match=r"_LifecycleRule.*_TickEvent"):
+    rule = _TwicePhaseRule(_PHASE_A, PhaseSlot(_MACHINE_KEY, _PHASE_A))
+    rule.on(_TickEvent, lambda e, s: None)
+
+    with pytest.raises(ValueError, match=r"_TwicePhaseRule.*_TickEvent"):
         rule.on(_TickEvent, lambda e, s: None)
 
 
@@ -670,6 +674,25 @@ def _run_sensors(
         run.tick(0.5)
         phases.append(slot(state).phase)
     return phases
+
+
+def test_a_phase_rule_may_register_its_own_sensors_handler() -> None:
+    slot = PhaseSlot(_MACHINE_KEY, _PHASE_A)
+    rule = _EndsBy(_PHASE_A, slot, _declare_nothing, handles_sensors=True, label="a")
+    spy = SpyEffectControls()
+
+    _run_sensors([rule], slot, ticks=2, spy=spy)
+
+    assert [name for _, name, _ in spy.add_effect_calls] == ["sensors:a", "sensors:a"]
+
+
+def test_a_phase_rule_registering_a_second_sensors_handler_raises() -> None:
+    rule = _EndsBy(
+        _PHASE_A, PhaseSlot(_MACHINE_KEY, _PHASE_A), _declare_nothing, handles_sensors=True
+    )
+
+    with pytest.raises(ValueError, match="Sensors"):
+        rule.on(InputEvents.Sensors, lambda e, s: None)
 
 
 @pytest.mark.parametrize("ending_at_one_second", _EVERY_KIND_OF_END)
