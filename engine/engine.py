@@ -28,11 +28,18 @@ class GameRule:
         """Register a handler for a specific event type.
 
         The handler is called as ``handler(event, state)`` when an event of
-        exactly ``event_type`` is dispatched to this rule.  Registering a
-        second handler for the same type replaces the first.
+        exactly ``event_type`` is dispatched to this rule.  A rule has at
+        most one handler per event type.
+
+        Raises:
+            ValueError: This rule already has a handler for ``event_type``.
         """
         if not hasattr(self, "_event_handlers"):
             self._event_handlers: dict[type, Callable[..., None]] = {}
+        if event_type in self._event_handlers:
+            raise ValueError(
+                f"{type(self).__name__} already has a handler for {event_type.__name__}"
+            )
         self._event_handlers[event_type] = handler
 
     def handle_event(self, event: Event, state: GameState) -> None:

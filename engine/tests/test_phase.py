@@ -470,6 +470,13 @@ def test_constructing_a_second_owner_for_a_phase_raises_naming_the_phase() -> No
         _LifecycleRule(_PHASE_A, "two", phase_slot=slot)
 
 
+def test_registering_a_second_handler_for_an_event_type_on_a_phase_rule_raises() -> None:
+    rule = _LifecycleRule(_PHASE_A, "a", phase_slot=PhaseSlot(_MACHINE_KEY, _PHASE_A))
+
+    with pytest.raises(ValueError, match=r"_LifecycleRule.*_TickEvent"):
+        rule.on(_TickEvent, lambda e, s: None)
+
+
 def test_the_same_phase_may_have_an_owner_under_each_of_two_slots() -> None:
     one_slot = PhaseSlot("machine_one", _PHASE_A)
     other_slot = PhaseSlot("machine_two", _PHASE_A)
