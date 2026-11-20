@@ -13,3 +13,4 @@ ruff, ruff format, import-linter, mypy, the section-banner comment check, the wo
 ## Judgement calls
 
 - **Docs agree with the change.** When a diff changes behaviour, every prose description of that behaviour must still be true: `README.md`, docstrings, `docs/domain.md` and `GLOSSARY.md`. Search the repo for the changed names and the behaviour's key words, and flag any sentence the diff makes false, including lines the diff never touched.
+- **Engine gaps get an engine issue.** Pack docstrings and comments describe what the pack does. When one under `packs/` explains how the pack works around an engine mechanic ("because the engine ...", "silently ignored", "nothing of its own to terminate it"), flag it: the fix is an engine issue that removes the need, and the pack's docs drop the workaround.
