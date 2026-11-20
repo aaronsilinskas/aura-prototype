@@ -539,6 +539,10 @@ _Avoid_: trying to "re-arm" or salvage a pulse from an overlapping frame (recogn
 The one answer to which repo files go on a device and where each lands: the device modules (compiled to `.mpy`, or as source), their data files, each nested package's parent `__init__`, and the board's `boot.py` on the mount root. It never includes tests, `conftest.py`, the **Simulation test harness** or the **Simulated device**. Building and deploying both follow it.
 _Avoid_: excluding or placing files separately in the build or deploy step; "manifest" for it (a **Pack manifest** is `effects.json`/`rules.json`)
 
+### Deploy plan
+One deploy, validated and resolved before anything is written: where it goes, whether modules ship compiled or as source, whether an example (with the **Ship list**'s `boot.py`) goes too, which scene to record, and whether it is a dry run. Carrying it out never re-decides any of these.
+_Avoid_: "deploy mode", "deploy config" for it; re-checking flags while carrying it out; building it long before it runs (it is validated against the mount as it was when planned)
+
 ### Deploy-watch
 The host tool that deploys an example and captures the resulting serial run; unlike `deploy.py` it flashes *and* captures.
 _Avoid_: treating it as a read-only serial monitor (it overwrites `code.py` and reboots); a no-deploy "just watch" mode
