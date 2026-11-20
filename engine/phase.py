@@ -237,9 +237,22 @@ class _PhaseGuardedRule(GameRule):
         self._phase_handlers: dict[type, Callable[..., None]] = {}
 
     def on(self, event_type: type[T], handler: Callable[[T, GameState], None]) -> None:
-        """Register a phase-gated *handler* for *event_type*."""
+        """Register a phase-gated *handler* for *event_type*.
+
+        A rule has at most one handler per event type.
+
+        Raises:
+            ValueError: This rule already has a handler for ``event_type``.
+        """
+        if event_type in self._phase_handlers:
+            raise self._duplicate_handler(event_type)
+        self._guard(event_type)
         self._phase_handlers[event_type] = handler
-        super().on(event_type, self._phase_dispatch)
+
+    def _guard(self, event_type: type) -> None:
+        """Route *event_type* through the phase guard, once per type."""
+        if not self._handles(event_type):
+            super().on(event_type, self._phase_dispatch)
 
     def phase_elapsed(self, state: GameState) -> float:
         """Return how long this rule's phase has run, in game time.
@@ -290,7 +303,7 @@ class PhaseRule(_PhaseGuardedRule):
         super().__init__(phase, phase_slot)
         phase_slot._register_owner(self)
         # A declared end is checked on Sensors whether or not a handler is registered for it.
-        GameRule.on(self, InputEvents.Sensors, self._phase_dispatch)
+        self._guard(InputEvents.Sensors)
 
     def transition_to(self, state: GameState, next_phase: PhaseKey) -> None:
         """Run ``on_exit``, move the machine to *next_phase*, then run its ``on_enter``.

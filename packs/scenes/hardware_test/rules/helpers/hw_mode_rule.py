@@ -1,8 +1,9 @@
 """Scene-local ``PhaseRule`` base shared by the hardware_test mode rules.
 
-Because the override-``on()`` model in :mod:`engine.phase` dispatches one
-handler per event type, this base registers the single ``Sensors`` handler
-for every mode and calls each mode's :meth:`HwModeRule.on_input_event` from it.
+This base registers the ``Sensors`` handler shared by every mode and calls
+each mode's :meth:`HwModeRule.on_input_event` from it, so a mode adds its own
+input behaviour without registering a second ``Sensors`` handler, which
+``on()`` rejects.
 
 ``on_input_event`` is scene-local: it is not a general ``on_event`` and is
 only ever called for ``Sensors`` events.

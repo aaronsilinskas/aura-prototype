@@ -1,3 +1,5 @@
+import pytest
+
 from engine.engine import GameRule
 from engine.events import Event, EventGroup
 from engine.state import EffectControls, GameState, SceneControls
@@ -60,15 +62,12 @@ def test_each_event_type_routes_to_its_own_registered_handler() -> None:
     assert b_captured == [b_event]
 
 
-def test_registering_a_second_handler_for_an_event_type_replaces_the_first() -> None:
-    first_captured = []
-    second_captured = []
-    rule = GameRule()
-    rule.on(_AEvent, lambda e, s: first_captured.append(e))
-    rule.on(_AEvent, lambda e, s: second_captured.append(e))
+def test_registering_a_second_handler_for_an_event_type_raises_naming_rule_and_type() -> None:
+    class _TwiceRule(GameRule):
+        pass
 
-    event = _AEvent()
-    rule.handle_event(event, _make_state())
+    rule = _TwiceRule()
+    rule.on(_AEvent, lambda e, s: None)
 
-    assert first_captured == []
-    assert second_captured == [event]
+    with pytest.raises(ValueError, match=r"_TwiceRule.*_AEvent"):
+        rule.on(_AEvent, lambda e, s: None)

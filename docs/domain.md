@@ -192,7 +192,7 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `SceneRun` | `engine/state.py` | A scene's `GameState` plus its rules in dispatch order; the only dispatcher of the scene's queued events, via `tick(elapsed)` |
 | `Capabilities` | `engine/capabilities.py` | Read-only view of the device's Capabilities that rules ask with `has(name)` |
 | `Settings` | `engine/settings.py` | One scene's resolved Settings, read by namespace (`scene` or a Rule pack name) and name; built by the catalog scan |
-| `GameRule` | `engine/engine.py` | Base rule: registers per-event-type handlers with `on`; `handle_event` routes by exact event class |
+| `GameRule` | `engine/engine.py` | Base rule: registers per-event-type handlers with `on`, at most one per event type (a second raises `ValueError`); `handle_event` routes by exact event class |
 | `Scene` | `engine/scene.py` | One scene's read-only record, built once by the scan: pack references, version, `ir_codec`, resolved Settings, Required capabilities, scene-local registries and sounds |
 | `SceneControls` | `engine/state.py` | Rule-facing transition seam (`overlay`, `pop`, `reboot_into`, `reboot_to_previous`; no in-process scene switch, see ADR-0005) plus `can_run(name)`, which the `lobby` pack asks to leave out entries the device can't play |
 | `SceneManager` | `engine/scene.py` | The live `SceneControls`: keeps the scene stack of `SceneRun`s, ticks the top one, and drives each transition through one `EffectAdmin` call; reboots go through the injected `SceneReboot`. Transitions raise `MissingCapabilityError` before changing anything; `pop` does not check |
