@@ -2,7 +2,6 @@
 
 No pixel output — issued with ``add_effect`` so it
 layers over the existing ``scene.ready`` laser sweep without a pixel conflict.
-One-shot with ``stops_effect=True`` so the effect ends when the clip finishes.
 The three shots are a single pre-baked clip, keeping the declarative
 one-clip-per-verb audio model intact rather than introducing a rule-driven
 sequencer.
@@ -14,9 +13,7 @@ from engine.effects.builder import ComposedEffectBuilder
 BUILD = ComposedEffectBuilder(
     audio=EffectAudio(
         clips={
-            EffectVerb.START: AudioPlaybackConfig(
-                name="scene.ready_shots_start", loop=False, stops_effect=True
-            ),
+            EffectVerb.START: AudioPlaybackConfig(name="scene.ready_shots_start", loop=False),
         }
     ),
 )

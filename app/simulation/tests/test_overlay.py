@@ -501,7 +501,7 @@ def test_after_an_overlay_is_popped_tag_still_decodes_shots(simulation, card):
 
 
 _STING = "basic.game_over_sting_start"
-"""Tag's game-over sting: a ``stops_effect`` one-shot whose end returns Tag to Ready."""
+"""Tag's game-over sting: a pixel-less one-shot whose end returns Tag to Ready."""
 
 _SHOOTER_SHOT = bytes(encode_tag_data(TagData(2, 3, 1)))
 """A one-damage tag shot from ``_SHOOTER``."""

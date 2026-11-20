@@ -145,8 +145,8 @@ class SimulatedAudio(EffectOutput, VoiceSink):
     """Plays clips on a real ``VoicePool``; a clip "plays" for its WAV's length.
 
     Claims through the same ``clip_stops_receipt`` rule as ``AudioEffectOutput``,
-    so a ``stops_effect`` clip ends its effect when the clip runs out, exactly as
-    on a board.
+    so a clip ends a pixel-less effect, or any effect when it sets ``stops_effect``,
+    when the clip runs out, exactly as on a board.
     """
 
     def __init__(self, device: SimulatedHardware, voices: int) -> None:

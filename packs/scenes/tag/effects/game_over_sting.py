@@ -10,9 +10,7 @@ from engine.effects.builder import ComposedEffectBuilder
 BUILD = ComposedEffectBuilder(
     audio=EffectAudio(
         clips={
-            EffectVerb.START: AudioPlaybackConfig(
-                name="basic.game_over_sting_start", loop=False, stops_effect=True
-            )
+            EffectVerb.START: AudioPlaybackConfig(name="basic.game_over_sting_start", loop=False)
         }
     ),
     haptic=EffectHaptic(
