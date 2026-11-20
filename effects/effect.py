@@ -83,8 +83,9 @@ class AudioPlaybackConfig:
         or eviction) the owning ``EffectReceipt`` is stopped, ending the whole effect
         (pixels and haptic included).  ``False`` (default) → the receipt lifecycle
         stays with rules if the effect has pixels; an effect without pixels stops
-        on the clip's release either way.  Combining ``stops_effect=True`` with ``loop=True`` is
-        a contradiction (a loop never finishes) and raises ``ValueError``.
+        on the clip's release either way.  Combining ``stops_effect=True`` with
+        ``loop=True`` is a contradiction (a loop never finishes) and raises
+        ``ValueError``.
     """
 
     __slots__ = ["loop", "name", "stops_effect"]

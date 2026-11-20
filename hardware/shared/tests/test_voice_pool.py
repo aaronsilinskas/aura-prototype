@@ -383,7 +383,7 @@ def test_holding_a_plain_one_shot_leaves_its_receipt_running(
 
 
 def test_holding_a_loop_leaves_its_receipt_running(pool: VoicePool, sink: RecordingSink) -> None:
-    # An audio-only effect's loop claims with stops_receipt set, but a held
+    # A pixel-less effect's loop claims with stops_receipt set, but a held
     # loop has not finished: it plays again on restore.
     held = make_receipt()
     pool.claim(sink, "loop.wav", loop=True, stops_receipt=True, receipt=held)

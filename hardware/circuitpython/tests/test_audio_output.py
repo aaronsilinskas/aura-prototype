@@ -82,7 +82,7 @@ def _with_pixels() -> Effect:
 
 
 def _audio_only() -> Effect:
-    """An effect with no pixels or haptic: audio is the whole effect."""
+    """An effect with no pixels, so a clip's release stops its receipt."""
     return Effect(name="audio_only")
 
 
