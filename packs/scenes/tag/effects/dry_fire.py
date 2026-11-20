@@ -2,8 +2,7 @@
 
 No pixel output — issued with ``add_effect`` on ``Scope.DIRECTIONAL`` so it
 layers alongside the ``Global.BUFF`` reload it accompanies without a pixel
-conflict. One-shot with ``stops_effect=True`` so the effect (and its haptic)
-ends when the clip finishes. Deliberately lighter than ``scene.fire_shot`` — a
+conflict. Deliberately lighter than ``scene.fire_shot`` — a
 soft bump rather than a strong click — since no shot was actually fired.
 """
 
@@ -19,9 +18,7 @@ from engine.effects.builder import ComposedEffectBuilder
 BUILD = ComposedEffectBuilder(
     audio=EffectAudio(
         clips={
-            EffectVerb.START: AudioPlaybackConfig(
-                name="scene.dry_fire_start", loop=False, stops_effect=True
-            ),
+            EffectVerb.START: AudioPlaybackConfig(name="scene.dry_fire_start", loop=False),
         }
     ),
     haptic=EffectHaptic(patterns={EffectVerb.START: HapticPattern([HapticPattern.SOFT_BUMP])}),

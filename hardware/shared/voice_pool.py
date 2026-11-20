@@ -25,10 +25,12 @@ if TYPE_CHECKING:
 def clip_stops_receipt(effect: Effect, clip: AudioPlaybackConfig) -> bool:
     """Whether ``clip``'s release (finish or eviction) should stop ``effect``'s receipt.
 
+    Only pixels keep an effect alive past its clip: haptic never ends a receipt on
+    its own, so a pattern longer than the clip is cut off when the receipt stops.
     The one copy of the claim rule, shared so the board and the Simulated device
     cannot drift apart.
     """
-    return (effect.pixels is None and effect.haptic is None) or clip.stops_effect
+    return effect.pixels is None or clip.stops_effect
 
 
 class VoiceSink:

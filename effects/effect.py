@@ -79,10 +79,11 @@ class AudioPlaybackConfig:
     Fields:
       - ``name``: the qualified clip name, resolved when the effect is built.
       - ``loop``: ``True`` → looping background; ``False`` → one-shot.
-      - ``stops_effect``: ``False`` (default) → receipt lifecycle stays with rules;
-        ``True`` → when this one-shot is released (natural finish or eviction) the
-        owning ``EffectReceipt`` is stopped, ending the whole effect (pixels and
-        haptic included).  Combining ``stops_effect=True`` with ``loop=True`` is
+      - ``stops_effect``: ``True`` → when this one-shot is released (natural finish
+        or eviction) the owning ``EffectReceipt`` is stopped, ending the whole effect
+        (pixels and haptic included).  ``False`` (default) → the receipt lifecycle
+        stays with rules if the effect has pixels; an effect without pixels stops
+        on the clip's release either way.  Combining ``stops_effect=True`` with ``loop=True`` is
         a contradiction (a loop never finishes) and raises ``ValueError``.
     """
 

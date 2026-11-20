@@ -21,8 +21,8 @@ The **Modality** (sound) declaring an effect's audio behaviour, mapping **Effect
 _Avoid_: an `EffectVerb.STOP` clips key (teardown is `flush()`, not `handle_event`; rejected at build with a **VerbKeyError**); string keys (rejected)
 
 ### AudioPlaybackConfig
-A value object for how one clip plays: which clip (a qualified clip name, resolved by the **Active scene namespace** when the effect is built), whether it loops, and whether finishing it stops the whole owning effect (`stops_effect`). Being cut off counts as finishing: a clip whose voice is taken by another sound, or that an **Overlay** covers mid-play, stops its effect just as if it had played out. Declared once at module level and shared by every effect built from it.
-_Avoid_: `stop_on_finish`, `end_effect`; reading `stops_effect` as "the sound stops" (it names the effect's end); combining it with `loop=True` (rejected); writing a resolved path onto it (that is a **Resolved clip**)
+A value object for how one clip plays: which clip (a qualified clip name, resolved by the **Active scene namespace** when the effect is built), whether it loops, and whether finishing it stops the whole owning effect (`stops_effect`). Only pixels keep an effect alive past its clip, so an effect without pixels stops when its clip finishes whether or not the flag is set; the flag matters only for an effect with pixels. Being cut off counts as finishing: a clip whose voice is taken by another sound, or that an **Overlay** covers mid-play, stops its effect just as if it had played out. Declared once at module level and shared by every effect built from it.
+_Avoid_: `stop_on_finish`, `end_effect`; setting it on an effect without pixels (redundant); reading `stops_effect` as "the sound stops" (it names the effect's end); combining it with `loop=True` (rejected); writing a resolved path onto it (that is a **Resolved clip**)
 
 ### Resolved clip
 A declared `AudioPlaybackConfig` paired with the WAV path its name resolved to, made when an effect is built and carried on that verb's `EffectEvent`. Owned by the running effect, never shared.
@@ -290,7 +290,7 @@ A CircuitPython `EffectOutput` driving audio via I2S and the live `VoiceSink` ad
 _Avoid_: stopping playback in `handle_event` on `EffectVerb.STOP`; assuming a fixed voice count or role-assigned slots; putting slot bookkeeping back in the output; resolving clip names (the event already carries the path)
 
 ### VoicePool
-A hardware-agnostic owner of audio voice-slot bookkeeping (imports no CircuitPython), driving hardware through a `VoiceSink` port and evicting oldest-first when full. `hold` frees a held effect's voices (a cut-off `stops_effect` one-shot stops its receipt, as on eviction) and `restore` plays its held loops again from the top.
+A hardware-agnostic owner of audio voice-slot bookkeeping (imports no CircuitPython), driving hardware through a `VoiceSink` port and evicting oldest-first when full. `hold` frees a held effect's voices (a cut-off one-shot that stops its effect, by `stops_effect` or because the effect has no pixels, stops its receipt, as on eviction) and `restore` plays its held loops again from the top.
 _Avoid_: importing CircuitPython audio libs here (hardware lives behind `VoiceSink`); parallel per-slot lists (use the `_Slot` record)
 
 ### VoiceSink

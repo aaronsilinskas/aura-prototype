@@ -465,13 +465,13 @@ _HAPTIC = EffectHaptic(patterns={})
     [
         pytest.param(None, None, False, True, id="audio-only effect"),
         pytest.param(_PIXELS, None, False, False, id="pixels, no flag"),
-        pytest.param(None, _HAPTIC, False, False, id="haptic, no flag"),
+        pytest.param(None, _HAPTIC, False, True, id="haptic, no pixels, no flag"),
         pytest.param(_PIXELS, _HAPTIC, False, False, id="pixels and haptic, no flag"),
         pytest.param(_PIXELS, None, True, True, id="pixels, stops_effect"),
         pytest.param(_PIXELS, _HAPTIC, True, True, id="pixels and haptic, stops_effect"),
     ],
 )
-def test_clip_stops_receipt_when_audio_is_the_whole_effect_or_clip_says_so(
+def test_clip_stops_receipt_when_the_effect_has_no_pixels_or_the_clip_says_so(
     pixels: EffectPixels | None, haptic: EffectHaptic | None, stops_effect: bool, expected: bool
 ) -> None:
     clip = AudioPlaybackConfig(name="pack.clip", loop=False, stops_effect=stops_effect)
