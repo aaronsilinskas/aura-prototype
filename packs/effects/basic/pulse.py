@@ -8,9 +8,6 @@ from packs.effects.basic.helpers.pulse_effect import PulseEffect
 class PulseBuilder(EffectBuilder):
     """Builds a :class:`PulseEffect` from color and phase-duration options.
 
-    The ``brightness`` option is ignored: ``MatrixEffectOutput`` applies
-    brightness at render time.
-
     Raises ``ValueError``, from :class:`PulseLayer`, if any duration is
     negative or if all durations are zero.
     """

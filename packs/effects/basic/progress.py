@@ -7,9 +7,6 @@ from engine.effects.builder import EffectBuilder
 class ProgressBuilder(EffectBuilder):
     """Builds a progress bar from the ``color`` and ``progress`` options.
 
-    The ``brightness`` option is ignored: ``MatrixEffectOutput`` applies
-    brightness at render time.
-
     No ``Palette``/``PaletteLUT256`` is allocated, so re-issuing ``set_effect``
     every tick is cheap.
     """

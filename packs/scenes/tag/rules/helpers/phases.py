@@ -1,9 +1,4 @@
-"""Phase keys and the typed phase-machine accessor for the ``tag`` scene.
-
-Because :class:`PhaseKey` compares by identity, these module-level singletons
-are the *only* tokens that match the machine's current phase; a bare string
-literal never will.
-"""
+"""Phase keys and the typed phase-machine accessor for the ``tag`` scene."""
 
 from __future__ import annotations
 
