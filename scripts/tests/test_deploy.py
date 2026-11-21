@@ -374,7 +374,7 @@ def test_stale_destination_file_is_overwritten(tmp_path: Path) -> None:
     assert dest.read_text() == "FAKE_MPY:render.py"
 
 
-def test_dry_run_skips_mount_existence_check(tmp_path: Path) -> None:
+def test_dry_run_skips_mount_existence_check(tmp_path: Path, capsys) -> None:
     source = tmp_path / "source"
     source.mkdir()
     make_source_tree(source)
@@ -382,6 +382,8 @@ def test_dry_run_skips_mount_existence_check(tmp_path: Path) -> None:
     deploy(
         None, tmp_path / "nonexistent", source_root=source, toolchain=FakeToolchain(), dry_run=True
     )
+
+    assert "[DRY RUN] COPY  engine/timer.mpy" in capsys.readouterr().out
 
 
 def test_dry_run_writes_no_files(tmp_path: Path) -> None:
@@ -589,6 +591,8 @@ def test_first_time_deploy_with_no_module_dirs_on_mount(tmp_path: Path) -> None:
     mount.mkdir()
 
     deploy(None, mount, source_root=source, toolchain=FakeToolchain())
+
+    assert (mount / "engine" / "timer.mpy").read_text() == "FAKE_MPY:timer.py"
 
 
 def test_dry_run_does_not_delete_stale_files(tmp_path: Path) -> None:
@@ -901,7 +905,22 @@ def test_deploy_failure_prints_no_error_line_itself(tmp_path: Path, capsys) -> N
     assert capsys.readouterr().err == ""
 
 
-def test_version_mismatch_with_device_mounted_raises_the_toolchain_error_as_deploy_error(
+def test_version_mismatch_with_device_mounted_raises_deploy_error_caused_by_the_version_error(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+
+    with pytest.raises(DeployError) as raised:
+        deploy(None, mount, source_root=source, toolchain=FakeToolchain(version_mismatch=True))
+
+    assert isinstance(raised.value.__cause__, VersionError)
+
+
+def test_version_mismatch_with_device_mounted_error_carries_the_toolchain_message(
     tmp_path: Path,
 ) -> None:
     source = tmp_path / "source"
@@ -914,7 +933,6 @@ def test_version_mismatch_with_device_mounted_raises_the_toolchain_error_as_depl
         deploy(None, mount, source_root=source, toolchain=FakeToolchain(version_mismatch=True))
 
     assert str(raised.value) == "mpy-cross major version 9 does not match CircuitPython 10.x"
-    assert isinstance(raised.value.__cause__, VersionError)
 
 
 def test_version_mismatch_with_device_mounted_writes_nothing_to_the_mount(tmp_path: Path) -> None:
@@ -1000,16 +1018,6 @@ def test_dry_run_version_mismatch_raises_deploy_error(tmp_path: Path) -> None:
             toolchain=FakeToolchain(version_mismatch=True),
             dry_run=True,
         )
-
-
-def test_source_mode_deploys_without_error(tmp_path: Path) -> None:
-    source = tmp_path / "source"
-    source.mkdir()
-    make_source_tree(source)
-    mount = tmp_path / "mount"
-    mount.mkdir()
-
-    deploy(None, mount, source_root=source, use_source=True)
 
 
 def test_source_mode_ships_raw_py_files_not_compiled_mpy(tmp_path: Path) -> None:
@@ -1172,7 +1180,7 @@ def test_main_exits_1_with_the_error_line_when_the_mount_is_read_only(
     )
 
 
-def test_main_returns_normally_after_a_successful_deploy(
+def test_main_deploys_source_modules_to_the_mount(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     source = tmp_path / "source"

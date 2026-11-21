@@ -361,7 +361,7 @@ def parse_args(argv: "list[str] | None" = None) -> argparse.Namespace:
 
 
 def run_deploy(args: argparse.Namespace, *, deploy: "Callable[..., None]" = deploy) -> int:
-    """Deploy as *args* ask, returning 0, or 1 after printing the ``Error:`` line if it fails."""
+    """Deploy as ``args`` ask, returning 0, or 1 after printing the ``Error:`` line if it fails."""
     try:
         deploy(args.example_file, args.mount, scene=args.scene, use_source=args.source)
     except DeployError as exc:

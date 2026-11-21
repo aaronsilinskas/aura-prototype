@@ -142,6 +142,10 @@ def deploy(
         use_source: When True, skip compilation entirely and sync raw ``.py`` files
             directly from the source tree.  Requires no ``mpy-cross`` toolchain.
 
+    Raises:
+        DeployError: The mount is missing, not a directory or read-only, the
+            compiler's version doesn't match, or a module fails to compile.
+
     The list's ``boot.py`` entry, if any, is copied to the mount alongside
     ``code.py`` whenever *example_file* is given -- the
     same force-always, never-pruned handling ``code.py`` gets, since a mount's
@@ -234,7 +238,7 @@ def deploy(
 
 
 def main(argv: list[str] | None = None) -> None:
-    """Run the deploy from the command line (``sys.argv`` when *argv* is ``None``).
+    """Run the deploy from the command line (``sys.argv`` when ``argv`` is ``None``).
 
     Exits 1 with an ``Error:`` line on stderr when the deploy fails.
     """
