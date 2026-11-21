@@ -9,6 +9,7 @@ import pytest
 
 from scripts.build import BuildError, Toolchain, VersionError
 from scripts.deploy import (
+    CompiledBuild,
     DeployError,
     SourceBuild,
     execute_plan,
@@ -66,12 +67,22 @@ def plan_and_execute(
     execute_plan(plan)
 
 
-def test_dry_run_plans_without_a_mount(tmp_path: Path) -> None:
-    plan = plan_deploy(
-        None, tmp_path / "nonexistent", tmp_path, dry_run=True, toolchain=FakeToolchain()
-    )
+def test_dry_run_plans_a_compiled_deploy_without_a_mount(tmp_path: Path) -> None:
+    toolchain = FakeToolchain()
 
-    assert plan.dry_run
+    plan = plan_deploy(None, tmp_path / "nonexistent", tmp_path, dry_run=True, toolchain=toolchain)
+
+    assert plan.build_choice == CompiledBuild(toolchain)
+
+
+def test_dry_run_plan_checks_the_toolchain_version_against_the_expected_major(
+    tmp_path: Path,
+) -> None:
+    toolchain = FakeToolchain()
+
+    plan_deploy(None, tmp_path / "nonexistent", tmp_path, dry_run=True, toolchain=toolchain)
+
+    assert toolchain.checked_mounts == [None]
 
 
 def test_source_plan_holds_no_toolchain(tmp_path: Path) -> None:
@@ -1010,21 +1021,6 @@ def test_compiled_deploy_checks_the_toolchain_version_against_the_mount(tmp_path
     plan_and_execute(None, mount, source_root=source, toolchain=toolchain)
 
     assert toolchain.checked_mounts == [mount]
-
-
-def test_dry_run_checks_the_toolchain_version_against_the_expected_major(
-    tmp_path: Path,
-) -> None:
-    source = tmp_path / "source"
-    source.mkdir()
-    make_source_tree(source)
-    toolchain = FakeToolchain()
-
-    plan_and_execute(
-        None, tmp_path / "nonexistent", source_root=source, toolchain=toolchain, dry_run=True
-    )
-
-    assert toolchain.checked_mounts == [None]
 
 
 def test_dry_run_version_mismatch_raises_deploy_error(tmp_path: Path) -> None:
