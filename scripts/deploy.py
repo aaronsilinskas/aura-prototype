@@ -34,19 +34,12 @@ if not __package__:
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from hardware.shared.scene_selection import with_scene_deploy
-from scripts.build import (
-    BuildError,
-    VersionError,
-    build,
-    mpy_cross_compile,
-    validate_mpy_cross_version,
-)
+from scripts.build import BuildError, MpyCross, Toolchain, VersionError, build
 from scripts.ship_list import MODULE_DIRS, governed_mount_files, ship_list
 
 TYPE_CHECKING = False
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
     from typing import Final
 
 DEFAULT_MOUNT: Final = "/Volumes/CIRCUITPY"
@@ -115,7 +108,7 @@ def deploy(
     source_root: Path | None = None,
     dry_run: bool = False,
     scene: str | None = None,
-    compile: Callable[[Path, Path], None] | None = None,
+    toolchain: Toolchain | None = None,
     use_source: bool = False,
 ) -> int:
     """Deploy to mount. Returns 0 on success, 1 on error.
@@ -134,9 +127,10 @@ def deploy(
             without writing any files.
         scene: Scene name to record in ``aura-boot.json``'s ``default_scene`` key,
             beside a fresh ``scene_deploy_token``; omit to leave the file untouched.
-        compile: Callable ``(src, dest) -> None`` used to compile each ``.py`` file
-            to ``.mpy`` in a staging tree before syncing.  Defaults to the real
-            ``mpy_cross_compile`` (requires ``mpy-cross`` installed).
+        toolchain: Checks the compiler's version against the mount (or, for a
+            dry run, the repo-pinned CircuitPython major), then compiles each
+            ``.py`` file to ``.mpy`` in a staging tree before syncing. Defaults
+            to the real ``mpy-cross``.
         use_source: When True, skip compilation entirely and sync raw ``.py`` files
             directly from the source tree.  Requires no ``mpy-cross`` toolchain.
 
@@ -171,12 +165,11 @@ def deploy(
     if use_source:
         synced = {entry.source_device: source_root / entry.source for entry in entries}
     else:
-        if compile is None:
-            compile = mpy_cross_compile
+        if toolchain is None:
+            toolchain = MpyCross()
 
-        validation_mount = None if dry_run else mount
         try:
-            validate_mpy_cross_version(mount=validation_mount)
+            toolchain.check_version(None if dry_run else mount)
         except VersionError as exc:
             print(f"Error: {exc}", file=sys.stderr)
             return 1
@@ -186,7 +179,7 @@ def deploy(
             build_result = build(
                 source_root=source_root,
                 staging_root=staging_root,
-                compile=compile,
+                compile=toolchain.compile,
             )
         except BuildError as exc:
             print(f"Error: {exc}", file=sys.stderr)

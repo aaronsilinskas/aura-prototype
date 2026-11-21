@@ -7,6 +7,7 @@ import pytest
 
 from scripts.build import (
     EXPECTED_CIRCUITPYTHON_MAJOR,
+    MpyCross,
     VersionError,
     get_mpy_cross_major,
     parse_circuitpython_major_from_boot_out,
@@ -144,6 +145,28 @@ def test_dry_run_version_error_message_mentions_expected_version() -> None:
         with pytest.raises(VersionError) as exc_info:
             validate_mpy_cross_version(mount=None, mpy_cross_bin="mpy-cross")
         assert str(EXPECTED_CIRCUITPYTHON_MAJOR) in str(exc_info.value)
+
+
+def test_mpy_cross_toolchain_rejects_a_mount_running_another_major(tmp_path: Path) -> None:
+    mount = tmp_path / "mount"
+    mount.mkdir()
+    (mount / "boot_out.txt").write_text(
+        "Adafruit CircuitPython 10.2.1 on 2025-01-15; Adafruit Feather RP2040"
+    )
+    with (
+        patch("scripts.build.get_mpy_cross_major", return_value=9),
+        pytest.raises(VersionError, match="mpy-cross"),
+    ):
+        MpyCross().check_version(mount)
+
+
+def test_mpy_cross_toolchain_checks_a_dry_run_against_the_expected_major() -> None:
+    wrong_major = EXPECTED_CIRCUITPYTHON_MAJOR + 1
+    with (
+        patch("scripts.build.get_mpy_cross_major", return_value=wrong_major),
+        pytest.raises(VersionError, match=str(EXPECTED_CIRCUITPYTHON_MAJOR)),
+    ):
+        MpyCross().check_version(None)
 
 
 def test_expected_circuitpython_major_matches_setup_script_default() -> None:
