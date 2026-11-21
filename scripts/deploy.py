@@ -132,7 +132,7 @@ class DeployPlan:
     source_root: Path
     scene: str | None
     dry_run: bool
-    build: CompiledBuild | SourceBuild
+    build_choice: CompiledBuild | SourceBuild
 
 
 def plan_deploy(
@@ -145,11 +145,25 @@ def plan_deploy(
     dry_run: bool = False,
     use_source: bool = False,
 ) -> DeployPlan:
-    """Validate a deploy and return its plan, raising :class:`DeployError` if it can't go ahead.
+    """Validate a deploy and return its plan.
 
-    A dry run skips the mount checks and checks *toolchain* against the
-    repo-pinned CircuitPython major instead of the mount. A source deploy
-    (*use_source*) ships raw ``.py`` files, so it never uses *toolchain*.
+    Args:
+        example_file: The example to deploy as ``code.py``, or ``None`` to sync
+            modules only.
+        mount: The mounted CIRCUITPY volume.
+        source_root: Root of the source tree the Ship list is read from.
+        toolchain: Compiles modules, and checks its version against *mount*
+            (or, for a dry run, the repo-pinned CircuitPython major). A source
+            deploy never uses it.
+        scene: Scene to record as ``default_scene`` in ``aura-boot.json``,
+            beside a fresh Scene deploy token; ``None`` leaves the file alone.
+        dry_run: Print what would change without writing to the mount. The
+            mount checks are skipped.
+        use_source: Ship raw ``.py`` files instead of compiling them.
+
+    Raises:
+        DeployError: The mount is missing, not a directory or read-only, or
+            the toolchain's version doesn't match.
     """
     if not dry_run:
         if not mount.is_dir():
@@ -175,15 +189,12 @@ def plan_deploy(
         source_root=source_root,
         scene=scene,
         dry_run=dry_run,
-        build=build_choice,
+        build_choice=build_choice,
     )
 
 
 def execute_plan(plan: DeployPlan) -> None:
     """Carry out *plan*, raising :class:`DeployError` if a module fails to compile.
-
-    The build runs first and writes only under ``source_root/build``, so a
-    compile error leaves the mount untouched.
 
     An example ships with the Ship list's ``boot.py``, force-copied and never
     pruned like ``code.py``: a ``boot.py`` already on the mount can't be told
@@ -196,13 +207,15 @@ def execute_plan(plan: DeployPlan) -> None:
     entries = listed.modules
 
     compiled_count = 0
-    if isinstance(plan.build, CompiledBuild):
+    build_choice = plan.build_choice
+    use_source = isinstance(build_choice, SourceBuild)
+    if isinstance(build_choice, CompiledBuild):
         staging_root = source_root / "build"
         try:
             build_result = build(
                 source_root=source_root,
                 staging_root=staging_root,
-                compile=plan.build.toolchain.compile,
+                compile=build_choice.toolchain.compile,
             )
         except BuildError as exc:
             raise DeployError(str(exc)) from exc
@@ -238,7 +251,6 @@ def execute_plan(plan: DeployPlan) -> None:
     for device, src in synced.items():
         _sync_file(src, mount / device, str(device), copied, skipped, dry_run)
 
-    use_source = isinstance(plan.build, SourceBuild)
     for rel in governed_mount_files(mount, use_source):
         if rel in synced:
             continue

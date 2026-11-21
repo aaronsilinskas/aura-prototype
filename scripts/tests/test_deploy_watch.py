@@ -12,7 +12,6 @@ from typing import TYPE_CHECKING, cast
 
 import serial
 
-from scripts.build import Toolchain
 from scripts.deploy import CompiledBuild, DeployError, DeployPlan, SourceBuild
 from scripts.deploy_watch import (
     SerialHandle,
@@ -25,6 +24,7 @@ from scripts.deploy_watch import (
     run_deploy,
     watch_stream,
 )
+from scripts.tests.helpers import FakeToolchain
 
 if TYPE_CHECKING:
     from serial import Serial
@@ -322,16 +322,6 @@ def test_split_writer_file_excludes_lines_written_directly_to_stdout() -> None:
     assert "Deploying" not in file_out.getvalue()
 
 
-class FakeToolchain(Toolchain):
-    """A toolchain whose version check passes and which never compiles."""
-
-    def compile(self, src: Path, dest: Path) -> None:
-        raise AssertionError("deploy-watch's planning step must not compile")
-
-    def check_version(self, mount: Path | None) -> None:
-        pass
-
-
 def _cli_args(tmp_path: Path, *extra: str) -> list[str]:
     mount = tmp_path / "mount"
     mount.mkdir()
@@ -340,10 +330,10 @@ def _cli_args(tmp_path: Path, *extra: str) -> list[str]:
     return [str(example), "--mount", str(mount), "--seconds", "1", *extra]
 
 
-def _planned(argv: list[str]) -> DeployPlan:
+def _planned(argv: list[str], toolchain: FakeToolchain | None = None) -> DeployPlan:
     """The Deploy plan deploy-watch hands its executor for *argv*."""
     plans: list[DeployPlan] = []
-    run_deploy(parse_args(argv), toolchain=FakeToolchain(), execute=plans.append)
+    run_deploy(parse_args(argv), toolchain=toolchain or FakeToolchain(), execute=plans.append)
     [plan] = plans
     return plan
 
@@ -367,16 +357,15 @@ def test_omitting_scene_flag_asks_to_record_no_scene(tmp_path: Path) -> None:
 def test_source_flag_deploys_raw_source(tmp_path: Path) -> None:
     plan = _planned(_cli_args(tmp_path, "--source"))
 
-    assert plan.build == SourceBuild()
+    assert plan.build_choice == SourceBuild()
 
 
 def test_omitting_source_flag_deploys_compiled_modules(tmp_path: Path) -> None:
     toolchain = FakeToolchain()
-    plans: list[DeployPlan] = []
 
-    run_deploy(parse_args(_cli_args(tmp_path)), toolchain=toolchain, execute=plans.append)
+    plan = _planned(_cli_args(tmp_path), toolchain)
 
-    assert plans[0].build == CompiledBuild(toolchain)
+    assert plan.build_choice == CompiledBuild(toolchain)
 
 
 def test_failed_deploy_returns_1_and_prints_the_error_line(tmp_path: Path, capsys) -> None:
@@ -390,20 +379,28 @@ def test_failed_deploy_returns_1_and_prints_the_error_line(tmp_path: Path, capsy
     )
 
 
-def test_refused_plan_returns_1_with_the_error_line_and_executes_nothing(
-    tmp_path: Path, capsys
-) -> None:
-    missing = tmp_path / "missing"
-    plans: list[DeployPlan] = []
-    args = parse_args([str(tmp_path / "example.py"), "--mount", str(missing), "--seconds", "1"])
+def _missing_mount_args(tmp_path: Path) -> list[str]:
+    return [str(tmp_path / "example.py"), "--mount", str(tmp_path / "missing"), "--seconds", "1"]
 
-    rc = run_deploy(args, toolchain=FakeToolchain(), execute=plans.append)
+
+def test_refused_plan_returns_1_and_prints_the_error_line(tmp_path: Path, capsys) -> None:
+    args = parse_args(_missing_mount_args(tmp_path))
+
+    rc = run_deploy(args, toolchain=FakeToolchain(), execute=lambda plan: None)
 
     assert rc == 1
-    assert plans == []
     assert capsys.readouterr().err == (
-        f"Error: mount path '{missing}' does not exist or is not a directory.\n"
+        f"Error: mount path '{tmp_path / 'missing'}' does not exist or is not a directory.\n"
     )
+
+
+def test_refused_plan_executes_nothing(tmp_path: Path) -> None:
+    plans: list[DeployPlan] = []
+    args = parse_args(_missing_mount_args(tmp_path))
+
+    run_deploy(args, toolchain=FakeToolchain(), execute=plans.append)
+
+    assert plans == []
 
 
 def test_successful_deploy_returns_0(tmp_path: Path) -> None:
