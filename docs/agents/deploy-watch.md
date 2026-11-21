@@ -35,7 +35,7 @@ Both `--seconds` and `--until` can be combined: exits 0 on match, 2 on timeout.
 | Code | Meaning |
 |---|---|
 | 0 | Matched (`--until` found), or timed out / stream ended without `--until` |
-| 1 | Usage error or port-discovery failure |
+| 1 | Usage error, port-discovery failure, or failed deploy (`Error:` line on stderr, no capture) |
 | 2 | Timed out before `--until` marker was matched |
 | 3 | CircuitPython soft-reboot banner never appeared within `--reboot-timeout` |
 

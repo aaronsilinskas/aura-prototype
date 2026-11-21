@@ -26,6 +26,8 @@ import os
 import secrets
 import shutil
 import sys
+from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 
 if not __package__:
@@ -34,22 +36,23 @@ if not __package__:
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from hardware.shared.scene_selection import with_scene_deploy
-from scripts.build import (
-    BuildError,
-    VersionError,
-    build,
-    mpy_cross_compile,
-    validate_mpy_cross_version,
-)
+from scripts.build import BuildError, MpyCross, Toolchain, VersionError, build
 from scripts.ship_list import MODULE_DIRS, governed_mount_files, ship_list
 
 TYPE_CHECKING = False
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
     from typing import Final
 
 DEFAULT_MOUNT: Final = "/Volumes/CIRCUITPY"
+
+
+class DeployError(Exception):
+    """A deploy was refused or failed before anything was written to the mount.
+
+    The message is the line a user sees after ``Error:``. A version mismatch or
+    compile failure is raised from the build module's error.
+    """
 
 
 def _should_skip(src: Path, dest: Path) -> bool:
@@ -109,101 +112,131 @@ def _write_scene(mount: Path, scene: str) -> None:
     boot_path.write_text(json.dumps(boot_values, indent=2))
 
 
-def deploy(
+@dataclass(frozen=True)
+class CompiledBuild:
+    """Modules ship as ``.mpy`` files that *toolchain* compiles."""
+
+    toolchain: Toolchain
+
+
+@dataclass(frozen=True)
+class SourceBuild:
+    """Modules ship as raw ``.py`` files, so no compiler is involved."""
+
+
+@dataclass(frozen=True)
+class DeployPlan:
+    """One deploy, validated against the mount as it was when planned."""
+
+    example_file: Path | None
+    mount: Path
+    source_root: Path
+    scene: str | None
+    dry_run: bool
+    build_choice: CompiledBuild | SourceBuild
+
+
+def plan_deploy(
     example_file: Path | None,
     mount: Path,
-    source_root: Path | None = None,
-    dry_run: bool = False,
+    source_root: Path,
+    *,
+    toolchain: Toolchain,
     scene: str | None = None,
-    compile: Callable[[Path, Path], None] | None = None,
+    dry_run: bool = False,
     use_source: bool = False,
-) -> int:
-    """Deploy to mount. Returns 0 on success, 1 on error.
-
-    Syncs the Ship list's entries to *mount*, then prunes each mount file the
-    list governs but no longer names, and removes every empty directory under
-    each module directory.
+) -> DeployPlan:
+    """Validate a deploy and return its plan.
 
     Args:
-        example_file: Path to the example file to copy as ``code.py``.
-            Pass ``None`` to sync modules only without touching ``code.py``
-            (or its paired ``boot.py`` -- see below).
-        mount: Path to the mounted CIRCUITPY volume.
-        source_root: Root of the source tree. Defaults to ``Path.cwd()``.
-        dry_run: When True, skip mount validation and print what would be copied
-            without writing any files.
-        scene: Scene name to record in ``aura-boot.json``'s ``default_scene`` key,
-            beside a fresh ``scene_deploy_token``; omit to leave the file untouched.
-        compile: Callable ``(src, dest) -> None`` used to compile each ``.py`` file
-            to ``.mpy`` in a staging tree before syncing.  Defaults to the real
-            ``mpy_cross_compile`` (requires ``mpy-cross`` installed).
-        use_source: When True, skip compilation entirely and sync raw ``.py`` files
-            directly from the source tree.  Requires no ``mpy-cross`` toolchain.
+        example_file: The example to deploy as ``code.py``, or ``None`` to sync
+            modules only.
+        mount: The mounted CIRCUITPY volume.
+        source_root: Root of the source tree the Ship list is read from.
+        toolchain: Compiles modules, and checks its version against *mount*
+            (or, for a dry run, the repo-pinned CircuitPython major). A source
+            deploy never uses it.
+        scene: Scene to record as ``default_scene`` in ``aura-boot.json``,
+            beside a fresh Scene deploy token; ``None`` leaves the file alone.
+        dry_run: Print what would change without writing to the mount. The
+            mount checks are skipped.
+        use_source: Ship raw ``.py`` files instead of compiling them.
 
-    The list's ``boot.py`` entry, if any, is copied to the mount alongside
-    ``code.py`` whenever *example_file* is given -- the
-    same force-always, never-pruned handling ``code.py`` gets, since a mount's
-    existing ``boot.py`` is otherwise indistinguishable from a stale one.
-    It is not deployed when *example_file* is ``None`` (module-only sync).
+    Raises:
+        DeployError: The mount is missing, not a directory or read-only, or
+            the toolchain's version doesn't match.
     """
-    if source_root is None:
-        source_root = Path.cwd()
-
     if not dry_run:
         if not mount.is_dir():
-            print(
-                f"Error: mount path '{mount}' does not exist or is not a directory.",
-                file=sys.stderr,
-            )
-            return 1
-
+            raise DeployError(f"mount path '{mount}' does not exist or is not a directory.")
         if not os.access(mount, os.W_OK):
-            print(
-                "Error: CIRCUITPY is read-only. Press Ctrl+C on the device to stop code.py first.",
-                file=sys.stderr,
+            raise DeployError(
+                "CIRCUITPY is read-only. Press Ctrl+C on the device to stop code.py first."
             )
-            return 1
 
-    compiled_count = 0
+    build_choice: CompiledBuild | SourceBuild
+    if use_source:
+        build_choice = SourceBuild()
+    else:
+        try:
+            toolchain.check_version(None if dry_run else mount)
+        except VersionError as exc:
+            raise DeployError(str(exc)) from exc
+        build_choice = CompiledBuild(toolchain)
+
+    return DeployPlan(
+        example_file=example_file,
+        mount=mount,
+        source_root=source_root,
+        scene=scene,
+        dry_run=dry_run,
+        build_choice=build_choice,
+    )
+
+
+def execute_plan(plan: DeployPlan) -> None:
+    """Carry out *plan*, raising :class:`DeployError` if a module fails to compile.
+
+    An example ships with the Ship list's ``boot.py``, force-copied and never
+    pruned like ``code.py``: a ``boot.py`` already on the mount can't be told
+    apart from a stale one, so it is replaced whenever ``code.py`` is.
+    """
+    mount = plan.mount
+    source_root = plan.source_root
+    dry_run = plan.dry_run
     listed = ship_list(source_root)
     entries = listed.modules
 
-    if use_source:
-        synced = {entry.source_device: source_root / entry.source for entry in entries}
-    else:
-        if compile is None:
-            compile = mpy_cross_compile
-
-        validation_mount = None if dry_run else mount
-        try:
-            validate_mpy_cross_version(mount=validation_mount)
-        except VersionError as exc:
-            print(f"Error: {exc}", file=sys.stderr)
-            return 1
-
+    compiled_count = 0
+    build_choice = plan.build_choice
+    if isinstance(build_choice, CompiledBuild):
+        use_source = False
         staging_root = source_root / "build"
         try:
             build_result = build(
                 source_root=source_root,
                 staging_root=staging_root,
-                compile=compile,
+                compile=build_choice.toolchain.compile,
             )
         except BuildError as exc:
-            print(f"Error: {exc}", file=sys.stderr)
-            return 1
-
+            raise DeployError(str(exc)) from exc
         compiled_count = build_result.compiled
         synced = {entry.device: staging_root / entry.device for entry in entries}
+    else:
+        use_source = True
+        synced = {entry.source_device: source_root / entry.source for entry in entries}
 
-    if scene is not None and not dry_run:
-        _write_scene(mount, scene)
+    if plan.scene is not None and not dry_run:
+        _write_scene(mount, plan.scene)
 
     copied: list[Path] = []
     skipped: list[Path] = []
     pruned: list[Path] = []
 
-    if example_file is not None:
-        _sync_file(example_file, mount / "code.py", "code.py", copied, skipped, dry_run, force=True)
+    if plan.example_file is not None:
+        _sync_file(
+            plan.example_file, mount / "code.py", "code.py", copied, skipped, dry_run, force=True
+        )
 
         boot = listed.boot
         if boot is not None:
@@ -238,10 +271,47 @@ def deploy(
         f"Done. {compiled_count} compiled, "
         f"{len(copied)} copied, {len(skipped)} skipped, {len(pruned)} pruned."
     )
+
+
+def run_deploy_cli(
+    example_file: Path | None,
+    mount: Path,
+    *,
+    toolchain: Toolchain | None = None,
+    scene: str | None = None,
+    dry_run: bool = False,
+    use_source: bool = False,
+    execute: Callable[[DeployPlan], None] = execute_plan,
+) -> int:
+    """Plan a deploy from the current directory and *execute* it, for a command line.
+
+    This is the command-line adapter that ``main`` and deploy-watch share, not
+    part of the library surface: it returns 0, or 1 after printing the
+    ``Error:`` line to stderr if the deploy is refused or fails. *toolchain*
+    defaults to the real ``mpy-cross``.
+    """
+    try:
+        plan = plan_deploy(
+            example_file,
+            mount,
+            Path.cwd(),
+            toolchain=toolchain if toolchain is not None else MpyCross(),
+            scene=scene,
+            dry_run=dry_run,
+            use_source=use_source,
+        )
+        execute(plan)
+    except DeployError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
     return 0
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
+    """Run the deploy from the command line (``sys.argv`` when ``argv`` is ``None``).
+
+    Exits 1 with an ``Error:`` line on stderr when the deploy fails.
+    """
     parser = argparse.ArgumentParser(
         description="Deploy a CircuitPython example and modules to a CIRCUITPY volume."
     )
@@ -286,16 +356,16 @@ def main() -> None:
             "Requires no mpy-cross toolchain."
         ),
     )
-    args = parser.parse_args()
-    sys.exit(
-        deploy(
-            args.example_file,
-            args.mount,
-            dry_run=args.dry_run,
-            scene=args.scene,
-            use_source=args.source,
-        )
+    args = parser.parse_args(argv)
+    rc = run_deploy_cli(
+        args.example_file,
+        args.mount,
+        scene=args.scene,
+        dry_run=args.dry_run,
+        use_source=args.source,
     )
+    if rc != 0:
+        sys.exit(rc)
 
 
 if __name__ == "__main__":

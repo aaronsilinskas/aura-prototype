@@ -18,7 +18,7 @@ Usage
 Exit codes
 ----------
     0  matched (marker found) or timed out without --until or stream ended without --until
-    1  usage / port-discovery error
+    1  usage / port-discovery error, or the deploy failed
     2  timed out before marker matched (--until was set)
     3  soft-reboot banner never arrived within --reboot-timeout
 """
@@ -36,7 +36,8 @@ if not __package__:
     # so the package imports below resolve as they do under python -m.
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from scripts.deploy import DEFAULT_MOUNT, deploy
+from scripts.build import Toolchain
+from scripts.deploy import DEFAULT_MOUNT, DeployPlan, execute_plan, run_deploy_cli
 from scripts.port_auto_detect import PortAutoDetectError, SerialChannel, find_port
 
 TYPE_CHECKING = False
@@ -360,8 +361,21 @@ def parse_args(argv: "list[str] | None" = None) -> argparse.Namespace:
     return args
 
 
-def run_deploy(args: argparse.Namespace, *, deploy: "Callable[..., int]" = deploy) -> int:
-    return deploy(args.example_file, args.mount, scene=args.scene, use_source=args.source)
+def run_deploy(
+    args: argparse.Namespace,
+    *,
+    toolchain: Toolchain | None = None,
+    execute: Callable[[DeployPlan], None] = execute_plan,
+) -> int:
+    """Deploy as ``args`` ask through :func:`~scripts.deploy.run_deploy_cli`, returning its code."""
+    return run_deploy_cli(
+        args.example_file,
+        args.mount,
+        toolchain=toolchain,
+        scene=args.scene,
+        use_source=args.source,
+        execute=execute,
+    )
 
 
 def main() -> None:
