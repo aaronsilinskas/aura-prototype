@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, cast
 
 import serial
 
-from scripts.deploy import deploy
+from scripts.deploy import DeployError, deploy
 from scripts.deploy_watch import (
     SerialHandle,
     SplitWriter,
@@ -323,7 +323,7 @@ def test_split_writer_file_excludes_lines_written_directly_to_stdout() -> None:
     assert "Deploying" not in file_out.getvalue()
 
 
-def _deploy_from_source(tmp_path: Path) -> "Callable[..., int]":
+def _deploy_from_source(tmp_path: Path) -> "Callable[..., None]":
     """The real ``deploy`` over a tiny source tree under *tmp_path*."""
     source = tmp_path / "source"
     (source / "engine").mkdir(parents=True)
@@ -358,14 +358,34 @@ def test_omitting_scene_flag_writes_no_boot_file(tmp_path: Path) -> None:
     assert not (tmp_path / "mount" / "aura-boot.json").exists()
 
 
-def _recording_deploy(calls: list[dict[str, object]]) -> "Callable[..., int]":
+def _recording_deploy(calls: list[dict[str, object]]) -> "Callable[..., None]":
     """A fake ``deploy`` that records the keyword arguments it was called with."""
 
-    def fake(example_file: Path, mount: Path, **kwargs: object) -> int:
+    def fake(example_file: Path, mount: Path, **kwargs: object) -> None:
         calls.append(kwargs)
-        return 0
 
     return fake
+
+
+def _failing_deploy(example_file: Path, mount: Path, **kwargs: object) -> None:
+    raise DeployError("CIRCUITPY is read-only. Press Ctrl+C on the device to stop code.py first.")
+
+
+def test_failed_deploy_returns_1_and_prints_the_error_line(tmp_path: Path, capsys) -> None:
+    args = parse_args(_cli_args(tmp_path))
+
+    rc = run_deploy(args, deploy=_failing_deploy)
+
+    assert rc == 1
+    assert capsys.readouterr().err == (
+        "Error: CIRCUITPY is read-only. Press Ctrl+C on the device to stop code.py first.\n"
+    )
+
+
+def test_successful_deploy_returns_0(tmp_path: Path) -> None:
+    args = parse_args(_cli_args(tmp_path))
+
+    assert run_deploy(args, deploy=_recording_deploy([])) == 0
 
 
 def test_source_flag_deploys_raw_source(tmp_path: Path) -> None:

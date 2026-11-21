@@ -18,7 +18,7 @@ Usage
 Exit codes
 ----------
     0  matched (marker found) or timed out without --until or stream ended without --until
-    1  usage / port-discovery error
+    1  usage / port-discovery error, or the deploy failed
     2  timed out before marker matched (--until was set)
     3  soft-reboot banner never arrived within --reboot-timeout
 """
@@ -36,7 +36,7 @@ if not __package__:
     # so the package imports below resolve as they do under python -m.
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from scripts.deploy import DEFAULT_MOUNT, deploy
+from scripts.deploy import DEFAULT_MOUNT, DeployError, deploy
 from scripts.port_auto_detect import PortAutoDetectError, SerialChannel, find_port
 
 TYPE_CHECKING = False
@@ -360,8 +360,14 @@ def parse_args(argv: "list[str] | None" = None) -> argparse.Namespace:
     return args
 
 
-def run_deploy(args: argparse.Namespace, *, deploy: "Callable[..., int]" = deploy) -> int:
-    return deploy(args.example_file, args.mount, scene=args.scene, use_source=args.source)
+def run_deploy(args: argparse.Namespace, *, deploy: "Callable[..., None]" = deploy) -> int:
+    """Deploy as *args* ask, returning 0, or 1 after printing the ``Error:`` line if it fails."""
+    try:
+        deploy(args.example_file, args.mount, scene=args.scene, use_source=args.source)
+    except DeployError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+    return 0
 
 
 def main() -> None:
