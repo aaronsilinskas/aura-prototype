@@ -26,6 +26,7 @@ import os
 import secrets
 import shutil
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -272,6 +273,38 @@ def execute_plan(plan: DeployPlan) -> None:
     )
 
 
+def deploy_command(
+    example_file: Path | None,
+    mount: Path,
+    *,
+    toolchain: Toolchain | None = None,
+    scene: str | None = None,
+    dry_run: bool = False,
+    use_source: bool = False,
+    execute: Callable[[DeployPlan], None] = execute_plan,
+) -> int:
+    """Plan a deploy from the current directory and *execute* it, as a command line does.
+
+    Returns 0, or 1 after printing the ``Error:`` line to stderr if the deploy
+    is refused or fails. *toolchain* defaults to the real ``mpy-cross``.
+    """
+    try:
+        plan = plan_deploy(
+            example_file,
+            mount,
+            Path.cwd(),
+            toolchain=toolchain if toolchain is not None else MpyCross(),
+            scene=scene,
+            dry_run=dry_run,
+            use_source=use_source,
+        )
+        execute(plan)
+    except DeployError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+    return 0
+
+
 def main(argv: list[str] | None = None) -> None:
     """Run the deploy from the command line (``sys.argv`` when ``argv`` is ``None``).
 
@@ -322,20 +355,15 @@ def main(argv: list[str] | None = None) -> None:
         ),
     )
     args = parser.parse_args(argv)
-    try:
-        plan = plan_deploy(
-            args.example_file,
-            args.mount,
-            Path.cwd(),
-            toolchain=MpyCross(),
-            scene=args.scene,
-            dry_run=args.dry_run,
-            use_source=args.source,
-        )
-        execute_plan(plan)
-    except DeployError as exc:
-        print(f"Error: {exc}", file=sys.stderr)
-        sys.exit(1)
+    rc = deploy_command(
+        args.example_file,
+        args.mount,
+        scene=args.scene,
+        dry_run=args.dry_run,
+        use_source=args.source,
+    )
+    if rc != 0:
+        sys.exit(rc)
 
 
 if __name__ == "__main__":

@@ -36,8 +36,8 @@ if not __package__:
     # so the package imports below resolve as they do under python -m.
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from scripts.build import MpyCross, Toolchain
-from scripts.deploy import DEFAULT_MOUNT, DeployError, DeployPlan, execute_plan, plan_deploy
+from scripts.build import Toolchain
+from scripts.deploy import DEFAULT_MOUNT, DeployPlan, deploy_command, execute_plan
 from scripts.port_auto_detect import PortAutoDetectError, SerialChannel, find_port
 
 TYPE_CHECKING = False
@@ -371,20 +371,14 @@ def run_deploy(
 
     *toolchain* defaults to the real ``mpy-cross``.
     """
-    try:
-        plan = plan_deploy(
-            args.example_file,
-            args.mount,
-            Path.cwd(),
-            toolchain=toolchain if toolchain is not None else MpyCross(),
-            scene=args.scene,
-            use_source=args.source,
-        )
-        execute(plan)
-    except DeployError as exc:
-        print(f"Error: {exc}", file=sys.stderr)
-        return 1
-    return 0
+    return deploy_command(
+        args.example_file,
+        args.mount,
+        toolchain=toolchain,
+        scene=args.scene,
+        use_source=args.source,
+        execute=execute,
+    )
 
 
 def main() -> None:
