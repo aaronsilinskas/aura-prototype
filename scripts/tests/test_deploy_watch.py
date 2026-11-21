@@ -1,10 +1,8 @@
 """Tests for deploy_watch: watch_stream, discard_until, exit codes, SplitWriter,
 reading serial lines, and the CLI's deploy step."""
 
-import functools
 import io
 import itertools
-import json
 import os
 import subprocess
 import sys
@@ -14,7 +12,8 @@ from typing import TYPE_CHECKING, cast
 
 import serial
 
-from scripts.deploy import DeployError, deploy
+from scripts.build import Toolchain
+from scripts.deploy import CompiledBuild, DeployError, DeployPlan, SourceBuild
 from scripts.deploy_watch import (
     SerialHandle,
     SplitWriter,
@@ -323,12 +322,14 @@ def test_split_writer_file_excludes_lines_written_directly_to_stdout() -> None:
     assert "Deploying" not in file_out.getvalue()
 
 
-def _deploy_from_source(tmp_path: Path) -> "Callable[..., None]":
-    """The real ``deploy`` over a tiny source tree under *tmp_path*."""
-    source = tmp_path / "source"
-    (source / "engine").mkdir(parents=True)
-    (source / "engine" / "timer.py").write_text("# timer")
-    return functools.partial(deploy, source_root=source)
+class FakeToolchain(Toolchain):
+    """A toolchain whose version check passes and which never compiles."""
+
+    def compile(self, src: Path, dest: Path) -> None:
+        raise AssertionError("deploy-watch's planning step must not compile")
+
+    def check_version(self, mount: Path | None) -> None:
+        pass
 
 
 def _cli_args(tmp_path: Path, *extra: str) -> list[str]:
@@ -339,71 +340,76 @@ def _cli_args(tmp_path: Path, *extra: str) -> list[str]:
     return [str(example), "--mount", str(mount), "--seconds", "1", *extra]
 
 
-def test_scene_flag_records_the_scene_as_default_scene_in_deployed_boot_file(
-    tmp_path: Path,
-) -> None:
-    args = parse_args(_cli_args(tmp_path, "--source", "--scene", "hardware_test"))
-
-    run_deploy(args, deploy=_deploy_from_source(tmp_path))
-
-    boot_values = json.loads((tmp_path / "mount" / "aura-boot.json").read_text())
-    assert boot_values["default_scene"] == "hardware_test"
+def _planned(argv: list[str]) -> DeployPlan:
+    """The Deploy plan deploy-watch hands its executor for *argv*."""
+    plans: list[DeployPlan] = []
+    run_deploy(parse_args(argv), toolchain=FakeToolchain(), execute=plans.append)
+    [plan] = plans
+    return plan
 
 
-def test_omitting_scene_flag_writes_no_boot_file(tmp_path: Path) -> None:
-    args = parse_args(_cli_args(tmp_path, "--source"))
-
-    run_deploy(args, deploy=_deploy_from_source(tmp_path))
-
-    assert not (tmp_path / "mount" / "aura-boot.json").exists()
+def _failing_executor(plan: DeployPlan) -> None:
+    raise DeployError("mpy-cross failed on engine/timer.py: SyntaxError: oops")
 
 
-def _recording_deploy(calls: list[dict[str, object]]) -> "Callable[..., None]":
-    """A fake ``deploy`` that records the keyword arguments it was called with."""
+def test_scene_flag_asks_to_record_that_scene(tmp_path: Path) -> None:
+    plan = _planned(_cli_args(tmp_path, "--scene", "hardware_test"))
 
-    def fake(example_file: Path, mount: Path, **kwargs: object) -> None:
-        calls.append(kwargs)
-
-    return fake
+    assert plan.scene == "hardware_test"
 
 
-def _failing_deploy(example_file: Path, mount: Path, **kwargs: object) -> None:
-    raise DeployError("CIRCUITPY is read-only. Press Ctrl+C on the device to stop code.py first.")
+def test_omitting_scene_flag_asks_to_record_no_scene(tmp_path: Path) -> None:
+    plan = _planned(_cli_args(tmp_path))
+
+    assert plan.scene is None
+
+
+def test_source_flag_deploys_raw_source(tmp_path: Path) -> None:
+    plan = _planned(_cli_args(tmp_path, "--source"))
+
+    assert plan.build == SourceBuild()
+
+
+def test_omitting_source_flag_deploys_compiled_modules(tmp_path: Path) -> None:
+    toolchain = FakeToolchain()
+    plans: list[DeployPlan] = []
+
+    run_deploy(parse_args(_cli_args(tmp_path)), toolchain=toolchain, execute=plans.append)
+
+    assert plans[0].build == CompiledBuild(toolchain)
 
 
 def test_failed_deploy_returns_1_and_prints_the_error_line(tmp_path: Path, capsys) -> None:
     args = parse_args(_cli_args(tmp_path))
 
-    rc = run_deploy(args, deploy=_failing_deploy)
+    rc = run_deploy(args, toolchain=FakeToolchain(), execute=_failing_executor)
 
     assert rc == 1
     assert capsys.readouterr().err == (
-        "Error: CIRCUITPY is read-only. Press Ctrl+C on the device to stop code.py first.\n"
+        "Error: mpy-cross failed on engine/timer.py: SyntaxError: oops\n"
+    )
+
+
+def test_refused_plan_returns_1_with_the_error_line_and_executes_nothing(
+    tmp_path: Path, capsys
+) -> None:
+    missing = tmp_path / "missing"
+    plans: list[DeployPlan] = []
+    args = parse_args([str(tmp_path / "example.py"), "--mount", str(missing), "--seconds", "1"])
+
+    rc = run_deploy(args, toolchain=FakeToolchain(), execute=plans.append)
+
+    assert rc == 1
+    assert plans == []
+    assert capsys.readouterr().err == (
+        f"Error: mount path '{missing}' does not exist or is not a directory.\n"
     )
 
 
 def test_successful_deploy_returns_0(tmp_path: Path) -> None:
     args = parse_args(_cli_args(tmp_path))
 
-    assert run_deploy(args, deploy=_recording_deploy([])) == 0
-
-
-def test_source_flag_deploys_raw_source(tmp_path: Path) -> None:
-    calls: list[dict[str, object]] = []
-    args = parse_args(_cli_args(tmp_path, "--source"))
-
-    run_deploy(args, deploy=_recording_deploy(calls))
-
-    assert calls[0]["use_source"] is True
-
-
-def test_omitting_source_flag_deploys_compiled_modules(tmp_path: Path) -> None:
-    calls: list[dict[str, object]] = []
-    args = parse_args(_cli_args(tmp_path))
-
-    run_deploy(args, deploy=_recording_deploy(calls))
-
-    assert calls[0]["use_source"] is False
+    assert run_deploy(args, toolchain=FakeToolchain(), execute=lambda plan: None) == 0
 
 
 def test_deploy_watch_runs_as_a_script_file_outside_the_repo_root(tmp_path: Path) -> None:

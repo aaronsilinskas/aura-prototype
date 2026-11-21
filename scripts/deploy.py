@@ -26,6 +26,7 @@ import os
 import secrets
 import shutil
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 if not __package__:
@@ -110,97 +111,117 @@ def _write_scene(mount: Path, scene: str) -> None:
     boot_path.write_text(json.dumps(boot_values, indent=2))
 
 
-def deploy(
+@dataclass(frozen=True)
+class CompiledBuild:
+    """Modules ship as ``.mpy`` files that *toolchain* compiles."""
+
+    toolchain: Toolchain
+
+
+@dataclass(frozen=True)
+class SourceBuild:
+    """Modules ship as raw ``.py`` files, so no compiler is involved."""
+
+
+@dataclass(frozen=True)
+class DeployPlan:
+    """One deploy, validated against the mount as it was when planned."""
+
+    example_file: Path | None
+    mount: Path
+    source_root: Path
+    scene: str | None
+    dry_run: bool
+    build: CompiledBuild | SourceBuild
+
+
+def plan_deploy(
     example_file: Path | None,
     mount: Path,
-    source_root: Path | None = None,
-    dry_run: bool = False,
+    source_root: Path,
+    *,
+    toolchain: Toolchain,
     scene: str | None = None,
-    toolchain: Toolchain | None = None,
+    dry_run: bool = False,
     use_source: bool = False,
-) -> None:
-    """Deploy to mount, raising :class:`DeployError` if the deploy can't go ahead.
+) -> DeployPlan:
+    """Validate a deploy and return its plan, raising :class:`DeployError` if it can't go ahead.
 
-    Syncs the Ship list's entries to *mount*, then prunes each mount file the
-    list governs but no longer names, and removes every empty directory under
-    each module directory.
-
-    Args:
-        example_file: Path to the example file to copy as ``code.py``.
-            Pass ``None`` to sync modules only without touching ``code.py``
-            (or its paired ``boot.py`` -- see below).
-        mount: Path to the mounted CIRCUITPY volume.
-        source_root: Root of the source tree. Defaults to ``Path.cwd()``.
-        dry_run: When True, skip mount validation and print what would be copied
-            without writing any files.
-        scene: Scene name to record in ``aura-boot.json``'s ``default_scene`` key,
-            beside a fresh ``scene_deploy_token``; omit to leave the file untouched.
-        toolchain: Checks the compiler's version against the mount (or, for a
-            dry run, the repo-pinned CircuitPython major), then compiles each
-            ``.py`` file to ``.mpy`` in a staging tree before syncing. Defaults
-            to the real ``mpy-cross``.
-        use_source: When True, skip compilation entirely and sync raw ``.py`` files
-            directly from the source tree.  Requires no ``mpy-cross`` toolchain.
-
-    Raises:
-        DeployError: The mount is missing, not a directory or read-only, the
-            compiler's version doesn't match, or a module fails to compile.
-
-    The list's ``boot.py`` entry, if any, is copied to the mount alongside
-    ``code.py`` whenever *example_file* is given -- the
-    same force-always, never-pruned handling ``code.py`` gets, since a mount's
-    existing ``boot.py`` is otherwise indistinguishable from a stale one.
-    It is not deployed when *example_file* is ``None`` (module-only sync).
+    A dry run skips the mount checks and checks *toolchain* against the
+    repo-pinned CircuitPython major instead of the mount. A source deploy
+    (*use_source*) ships raw ``.py`` files, so it never uses *toolchain*.
     """
-    if source_root is None:
-        source_root = Path.cwd()
-
     if not dry_run:
         if not mount.is_dir():
             raise DeployError(f"mount path '{mount}' does not exist or is not a directory.")
-
         if not os.access(mount, os.W_OK):
             raise DeployError(
                 "CIRCUITPY is read-only. Press Ctrl+C on the device to stop code.py first."
             )
 
-    compiled_count = 0
-    listed = ship_list(source_root)
-    entries = listed.modules
-
+    build_choice: CompiledBuild | SourceBuild
     if use_source:
-        synced = {entry.source_device: source_root / entry.source for entry in entries}
+        build_choice = SourceBuild()
     else:
-        if toolchain is None:
-            toolchain = MpyCross()
-
         try:
             toolchain.check_version(None if dry_run else mount)
         except VersionError as exc:
             raise DeployError(str(exc)) from exc
+        build_choice = CompiledBuild(toolchain)
 
+    return DeployPlan(
+        example_file=example_file,
+        mount=mount,
+        source_root=source_root,
+        scene=scene,
+        dry_run=dry_run,
+        build=build_choice,
+    )
+
+
+def execute_plan(plan: DeployPlan) -> None:
+    """Carry out *plan*, raising :class:`DeployError` if a module fails to compile.
+
+    The build runs first and writes only under ``source_root/build``, so a
+    compile error leaves the mount untouched.
+
+    An example ships with the Ship list's ``boot.py``, force-copied and never
+    pruned like ``code.py``: a ``boot.py`` already on the mount can't be told
+    apart from a stale one, so it is replaced whenever ``code.py`` is.
+    """
+    mount = plan.mount
+    source_root = plan.source_root
+    dry_run = plan.dry_run
+    listed = ship_list(source_root)
+    entries = listed.modules
+
+    compiled_count = 0
+    if isinstance(plan.build, CompiledBuild):
         staging_root = source_root / "build"
         try:
             build_result = build(
                 source_root=source_root,
                 staging_root=staging_root,
-                compile=toolchain.compile,
+                compile=plan.build.toolchain.compile,
             )
         except BuildError as exc:
             raise DeployError(str(exc)) from exc
-
         compiled_count = build_result.compiled
         synced = {entry.device: staging_root / entry.device for entry in entries}
+    else:
+        synced = {entry.source_device: source_root / entry.source for entry in entries}
 
-    if scene is not None and not dry_run:
-        _write_scene(mount, scene)
+    if plan.scene is not None and not dry_run:
+        _write_scene(mount, plan.scene)
 
     copied: list[Path] = []
     skipped: list[Path] = []
     pruned: list[Path] = []
 
-    if example_file is not None:
-        _sync_file(example_file, mount / "code.py", "code.py", copied, skipped, dry_run, force=True)
+    if plan.example_file is not None:
+        _sync_file(
+            plan.example_file, mount / "code.py", "code.py", copied, skipped, dry_run, force=True
+        )
 
         boot = listed.boot
         if boot is not None:
@@ -217,6 +238,7 @@ def deploy(
     for device, src in synced.items():
         _sync_file(src, mount / device, str(device), copied, skipped, dry_run)
 
+    use_source = isinstance(plan.build, SourceBuild)
     for rel in governed_mount_files(mount, use_source):
         if rel in synced:
             continue
@@ -288,13 +310,16 @@ def main(argv: list[str] | None = None) -> None:
     )
     args = parser.parse_args(argv)
     try:
-        deploy(
+        plan = plan_deploy(
             args.example_file,
             args.mount,
-            dry_run=args.dry_run,
+            Path.cwd(),
+            toolchain=MpyCross(),
             scene=args.scene,
+            dry_run=args.dry_run,
             use_source=args.source,
         )
+        execute_plan(plan)
     except DeployError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         sys.exit(1)

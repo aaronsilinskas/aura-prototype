@@ -36,7 +36,8 @@ if not __package__:
     # so the package imports below resolve as they do under python -m.
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from scripts.deploy import DEFAULT_MOUNT, DeployError, deploy
+from scripts.build import MpyCross, Toolchain
+from scripts.deploy import DEFAULT_MOUNT, DeployError, DeployPlan, execute_plan, plan_deploy
 from scripts.port_auto_detect import PortAutoDetectError, SerialChannel, find_port
 
 TYPE_CHECKING = False
@@ -360,10 +361,26 @@ def parse_args(argv: "list[str] | None" = None) -> argparse.Namespace:
     return args
 
 
-def run_deploy(args: argparse.Namespace, *, deploy: "Callable[..., None]" = deploy) -> int:
-    """Deploy as ``args`` ask, returning 0, or 1 after printing the ``Error:`` line if it fails."""
+def run_deploy(
+    args: argparse.Namespace,
+    *,
+    toolchain: Toolchain | None = None,
+    execute: Callable[[DeployPlan], None] = execute_plan,
+) -> int:
+    """Deploy as ``args`` ask, returning 0, or 1 after printing the ``Error:`` line if it fails.
+
+    *toolchain* defaults to the real ``mpy-cross``.
+    """
     try:
-        deploy(args.example_file, args.mount, scene=args.scene, use_source=args.source)
+        plan = plan_deploy(
+            args.example_file,
+            args.mount,
+            Path.cwd(),
+            toolchain=toolchain if toolchain is not None else MpyCross(),
+            scene=args.scene,
+            use_source=args.source,
+        )
+        execute(plan)
     except DeployError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
