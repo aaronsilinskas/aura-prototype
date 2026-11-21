@@ -208,8 +208,8 @@ def execute_plan(plan: DeployPlan) -> None:
 
     compiled_count = 0
     build_choice = plan.build_choice
-    use_source = isinstance(build_choice, SourceBuild)
     if isinstance(build_choice, CompiledBuild):
+        use_source = False
         staging_root = source_root / "build"
         try:
             build_result = build(
@@ -222,6 +222,7 @@ def execute_plan(plan: DeployPlan) -> None:
         compiled_count = build_result.compiled
         synced = {entry.device: staging_root / entry.device for entry in entries}
     else:
+        use_source = True
         synced = {entry.source_device: source_root / entry.source for entry in entries}
 
     if plan.scene is not None and not dry_run:
