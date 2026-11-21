@@ -906,7 +906,9 @@ def test_version_mismatch_with_device_mounted_returns_nonzero(tmp_path: Path) ->
     assert result != 0
 
 
-def test_version_mismatch_with_device_mounted_prints_error(tmp_path: Path, capsys) -> None:
+def test_version_mismatch_with_device_mounted_prints_the_toolchain_error(
+    tmp_path: Path, capsys
+) -> None:
     source = tmp_path / "source"
     source.mkdir()
     make_source_tree(source)
@@ -919,7 +921,7 @@ def test_version_mismatch_with_device_mounted_prints_error(tmp_path: Path, capsy
     assert "Error: mpy-cross major version 9 does not match" in captured.err
 
 
-def test_version_mismatch_with_device_mounted_copies_nothing(tmp_path: Path) -> None:
+def test_version_mismatch_with_device_mounted_writes_nothing_to_the_mount(tmp_path: Path) -> None:
     source = tmp_path / "source"
     source.mkdir()
     make_source_tree(source)
@@ -935,6 +937,19 @@ def test_version_mismatch_with_device_mounted_copies_nothing(tmp_path: Path) -> 
     )
 
     assert list(mount.rglob("*")) == []
+
+
+def test_matching_toolchain_version_deploys_compiled_modules(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+
+    result = deploy(None, mount, source_root=source, toolchain=FakeToolchain())
+
+    assert result == 0
+    assert (mount / "effects" / "render.mpy").read_text() == "FAKE_MPY:render.py"
 
 
 def test_version_mismatch_compiles_nothing(tmp_path: Path) -> None:

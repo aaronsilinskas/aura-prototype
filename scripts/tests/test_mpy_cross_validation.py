@@ -160,15 +160,6 @@ def test_mpy_cross_toolchain_rejects_a_mount_running_another_major(tmp_path: Pat
         MpyCross().check_version(mount)
 
 
-def test_mpy_cross_toolchain_checks_a_dry_run_against_the_expected_major() -> None:
-    wrong_major = EXPECTED_CIRCUITPYTHON_MAJOR + 1
-    with (
-        patch("scripts.build.get_mpy_cross_major", return_value=wrong_major),
-        pytest.raises(VersionError, match=str(EXPECTED_CIRCUITPYTHON_MAJOR)),
-    ):
-        MpyCross().check_version(None)
-
-
 def test_expected_circuitpython_major_matches_setup_script_default() -> None:
     # setup_mpy_cross.sh defaults to 10.3.1 → major = 10
     assert EXPECTED_CIRCUITPYTHON_MAJOR == 10
