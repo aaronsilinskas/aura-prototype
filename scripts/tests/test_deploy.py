@@ -67,11 +67,12 @@ def plan_and_execute(
     execute_plan(plan)
 
 
-def test_dry_run_plans_a_compiled_deploy_without_a_mount(tmp_path: Path) -> None:
+def test_dry_run_plans_a_compiled_dry_run_without_a_mount(tmp_path: Path) -> None:
     toolchain = FakeToolchain()
 
     plan = plan_deploy(None, tmp_path / "nonexistent", tmp_path, dry_run=True, toolchain=toolchain)
 
+    assert plan.dry_run
     assert plan.build_choice == CompiledBuild(toolchain)
 
 

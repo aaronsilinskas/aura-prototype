@@ -273,7 +273,7 @@ def execute_plan(plan: DeployPlan) -> None:
     )
 
 
-def deploy_command(
+def run_deploy_cli(
     example_file: Path | None,
     mount: Path,
     *,
@@ -283,10 +283,12 @@ def deploy_command(
     use_source: bool = False,
     execute: Callable[[DeployPlan], None] = execute_plan,
 ) -> int:
-    """Plan a deploy from the current directory and *execute* it, as a command line does.
+    """Plan a deploy from the current directory and *execute* it, for a command line.
 
-    Returns 0, or 1 after printing the ``Error:`` line to stderr if the deploy
-    is refused or fails. *toolchain* defaults to the real ``mpy-cross``.
+    This is the command-line adapter that ``main`` and deploy-watch share, not
+    part of the library surface: it returns 0, or 1 after printing the
+    ``Error:`` line to stderr if the deploy is refused or fails. *toolchain*
+    defaults to the real ``mpy-cross``.
     """
     try:
         plan = plan_deploy(
@@ -355,7 +357,7 @@ def main(argv: list[str] | None = None) -> None:
         ),
     )
     args = parser.parse_args(argv)
-    rc = deploy_command(
+    rc = run_deploy_cli(
         args.example_file,
         args.mount,
         scene=args.scene,
