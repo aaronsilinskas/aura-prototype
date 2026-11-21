@@ -26,6 +26,7 @@ import os
 import secrets
 import shutil
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -208,8 +209,8 @@ def execute_plan(plan: DeployPlan) -> None:
 
     compiled_count = 0
     build_choice = plan.build_choice
-    use_source = isinstance(build_choice, SourceBuild)
     if isinstance(build_choice, CompiledBuild):
+        use_source = False
         staging_root = source_root / "build"
         try:
             build_result = build(
@@ -222,6 +223,7 @@ def execute_plan(plan: DeployPlan) -> None:
         compiled_count = build_result.compiled
         synced = {entry.device: staging_root / entry.device for entry in entries}
     else:
+        use_source = True
         synced = {entry.source_device: source_root / entry.source for entry in entries}
 
     if plan.scene is not None and not dry_run:
@@ -269,6 +271,40 @@ def execute_plan(plan: DeployPlan) -> None:
         f"Done. {compiled_count} compiled, "
         f"{len(copied)} copied, {len(skipped)} skipped, {len(pruned)} pruned."
     )
+
+
+def run_deploy_cli(
+    example_file: Path | None,
+    mount: Path,
+    *,
+    toolchain: Toolchain | None = None,
+    scene: str | None = None,
+    dry_run: bool = False,
+    use_source: bool = False,
+    execute: Callable[[DeployPlan], None] = execute_plan,
+) -> int:
+    """Plan a deploy from the current directory and *execute* it, for a command line.
+
+    This is the command-line adapter that ``main`` and deploy-watch share, not
+    part of the library surface: it returns 0, or 1 after printing the
+    ``Error:`` line to stderr if the deploy is refused or fails. *toolchain*
+    defaults to the real ``mpy-cross``.
+    """
+    try:
+        plan = plan_deploy(
+            example_file,
+            mount,
+            Path.cwd(),
+            toolchain=toolchain if toolchain is not None else MpyCross(),
+            scene=scene,
+            dry_run=dry_run,
+            use_source=use_source,
+        )
+        execute(plan)
+    except DeployError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+    return 0
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -321,20 +357,15 @@ def main(argv: list[str] | None = None) -> None:
         ),
     )
     args = parser.parse_args(argv)
-    try:
-        plan = plan_deploy(
-            args.example_file,
-            args.mount,
-            Path.cwd(),
-            toolchain=MpyCross(),
-            scene=args.scene,
-            dry_run=args.dry_run,
-            use_source=args.source,
-        )
-        execute_plan(plan)
-    except DeployError as exc:
-        print(f"Error: {exc}", file=sys.stderr)
-        sys.exit(1)
+    rc = run_deploy_cli(
+        args.example_file,
+        args.mount,
+        scene=args.scene,
+        dry_run=args.dry_run,
+        use_source=args.source,
+    )
+    if rc != 0:
+        sys.exit(rc)
 
 
 if __name__ == "__main__":
