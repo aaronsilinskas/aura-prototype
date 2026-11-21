@@ -4,18 +4,40 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
-from scripts.build import BuildError
+from scripts.build import BuildError, Toolchain, VersionError
 from scripts.deploy import deploy
 from scripts.ship_list import MODULE_DIRS, ship_list
 
 
-def fake_compile(src: Path, dest: Path) -> None:
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_text(f"FAKE_MPY:{src.name}")
+class FakeToolchain(Toolchain):
+    """Writes ``FAKE_MPY:<name>`` for each compile and records every call.
+
+    Its version check passes unless *version_mismatch* is set, and its first
+    *failing_compiles* compiles raise :class:`BuildError`.
+    """
+
+    def __init__(self, *, version_mismatch: bool = False, failing_compiles: int = 0) -> None:
+        self._version_mismatch = version_mismatch
+        self._failing_compiles = failing_compiles
+        self.checked_mounts: list[Path | None] = []
+        self.compiled: list[Path] = []
+        self.failed: list[Path] = []
+
+    def compile(self, src: Path, dest: Path) -> None:
+        if len(self.failed) < self._failing_compiles:
+            self.failed.append(src)
+            raise BuildError(f"mpy-cross failed on {src}: SyntaxError: oops")
+        self.compiled.append(src)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(f"FAKE_MPY:{src.name}")
+
+    def check_version(self, mount: Path | None) -> None:
+        self.checked_mounts.append(mount)
+        if self._version_mismatch:
+            raise VersionError("mpy-cross major version 9 does not match CircuitPython 10.x")
 
 
 def make_source_tree(root: Path) -> None:
@@ -86,7 +108,7 @@ def test_read_only_mount_copies_nothing(tmp_path: Path) -> None:
     mount.mkdir()
     mount.chmod(0o555)
     try:
-        deploy(None, mount, source_root=source, compile=fake_compile)
+        deploy(None, mount, source_root=source, toolchain=FakeToolchain())
         assert not list(mount.rglob("*"))
     finally:
         mount.chmod(0o755)
@@ -101,7 +123,7 @@ def test_example_file_is_deployed_as_code_py(tmp_path: Path) -> None:
     example = source / "my_demo.py"
     example.write_text("# demo")
 
-    result = deploy(example, mount, source_root=source, compile=fake_compile)
+    result = deploy(example, mount, source_root=source, toolchain=FakeToolchain())
 
     assert result == 0
     assert (mount / "code.py").read_text() == "# demo"
@@ -119,7 +141,7 @@ def test_example_file_is_always_deployed_even_when_up_to_date(tmp_path: Path) ->
     existing.write_text("# old demo")
     os.utime(existing, (example.stat().st_mtime, example.stat().st_mtime))
 
-    deploy(example, mount, source_root=source, compile=fake_compile)
+    deploy(example, mount, source_root=source, toolchain=FakeToolchain())
 
     assert existing.read_text() == "# new demo"
 
@@ -133,7 +155,7 @@ def test_no_example_file_leaves_code_py_untouched(tmp_path: Path) -> None:
     existing = mount / "code.py"
     existing.write_text("# original")
 
-    deploy(None, mount, source_root=source, compile=fake_compile)
+    deploy(None, mount, source_root=source, toolchain=FakeToolchain())
 
     assert existing.read_text() == "# original"
 
@@ -148,7 +170,7 @@ def test_boot_py_is_deployed_alongside_code_py(tmp_path: Path) -> None:
     example = source / "my_demo.py"
     example.write_text("# demo")
 
-    deploy(example, mount, source_root=source, compile=fake_compile)
+    deploy(example, mount, source_root=source, toolchain=FakeToolchain())
 
     assert (mount / "boot.py").read_text() == "# boot"
 
@@ -161,7 +183,7 @@ def test_boot_py_is_not_deployed_when_no_example_file_given(tmp_path: Path) -> N
     mount = tmp_path / "mount"
     mount.mkdir()
 
-    deploy(None, mount, source_root=source, compile=fake_compile)
+    deploy(None, mount, source_root=source, toolchain=FakeToolchain())
 
     assert not (mount / "boot.py").exists()
 
@@ -181,7 +203,7 @@ def test_boot_py_deploy_overwrites_a_stale_copy_already_on_mount(tmp_path: Path)
     # Same mtime as the source boot.py -- would normally look "up to date".
     os.utime(existing_boot, (boot_source.stat().st_mtime, boot_source.stat().st_mtime))
 
-    deploy(example, mount, source_root=source, compile=fake_compile)
+    deploy(example, mount, source_root=source, toolchain=FakeToolchain())
 
     assert existing_boot.read_text() == "# new boot"
 
@@ -195,7 +217,7 @@ def test_boot_py_is_never_deleted_from_mount(tmp_path: Path) -> None:
     boot_py = mount / "boot.py"
     boot_py.write_text("# running boot")
 
-    deploy(None, mount, source_root=source, compile=fake_compile)
+    deploy(None, mount, source_root=source, toolchain=FakeToolchain())
 
     assert boot_py.exists()
 
@@ -209,7 +231,7 @@ def test_deploying_an_example_with_no_repo_boot_py_does_not_fail(tmp_path: Path)
     example = source / "my_demo.py"
     example.write_text("# demo")
 
-    result = deploy(example, mount, source_root=source, compile=fake_compile)
+    result = deploy(example, mount, source_root=source, toolchain=FakeToolchain())
 
     assert result == 0
     assert (mount / "code.py").read_text() == "# demo"
@@ -228,7 +250,7 @@ def test_boot_py_is_not_duplicated_into_mounts_hardware_circuitpython_on_compile
     example = source / "my_demo.py"
     example.write_text("# demo")
 
-    deploy(example, mount, source_root=source, compile=fake_compile)
+    deploy(example, mount, source_root=source, toolchain=FakeToolchain())
 
     assert (mount / "boot.py").read_text() == "# boot"
     assert not (mount / "hardware" / "circuitpython" / "boot.py").exists()
@@ -261,7 +283,7 @@ def test_module_directories_are_synced_to_mount(tmp_path: Path) -> None:
     mount = tmp_path / "mount"
     mount.mkdir()
 
-    result = deploy(None, mount, source_root=source, compile=fake_compile)
+    result = deploy(None, mount, source_root=source, toolchain=FakeToolchain())
 
     assert result == 0
     assert (mount / "effects" / "render.mpy").exists()
@@ -276,7 +298,7 @@ def test_hardware_subdirectory_modules_are_deployed(tmp_path: Path) -> None:
     mount = tmp_path / "mount"
     mount.mkdir()
 
-    deploy(None, mount, source_root=source, compile=fake_compile)
+    deploy(None, mount, source_root=source, toolchain=FakeToolchain())
 
     assert (mount / "hardware" / "__init__.mpy").exists()
     assert (mount / "hardware" / "shared" / "__init__.mpy").exists()
@@ -293,7 +315,7 @@ def test_existing_destination_file_is_not_overwritten(tmp_path: Path) -> None:
     dest = mount / "effects" / "render.mpy"
     dest.write_bytes(b"DEVICE_MPY")
 
-    deploy(None, mount, source_root=source, compile=fake_compile)
+    deploy(None, mount, source_root=source, toolchain=FakeToolchain())
 
     assert dest.read_bytes() == b"DEVICE_MPY"
 
@@ -315,7 +337,7 @@ def test_file_within_fat32_tolerance_is_skipped(tmp_path: Path) -> None:
     os.utime(src, (_BASE_TIME, _BASE_TIME))
     os.utime(dest, (_BASE_TIME - 1, _BASE_TIME - 1))  # 1 s behind — within tolerance
 
-    deploy(None, mount, source_root=source, compile=fake_compile)
+    deploy(None, mount, source_root=source, toolchain=FakeToolchain())
 
     assert dest.read_bytes() == b"DEVICE_MPY"
 
@@ -333,7 +355,7 @@ def test_file_at_fat32_boundary_is_skipped(tmp_path: Path) -> None:
     os.utime(src, (_BASE_TIME, _BASE_TIME))
     os.utime(dest, (_BASE_TIME - 2, _BASE_TIME - 2))  # exactly 2 s — still within tolerance
 
-    deploy(None, mount, source_root=source, compile=fake_compile)
+    deploy(None, mount, source_root=source, toolchain=FakeToolchain())
 
     assert dest.read_bytes() == b"DEVICE_MPY"
 
@@ -351,9 +373,9 @@ def test_stale_destination_file_is_overwritten(tmp_path: Path) -> None:
     os.utime(src, (_BASE_TIME, _BASE_TIME))
     os.utime(dest, (_BASE_TIME - 3, _BASE_TIME - 3))  # 3 s behind — outside tolerance
 
-    deploy(None, mount, source_root=source, compile=fake_compile)
+    deploy(None, mount, source_root=source, toolchain=FakeToolchain())
 
-    # fake_compile writes "FAKE_MPY:<name>" — the stale copy must be replaced.
+    # FakeToolchain writes "FAKE_MPY:<name>" — the stale copy must be replaced.
     assert dest.read_text() == "FAKE_MPY:render.py"
 
 
@@ -363,7 +385,7 @@ def test_dry_run_skips_mount_existence_check(tmp_path: Path) -> None:
     make_source_tree(source)
 
     result = deploy(
-        None, tmp_path / "nonexistent", source_root=source, compile=fake_compile, dry_run=True
+        None, tmp_path / "nonexistent", source_root=source, toolchain=FakeToolchain(), dry_run=True
     )
 
     assert result == 0
@@ -376,7 +398,7 @@ def test_dry_run_writes_no_files(tmp_path: Path) -> None:
     mount = tmp_path / "mount"
     mount.mkdir()
 
-    deploy(None, mount, source_root=source, compile=fake_compile, dry_run=True)
+    deploy(None, mount, source_root=source, toolchain=FakeToolchain(), dry_run=True)
 
     assert list(mount.rglob("*")) == []
 
@@ -388,7 +410,7 @@ def test_dry_run_output_shows_dry_run_prefix_for_copies(tmp_path: Path, capsys) 
     mount = tmp_path / "mount"
     mount.mkdir()
 
-    deploy(None, mount, source_root=source, compile=fake_compile, dry_run=True)
+    deploy(None, mount, source_root=source, toolchain=FakeToolchain(), dry_run=True)
 
     captured = capsys.readouterr()
     assert "[DRY RUN] COPY" in captured.out
@@ -404,7 +426,7 @@ def test_stale_py_file_is_deleted_from_mount(tmp_path: Path) -> None:
     stale = mount / "effects" / "old_module.py"
     stale.write_text("# stale")
 
-    deploy(None, mount, source_root=source, compile=fake_compile)
+    deploy(None, mount, source_root=source, toolchain=FakeToolchain())
 
     assert not stale.exists()
 
@@ -419,7 +441,7 @@ def test_live_mpy_file_is_not_deleted_from_mount(tmp_path: Path) -> None:
     existing = mount / "effects" / "render.mpy"
     existing.write_bytes(b"DEVICE_MPY")
 
-    deploy(None, mount, source_root=source, compile=fake_compile)
+    deploy(None, mount, source_root=source, toolchain=FakeToolchain())
 
     assert existing.exists()
 
@@ -434,7 +456,7 @@ def test_stale_excluded_suffix_file_on_mount_is_not_pruned(tmp_path: Path) -> No
     stale_pyc = mount / "effects" / "old_module.pyc"
     stale_pyc.write_text("")
 
-    deploy(None, mount, source_root=source, compile=fake_compile)
+    deploy(None, mount, source_root=source, toolchain=FakeToolchain())
 
     assert stale_pyc.exists()
 
@@ -451,7 +473,7 @@ def test_stale_wav_file_is_deleted_from_mount(tmp_path: Path) -> None:
     stale_wav = mount / "effects" / "sounds" / "old_sound.wav"
     stale_wav.write_bytes(b"")
 
-    deploy(None, mount, source_root=source, compile=fake_compile)
+    deploy(None, mount, source_root=source, toolchain=FakeToolchain())
 
     assert not stale_wav.exists()
 
@@ -465,7 +487,7 @@ def test_code_py_is_never_deleted_from_mount(tmp_path: Path) -> None:
     code_py = mount / "code.py"
     code_py.write_text("# running example")
 
-    deploy(None, mount, source_root=source, compile=fake_compile)
+    deploy(None, mount, source_root=source, toolchain=FakeToolchain())
 
     assert code_py.exists()
 
@@ -483,7 +505,7 @@ def test_files_outside_module_dirs_are_not_deleted(tmp_path: Path) -> None:
     settings = mount / "settings.toml"
     settings.write_text("[wifi]")
 
-    deploy(None, mount, source_root=source, compile=fake_compile)
+    deploy(None, mount, source_root=source, toolchain=FakeToolchain())
 
     assert lib_file.exists()
     assert settings.exists()
@@ -499,7 +521,7 @@ def test_excluded_path_files_on_mount_are_not_pruned(tmp_path: Path) -> None:
     legacy_test = mount / "effects" / "tests" / "old_test.py"
     legacy_test.write_text("# legacy test")
 
-    deploy(None, mount, source_root=source, compile=fake_compile)
+    deploy(None, mount, source_root=source, toolchain=FakeToolchain())
 
     assert legacy_test.exists()
 
@@ -514,7 +536,7 @@ def test_empty_subdirectory_is_removed_after_pruning(tmp_path: Path) -> None:
     stale = mount / "effects" / "steps" / "old_step.py"
     stale.write_text("# stale step")
 
-    deploy(None, mount, source_root=source, compile=fake_compile)
+    deploy(None, mount, source_root=source, toolchain=FakeToolchain())
 
     assert not stale.exists()
     assert not (mount / "effects" / "steps").exists()
@@ -527,7 +549,7 @@ def test_empty_subdirectory_already_on_mount_is_removed(tmp_path: Path) -> None:
     mount = tmp_path / "mount"
     (mount / "effects" / "steps").mkdir(parents=True)
 
-    deploy(None, mount, source_root=source, compile=fake_compile)
+    deploy(None, mount, source_root=source, toolchain=FakeToolchain())
 
     assert not (mount / "effects" / "steps").exists()
 
@@ -545,7 +567,7 @@ def test_module_root_removed_when_fully_pruned(tmp_path: Path) -> None:
     stale = mount / "effects" / "render.py"
     stale.write_text("# stale render")
 
-    deploy(None, mount, source_root=source, compile=fake_compile)
+    deploy(None, mount, source_root=source, toolchain=FakeToolchain())
 
     assert not stale.exists()
     assert not (mount / "effects").exists()
@@ -561,7 +583,7 @@ def test_non_empty_directory_is_not_removed(tmp_path: Path) -> None:
     stale = mount / "effects" / "steps" / "old_step.py"
     stale.write_text("# stale")
 
-    deploy(None, mount, source_root=source, compile=fake_compile)
+    deploy(None, mount, source_root=source, toolchain=FakeToolchain())
 
     assert (mount / "effects").exists()
 
@@ -573,7 +595,7 @@ def test_first_time_deploy_with_no_module_dirs_on_mount(tmp_path: Path) -> None:
     mount = tmp_path / "mount"
     mount.mkdir()
 
-    result = deploy(None, mount, source_root=source, compile=fake_compile)
+    result = deploy(None, mount, source_root=source, toolchain=FakeToolchain())
 
     assert result == 0
 
@@ -588,7 +610,7 @@ def test_dry_run_does_not_delete_stale_files(tmp_path: Path) -> None:
     stale = mount / "effects" / "old_module.py"
     stale.write_text("# stale")
 
-    deploy(None, mount, source_root=source, compile=fake_compile, dry_run=True)
+    deploy(None, mount, source_root=source, toolchain=FakeToolchain(), dry_run=True)
 
     assert stale.exists()
 
@@ -602,7 +624,7 @@ def test_dry_run_prune_output_shows_dry_run_prefix(tmp_path: Path, capsys) -> No
     (mount / "effects").mkdir()
     (mount / "effects" / "old_module.py").write_text("# stale")
 
-    deploy(None, mount, source_root=source, compile=fake_compile, dry_run=True)
+    deploy(None, mount, source_root=source, toolchain=FakeToolchain(), dry_run=True)
 
     captured = capsys.readouterr()
     assert "[DRY RUN] PRUNE" in captured.out
@@ -618,7 +640,7 @@ def test_summary_includes_pruned_count(tmp_path: Path, capsys) -> None:
     (mount / "effects" / "old_a.py").write_text("# stale")
     (mount / "effects" / "old_b.py").write_text("# stale")
 
-    deploy(None, mount, source_root=source, compile=fake_compile)
+    deploy(None, mount, source_root=source, toolchain=FakeToolchain())
 
     captured = capsys.readouterr()
     assert "2 pruned" in captured.out
@@ -632,7 +654,9 @@ def test_scene_flag_sets_default_scene_in_existing_boot_file(tmp_path: Path) -> 
     mount.mkdir()
     (mount / "aura-boot.json").write_text(json.dumps({"default_scene": "tag"}))
 
-    deploy(None, mount, source_root=source, compile=fake_compile, scene="red_light_green_light")
+    deploy(
+        None, mount, source_root=source, toolchain=FakeToolchain(), scene="red_light_green_light"
+    )
 
     result = json.loads((mount / "aura-boot.json").read_text())
     assert result["default_scene"] == "red_light_green_light"
@@ -647,7 +671,7 @@ def test_scene_flag_preserves_other_boot_values_when_scene_is_set(tmp_path: Path
     existing_boot_values = {"default_scene": "tag", "brightness": 0.8}
     (mount / "aura-boot.json").write_text(json.dumps(existing_boot_values))
 
-    deploy(None, mount, source_root=source, compile=fake_compile, scene="hardware_test")
+    deploy(None, mount, source_root=source, toolchain=FakeToolchain(), scene="hardware_test")
 
     result = json.loads((mount / "aura-boot.json").read_text())
     assert result["brightness"] == 0.8
@@ -660,7 +684,7 @@ def test_scene_flag_creates_boot_file_fresh_when_absent(tmp_path: Path) -> None:
     mount = tmp_path / "mount"
     mount.mkdir()
 
-    deploy(None, mount, source_root=source, compile=fake_compile, scene="hardware_test")
+    deploy(None, mount, source_root=source, toolchain=FakeToolchain(), scene="hardware_test")
 
     result = json.loads((mount / "aura-boot.json").read_text())
     assert result["default_scene"] == "hardware_test"
@@ -673,7 +697,7 @@ def test_scene_flag_writes_a_scene_deploy_token_beside_default_scene(tmp_path: P
     mount = tmp_path / "mount"
     mount.mkdir()
 
-    deploy(None, mount, source_root=source, compile=fake_compile, scene="hardware_test")
+    deploy(None, mount, source_root=source, toolchain=FakeToolchain(), scene="hardware_test")
 
     boot_values = json.loads((mount / "aura-boot.json").read_text())
     assert boot_values["default_scene"] == "hardware_test"
@@ -690,7 +714,7 @@ def test_scene_flag_leaves_an_old_aura_settings_json_untouched(tmp_path: Path) -
     old_path = mount / "aura-settings.json"
     old_path.write_text(original_content)
 
-    deploy(None, mount, source_root=source, compile=fake_compile, scene="hardware_test")
+    deploy(None, mount, source_root=source, toolchain=FakeToolchain(), scene="hardware_test")
 
     assert old_path.read_text() == original_content
 
@@ -703,9 +727,9 @@ def test_each_scene_flag_deploy_writes_a_new_scene_deploy_token(tmp_path: Path) 
     mount.mkdir()
     boot_path = mount / "aura-boot.json"
 
-    deploy(None, mount, source_root=source, compile=fake_compile, scene="tag")
+    deploy(None, mount, source_root=source, toolchain=FakeToolchain(), scene="tag")
     first = json.loads(boot_path.read_text())["scene_deploy_token"]
-    deploy(None, mount, source_root=source, compile=fake_compile, scene="tag")
+    deploy(None, mount, source_root=source, toolchain=FakeToolchain(), scene="tag")
     second = json.loads(boot_path.read_text())["scene_deploy_token"]
 
     assert first != second
@@ -725,7 +749,7 @@ def test_scene_flag_does_not_write_scene_key_into_device_config(tmp_path: Path) 
     device_config_path = mount / "aura-device.json"
     device_config_path.write_text(original_content)
 
-    deploy(None, mount, source_root=source, compile=fake_compile, scene="tag")
+    deploy(None, mount, source_root=source, toolchain=FakeToolchain(), scene="tag")
 
     assert device_config_path.read_text() == original_content
 
@@ -740,7 +764,7 @@ def test_omitting_scene_flag_leaves_existing_boot_file_untouched(tmp_path: Path)
     boot_path = mount / "aura-boot.json"
     boot_path.write_text(original_content)
 
-    deploy(None, mount, source_root=source, compile=fake_compile)
+    deploy(None, mount, source_root=source, toolchain=FakeToolchain())
 
     assert boot_path.read_text() == original_content
 
@@ -756,7 +780,12 @@ def test_scene_flag_with_dry_run_leaves_boot_file_untouched(tmp_path: Path) -> N
     boot_path.write_text(original_content)
 
     deploy(
-        None, mount, source_root=source, compile=fake_compile, scene="hardware_test", dry_run=True
+        None,
+        mount,
+        source_root=source,
+        toolchain=FakeToolchain(),
+        scene="hardware_test",
+        dry_run=True,
     )
 
     assert boot_path.read_text() == original_content
@@ -770,7 +799,12 @@ def test_scene_flag_with_dry_run_creates_no_boot_file_when_absent(tmp_path: Path
     mount.mkdir()
 
     deploy(
-        None, mount, source_root=source, compile=fake_compile, scene="hardware_test", dry_run=True
+        None,
+        mount,
+        source_root=source,
+        toolchain=FakeToolchain(),
+        scene="hardware_test",
+        dry_run=True,
     )
 
     assert not (mount / "aura-boot.json").exists()
@@ -783,7 +817,7 @@ def test_deploy_ships_mpy_not_py_for_compiled_modules(tmp_path: Path) -> None:
     mount = tmp_path / "mount"
     mount.mkdir()
 
-    deploy(None, mount, source_root=source, compile=fake_compile)
+    deploy(None, mount, source_root=source, toolchain=FakeToolchain())
 
     assert (mount / "effects" / "render.mpy").exists()
     assert not (mount / "effects" / "render.py").exists()
@@ -800,7 +834,7 @@ def test_deploy_ships_data_files_raw(tmp_path: Path) -> None:
     mount = tmp_path / "mount"
     mount.mkdir()
 
-    deploy(None, mount, source_root=source, compile=fake_compile)
+    deploy(None, mount, source_root=source, toolchain=FakeToolchain())
 
     assert (mount / "packs" / "data.json").read_text() == '{"key": "value"}'
     assert (mount / "packs" / "sounds" / "click.wav").read_bytes() == b"RIFF"
@@ -813,7 +847,7 @@ def test_deploy_summary_includes_compiled_count(tmp_path: Path, capsys) -> None:
     mount = tmp_path / "mount"
     mount.mkdir()
 
-    deploy(None, mount, source_root=source, compile=fake_compile)
+    deploy(None, mount, source_root=source, toolchain=FakeToolchain())
 
     captured = capsys.readouterr()
     assert "compiled" in captured.out
@@ -826,10 +860,7 @@ def test_deploy_compile_failure_returns_nonzero_exit_code(tmp_path: Path) -> Non
     mount = tmp_path / "mount"
     mount.mkdir()
 
-    def always_fails(src: Path, dest: Path) -> None:
-        raise BuildError(f"mpy-cross failed on {src}: SyntaxError")
-
-    result = deploy(None, mount, source_root=source, compile=always_fails)
+    result = deploy(None, mount, source_root=source, toolchain=FakeToolchain(failing_compiles=1))
 
     assert result != 0
 
@@ -841,10 +872,7 @@ def test_deploy_compile_failure_leaves_mount_untouched(tmp_path: Path) -> None:
     mount = tmp_path / "mount"
     mount.mkdir()
 
-    def always_fails(src: Path, dest: Path) -> None:
-        raise BuildError(f"mpy-cross failed on {src}: SyntaxError")
-
-    deploy(None, mount, source_root=source, compile=always_fails)
+    deploy(None, mount, source_root=source, toolchain=FakeToolchain(failing_compiles=1))
 
     assert list(mount.rglob("*")) == []
 
@@ -857,23 +885,13 @@ def test_deploy_compile_failure_prints_error_with_file_and_toolchain_output(
     make_source_tree(source)
     mount = tmp_path / "mount"
     mount.mkdir()
-    failed: list[str] = []
+    toolchain = FakeToolchain(failing_compiles=1)
 
-    def first_fails(src: Path, dest: Path) -> None:
-        if not failed:
-            failed.append(src.name)
-            raise BuildError(f"mpy-cross failed on {src}: SyntaxError: oops")
-        fake_compile(src, dest)
-
-    deploy(None, mount, source_root=source, compile=first_fails)
+    deploy(None, mount, source_root=source, toolchain=toolchain)
 
     captured = capsys.readouterr()
-    assert failed[0] in captured.err
+    assert str(toolchain.failed[0]) in captured.err
     assert "SyntaxError" in captured.err
-
-
-def _boot_out(major: int = 10) -> str:
-    return f"Adafruit CircuitPython {major}.2.1 on 2025-01-15; Adafruit Feather RP2040"
 
 
 def test_version_mismatch_with_device_mounted_returns_nonzero(tmp_path: Path) -> None:
@@ -882,57 +900,95 @@ def test_version_mismatch_with_device_mounted_returns_nonzero(tmp_path: Path) ->
     make_source_tree(source)
     mount = tmp_path / "mount"
     mount.mkdir()
-    (mount / "boot_out.txt").write_text(_boot_out(major=10))
 
-    with patch("scripts.build.get_mpy_cross_major", return_value=9):
-        result = deploy(None, mount, source_root=source, compile=fake_compile)
+    result = deploy(None, mount, source_root=source, toolchain=FakeToolchain(version_mismatch=True))
 
     assert result != 0
 
 
-def test_version_mismatch_with_device_mounted_prints_error(tmp_path: Path, capsys) -> None:
+def test_version_mismatch_with_device_mounted_prints_the_toolchain_error(
+    tmp_path: Path, capsys
+) -> None:
     source = tmp_path / "source"
     source.mkdir()
     make_source_tree(source)
     mount = tmp_path / "mount"
     mount.mkdir()
-    (mount / "boot_out.txt").write_text(_boot_out(major=10))
 
-    with patch("scripts.build.get_mpy_cross_major", return_value=9):
-        deploy(None, mount, source_root=source, compile=fake_compile)
+    deploy(None, mount, source_root=source, toolchain=FakeToolchain(version_mismatch=True))
 
     captured = capsys.readouterr()
-    assert "mpy-cross" in captured.err.lower() or "version" in captured.err.lower()
+    assert "Error: mpy-cross major version 9 does not match" in captured.err
 
 
-def test_version_mismatch_with_device_mounted_copies_nothing(tmp_path: Path) -> None:
+def test_version_mismatch_with_device_mounted_writes_nothing_to_the_mount(tmp_path: Path) -> None:
     source = tmp_path / "source"
     source.mkdir()
     make_source_tree(source)
     mount = tmp_path / "mount"
     mount.mkdir()
-    (mount / "boot_out.txt").write_text(_boot_out(major=10))
 
-    with patch("scripts.build.get_mpy_cross_major", return_value=9):
-        deploy(None, mount, source_root=source, compile=fake_compile)
+    deploy(
+        None,
+        mount,
+        source_root=source,
+        toolchain=FakeToolchain(version_mismatch=True),
+        scene="hardware_test",
+    )
 
-    synced = [p for p in mount.rglob("*") if p.name != "boot_out.txt"]
-    assert synced == []
+    assert list(mount.rglob("*")) == []
 
 
-def test_matching_version_with_device_mounted_deploys_normally(tmp_path: Path) -> None:
+def test_matching_toolchain_version_deploys_compiled_modules(tmp_path: Path) -> None:
     source = tmp_path / "source"
     source.mkdir()
     make_source_tree(source)
     mount = tmp_path / "mount"
     mount.mkdir()
-    (mount / "boot_out.txt").write_text(_boot_out(major=10))
 
-    with patch("scripts.build.get_mpy_cross_major", return_value=10):
-        result = deploy(None, mount, source_root=source, compile=fake_compile)
+    result = deploy(None, mount, source_root=source, toolchain=FakeToolchain())
 
     assert result == 0
-    assert (mount / "effects" / "render.mpy").exists()
+    assert (mount / "effects" / "render.mpy").read_text() == "FAKE_MPY:render.py"
+
+
+def test_version_mismatch_compiles_nothing(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+    toolchain = FakeToolchain(version_mismatch=True)
+
+    deploy(None, mount, source_root=source, toolchain=toolchain)
+
+    assert toolchain.compiled == []
+
+
+def test_compiled_deploy_checks_the_toolchain_version_against_the_mount(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+    toolchain = FakeToolchain()
+
+    deploy(None, mount, source_root=source, toolchain=toolchain)
+
+    assert toolchain.checked_mounts == [mount]
+
+
+def test_dry_run_checks_the_toolchain_version_against_the_expected_major(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    toolchain = FakeToolchain()
+
+    deploy(None, tmp_path / "nonexistent", source_root=source, toolchain=toolchain, dry_run=True)
+
+    assert toolchain.checked_mounts == [None]
 
 
 def test_dry_run_version_mismatch_returns_nonzero(tmp_path: Path) -> None:
@@ -940,25 +996,15 @@ def test_dry_run_version_mismatch_returns_nonzero(tmp_path: Path) -> None:
     source.mkdir()
     make_source_tree(source)
 
-    with patch("scripts.build.get_mpy_cross_major", return_value=9):
-        result = deploy(
-            None, tmp_path / "nonexistent", source_root=source, compile=fake_compile, dry_run=True
-        )
+    result = deploy(
+        None,
+        tmp_path / "nonexistent",
+        source_root=source,
+        toolchain=FakeToolchain(version_mismatch=True),
+        dry_run=True,
+    )
 
     assert result != 0
-
-
-def test_dry_run_matching_version_succeeds(tmp_path: Path) -> None:
-    source = tmp_path / "source"
-    source.mkdir()
-    make_source_tree(source)
-
-    with patch("scripts.build.get_mpy_cross_major", return_value=10):
-        result = deploy(
-            None, tmp_path / "nonexistent", source_root=source, compile=fake_compile, dry_run=True
-        )
-
-    assert result == 0
 
 
 def test_source_mode_returns_success(tmp_path: Path) -> None:
@@ -1029,7 +1075,7 @@ def test_compiled_mode_prunes_orphaned_py_left_by_previous_source_deploy(
     orphaned_py = mount / "effects" / "render.py"
     orphaned_py.write_bytes(b"OLD_PY")
 
-    deploy(None, mount, source_root=source, compile=fake_compile)
+    deploy(None, mount, source_root=source, toolchain=FakeToolchain())
 
     assert not orphaned_py.exists()
 
@@ -1059,18 +1105,22 @@ def test_source_mode_summary_reports_zero_compiled(tmp_path: Path, capsys) -> No
     assert "0 compiled" in captured.out
 
 
-def test_source_mode_succeeds_without_mpy_cross_installed(tmp_path: Path) -> None:
+@pytest.mark.parametrize("dry_run", [False, True], ids=["live", "dry_run"])
+def test_source_mode_never_calls_the_toolchain(tmp_path: Path, dry_run: bool) -> None:
     source = tmp_path / "source"
     source.mkdir()
     make_source_tree(source)
     mount = tmp_path / "mount"
     mount.mkdir()
+    toolchain = FakeToolchain(version_mismatch=True)
 
-    with patch("scripts.deploy.validate_mpy_cross_version") as mock_validate:
-        result = deploy(None, mount, source_root=source, use_source=True)
+    result = deploy(
+        None, mount, source_root=source, toolchain=toolchain, use_source=True, dry_run=dry_run
+    )
 
     assert result == 0
-    mock_validate.assert_not_called()
+    assert toolchain.checked_mounts == []
+    assert toolchain.compiled == []
 
 
 _REPO_ROOT = Path(__file__).parents[2]
@@ -1088,7 +1138,9 @@ def test_real_repo_tree_lands_exactly_the_ship_list_and_code_py_on_the_mount(
     example = tmp_path / "example.py"
     example.write_text("# demo")
 
-    result = deploy(example, mount, source_root=source, compile=fake_compile, use_source=use_source)
+    result = deploy(
+        example, mount, source_root=source, toolchain=FakeToolchain(), use_source=use_source
+    )
 
     landed = {path.relative_to(mount) for path in mount.rglob("*") if path.is_file()}
     shipped = ship_list(source)

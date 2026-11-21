@@ -239,6 +239,7 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `SerialTransport` | `scripts/sd_sync_transport.py` | Live host-side `Transport`, framing SD-sync lines with `LineFramer` like `UsbCdcTransport` but over a host serial port opened via `deploy_watch`'s `SerialHandle`/`open_serial_with_retry` |
 | `find_port` / `SerialChannel` / `PortAutoDetectError` | `scripts/port_auto_detect.py` | **Port auto-detect** for either channel: `deploy_watch` asks for the console channel, `scripts/sd_sync.py` for the data channel; `--port` overrides without scanning |
 | `ship_list` / `ShipList` / `ShipEntry` / `governed_mount_files` | `scripts/ship_list.py` | The **Ship list**: which files land where on a device (`MODULE_DIRS`, exclusions, compiled or raw, `boot.py` placement). `scripts/build.py` stages it; `scripts/deploy.py` syncs it and prunes mount files it no longer names |
+| `Toolchain` / `MpyCross` | `scripts/build.py` | Port (ADR-0012) for compiling device modules to `.mpy` and checking the compiler's CircuitPython major against a mount's `boot_out.txt`, or the repo-pinned major for a dry run. `MpyCross` is the real binary and the deploy's default; deploy tests pass a fake |
 
 ---
 
