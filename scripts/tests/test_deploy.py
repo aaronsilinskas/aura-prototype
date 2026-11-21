@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from scripts.build import BuildError, Toolchain, VersionError
-from scripts.deploy import deploy
+from scripts.deploy import DeployError, deploy, main
 from scripts.ship_list import MODULE_DIRS, ship_list
 
 
@@ -64,40 +64,40 @@ def boot_py_source(root: Path) -> Path:
     return root / "hardware" / "circuitpython" / "boot.py"
 
 
-def test_nonexistent_mount_exits_with_nonzero_code(tmp_path: Path) -> None:
-    result = deploy(None, tmp_path / "nonexistent")
-    assert result != 0
+def test_nonexistent_mount_raises_deploy_error(tmp_path: Path) -> None:
+    mount = tmp_path / "nonexistent"
+
+    with pytest.raises(DeployError) as raised:
+        deploy(None, mount)
+
+    assert str(raised.value) == f"mount path '{mount}' does not exist or is not a directory."
 
 
-def test_file_instead_of_directory_as_mount_exits_with_nonzero_code(tmp_path: Path) -> None:
+def test_file_instead_of_directory_as_mount_raises_deploy_error(tmp_path: Path) -> None:
     mount_file = tmp_path / "not_a_dir"
     mount_file.write_text("oops")
-    result = deploy(None, mount_file)
-    assert result != 0
+
+    with pytest.raises(DeployError) as raised:
+        deploy(None, mount_file)
+
+    assert str(raised.value) == f"mount path '{mount_file}' does not exist or is not a directory."
 
 
-def test_read_only_mount_exits_with_nonzero_code(tmp_path: Path) -> None:
+def test_read_only_mount_raises_deploy_error_telling_the_user_to_stop_code_py(
+    tmp_path: Path,
+) -> None:
     mount = tmp_path / "mount"
     mount.mkdir()
     mount.chmod(0o555)
     try:
-        result = deploy(None, mount)
-        assert result != 0
+        with pytest.raises(DeployError) as raised:
+            deploy(None, mount)
     finally:
         mount.chmod(0o755)
 
-
-def test_read_only_mount_prints_error_message(tmp_path: Path, capsys) -> None:
-    mount = tmp_path / "mount"
-    mount.mkdir()
-    mount.chmod(0o555)
-    try:
-        deploy(None, mount)
-        captured = capsys.readouterr()
-        assert "read-only" in captured.err
-        assert "Ctrl+C" in captured.err
-    finally:
-        mount.chmod(0o755)
+    assert str(raised.value) == (
+        "CIRCUITPY is read-only. Press Ctrl+C on the device to stop code.py first."
+    )
 
 
 def test_read_only_mount_copies_nothing(tmp_path: Path) -> None:
@@ -108,7 +108,8 @@ def test_read_only_mount_copies_nothing(tmp_path: Path) -> None:
     mount.mkdir()
     mount.chmod(0o555)
     try:
-        deploy(None, mount, source_root=source, toolchain=FakeToolchain())
+        with pytest.raises(DeployError):
+            deploy(None, mount, source_root=source, toolchain=FakeToolchain())
         assert not list(mount.rglob("*"))
     finally:
         mount.chmod(0o755)
@@ -123,9 +124,7 @@ def test_example_file_is_deployed_as_code_py(tmp_path: Path) -> None:
     example = source / "my_demo.py"
     example.write_text("# demo")
 
-    result = deploy(example, mount, source_root=source, toolchain=FakeToolchain())
-
-    assert result == 0
+    deploy(example, mount, source_root=source, toolchain=FakeToolchain())
     assert (mount / "code.py").read_text() == "# demo"
 
 
@@ -231,9 +230,7 @@ def test_deploying_an_example_with_no_repo_boot_py_does_not_fail(tmp_path: Path)
     example = source / "my_demo.py"
     example.write_text("# demo")
 
-    result = deploy(example, mount, source_root=source, toolchain=FakeToolchain())
-
-    assert result == 0
+    deploy(example, mount, source_root=source, toolchain=FakeToolchain())
     assert (mount / "code.py").read_text() == "# demo"
     assert not (mount / "boot.py").exists()
 
@@ -283,9 +280,7 @@ def test_module_directories_are_synced_to_mount(tmp_path: Path) -> None:
     mount = tmp_path / "mount"
     mount.mkdir()
 
-    result = deploy(None, mount, source_root=source, toolchain=FakeToolchain())
-
-    assert result == 0
+    deploy(None, mount, source_root=source, toolchain=FakeToolchain())
     assert (mount / "effects" / "render.mpy").exists()
     assert (mount / "engine" / "timer.mpy").exists()
     assert (mount / "magic" / "aura.mpy").exists()
@@ -379,16 +374,16 @@ def test_stale_destination_file_is_overwritten(tmp_path: Path) -> None:
     assert dest.read_text() == "FAKE_MPY:render.py"
 
 
-def test_dry_run_skips_mount_existence_check(tmp_path: Path) -> None:
+def test_dry_run_skips_mount_existence_check(tmp_path: Path, capsys) -> None:
     source = tmp_path / "source"
     source.mkdir()
     make_source_tree(source)
 
-    result = deploy(
+    deploy(
         None, tmp_path / "nonexistent", source_root=source, toolchain=FakeToolchain(), dry_run=True
     )
 
-    assert result == 0
+    assert "[DRY RUN] COPY  engine/timer.mpy" in capsys.readouterr().out
 
 
 def test_dry_run_writes_no_files(tmp_path: Path) -> None:
@@ -595,9 +590,9 @@ def test_first_time_deploy_with_no_module_dirs_on_mount(tmp_path: Path) -> None:
     mount = tmp_path / "mount"
     mount.mkdir()
 
-    result = deploy(None, mount, source_root=source, toolchain=FakeToolchain())
+    deploy(None, mount, source_root=source, toolchain=FakeToolchain())
 
-    assert result == 0
+    assert (mount / "engine" / "timer.mpy").read_text() == "FAKE_MPY:timer.py"
 
 
 def test_dry_run_does_not_delete_stale_files(tmp_path: Path) -> None:
@@ -853,16 +848,19 @@ def test_deploy_summary_includes_compiled_count(tmp_path: Path, capsys) -> None:
     assert "compiled" in captured.out
 
 
-def test_deploy_compile_failure_returns_nonzero_exit_code(tmp_path: Path) -> None:
+def test_deploy_compile_failure_raises_deploy_error_caused_by_the_build_error(
+    tmp_path: Path,
+) -> None:
     source = tmp_path / "source"
     source.mkdir()
     make_source_tree(source)
     mount = tmp_path / "mount"
     mount.mkdir()
 
-    result = deploy(None, mount, source_root=source, toolchain=FakeToolchain(failing_compiles=1))
+    with pytest.raises(DeployError) as raised:
+        deploy(None, mount, source_root=source, toolchain=FakeToolchain(failing_compiles=1))
 
-    assert result != 0
+    assert isinstance(raised.value.__cause__, BuildError)
 
 
 def test_deploy_compile_failure_leaves_mount_untouched(tmp_path: Path) -> None:
@@ -872,13 +870,14 @@ def test_deploy_compile_failure_leaves_mount_untouched(tmp_path: Path) -> None:
     mount = tmp_path / "mount"
     mount.mkdir()
 
-    deploy(None, mount, source_root=source, toolchain=FakeToolchain(failing_compiles=1))
+    with pytest.raises(DeployError):
+        deploy(None, mount, source_root=source, toolchain=FakeToolchain(failing_compiles=1))
 
     assert list(mount.rglob("*")) == []
 
 
-def test_deploy_compile_failure_prints_error_with_file_and_toolchain_output(
-    tmp_path: Path, capsys
+def test_deploy_compile_failure_error_names_the_file_and_toolchain_output(
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "source"
     source.mkdir()
@@ -887,27 +886,27 @@ def test_deploy_compile_failure_prints_error_with_file_and_toolchain_output(
     mount.mkdir()
     toolchain = FakeToolchain(failing_compiles=1)
 
-    deploy(None, mount, source_root=source, toolchain=toolchain)
+    with pytest.raises(DeployError) as raised:
+        deploy(None, mount, source_root=source, toolchain=toolchain)
 
-    captured = capsys.readouterr()
-    assert str(toolchain.failed[0]) in captured.err
-    assert "SyntaxError" in captured.err
+    assert str(raised.value) == f"mpy-cross failed on {toolchain.failed[0]}: SyntaxError: oops"
 
 
-def test_version_mismatch_with_device_mounted_returns_nonzero(tmp_path: Path) -> None:
+def test_deploy_failure_prints_no_error_line_itself(tmp_path: Path, capsys) -> None:
     source = tmp_path / "source"
     source.mkdir()
     make_source_tree(source)
     mount = tmp_path / "mount"
     mount.mkdir()
 
-    result = deploy(None, mount, source_root=source, toolchain=FakeToolchain(version_mismatch=True))
+    with pytest.raises(DeployError):
+        deploy(None, mount, source_root=source, toolchain=FakeToolchain(failing_compiles=1))
 
-    assert result != 0
+    assert capsys.readouterr().err == ""
 
 
-def test_version_mismatch_with_device_mounted_prints_the_toolchain_error(
-    tmp_path: Path, capsys
+def test_version_mismatch_with_device_mounted_raises_deploy_error_caused_by_the_version_error(
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "source"
     source.mkdir()
@@ -915,10 +914,25 @@ def test_version_mismatch_with_device_mounted_prints_the_toolchain_error(
     mount = tmp_path / "mount"
     mount.mkdir()
 
-    deploy(None, mount, source_root=source, toolchain=FakeToolchain(version_mismatch=True))
+    with pytest.raises(DeployError) as raised:
+        deploy(None, mount, source_root=source, toolchain=FakeToolchain(version_mismatch=True))
 
-    captured = capsys.readouterr()
-    assert "Error: mpy-cross major version 9 does not match" in captured.err
+    assert isinstance(raised.value.__cause__, VersionError)
+
+
+def test_version_mismatch_with_device_mounted_error_carries_the_toolchain_message(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+
+    with pytest.raises(DeployError) as raised:
+        deploy(None, mount, source_root=source, toolchain=FakeToolchain(version_mismatch=True))
+
+    assert str(raised.value) == "mpy-cross major version 9 does not match CircuitPython 10.x"
 
 
 def test_version_mismatch_with_device_mounted_writes_nothing_to_the_mount(tmp_path: Path) -> None:
@@ -928,13 +942,14 @@ def test_version_mismatch_with_device_mounted_writes_nothing_to_the_mount(tmp_pa
     mount = tmp_path / "mount"
     mount.mkdir()
 
-    deploy(
-        None,
-        mount,
-        source_root=source,
-        toolchain=FakeToolchain(version_mismatch=True),
-        scene="hardware_test",
-    )
+    with pytest.raises(DeployError):
+        deploy(
+            None,
+            mount,
+            source_root=source,
+            toolchain=FakeToolchain(version_mismatch=True),
+            scene="hardware_test",
+        )
 
     assert list(mount.rglob("*")) == []
 
@@ -946,9 +961,7 @@ def test_matching_toolchain_version_deploys_compiled_modules(tmp_path: Path) -> 
     mount = tmp_path / "mount"
     mount.mkdir()
 
-    result = deploy(None, mount, source_root=source, toolchain=FakeToolchain())
-
-    assert result == 0
+    deploy(None, mount, source_root=source, toolchain=FakeToolchain())
     assert (mount / "effects" / "render.mpy").read_text() == "FAKE_MPY:render.py"
 
 
@@ -960,7 +973,8 @@ def test_version_mismatch_compiles_nothing(tmp_path: Path) -> None:
     mount.mkdir()
     toolchain = FakeToolchain(version_mismatch=True)
 
-    deploy(None, mount, source_root=source, toolchain=toolchain)
+    with pytest.raises(DeployError):
+        deploy(None, mount, source_root=source, toolchain=toolchain)
 
     assert toolchain.compiled == []
 
@@ -991,32 +1005,19 @@ def test_dry_run_checks_the_toolchain_version_against_the_expected_major(
     assert toolchain.checked_mounts == [None]
 
 
-def test_dry_run_version_mismatch_returns_nonzero(tmp_path: Path) -> None:
+def test_dry_run_version_mismatch_raises_deploy_error(tmp_path: Path) -> None:
     source = tmp_path / "source"
     source.mkdir()
     make_source_tree(source)
 
-    result = deploy(
-        None,
-        tmp_path / "nonexistent",
-        source_root=source,
-        toolchain=FakeToolchain(version_mismatch=True),
-        dry_run=True,
-    )
-
-    assert result != 0
-
-
-def test_source_mode_returns_success(tmp_path: Path) -> None:
-    source = tmp_path / "source"
-    source.mkdir()
-    make_source_tree(source)
-    mount = tmp_path / "mount"
-    mount.mkdir()
-
-    result = deploy(None, mount, source_root=source, use_source=True)
-
-    assert result == 0
+    with pytest.raises(DeployError):
+        deploy(
+            None,
+            tmp_path / "nonexistent",
+            source_root=source,
+            toolchain=FakeToolchain(version_mismatch=True),
+            dry_run=True,
+        )
 
 
 def test_source_mode_ships_raw_py_files_not_compiled_mpy(tmp_path: Path) -> None:
@@ -1114,11 +1115,7 @@ def test_source_mode_never_calls_the_toolchain(tmp_path: Path, dry_run: bool) ->
     mount.mkdir()
     toolchain = FakeToolchain(version_mismatch=True)
 
-    result = deploy(
-        None, mount, source_root=source, toolchain=toolchain, use_source=True, dry_run=dry_run
-    )
-
-    assert result == 0
+    deploy(None, mount, source_root=source, toolchain=toolchain, use_source=True, dry_run=dry_run)
     assert toolchain.checked_mounts == []
     assert toolchain.compiled == []
 
@@ -1138,9 +1135,7 @@ def test_real_repo_tree_lands_exactly_the_ship_list_and_code_py_on_the_mount(
     example = tmp_path / "example.py"
     example.write_text("# demo")
 
-    result = deploy(
-        example, mount, source_root=source, toolchain=FakeToolchain(), use_source=use_source
-    )
+    deploy(example, mount, source_root=source, toolchain=FakeToolchain(), use_source=use_source)
 
     landed = {path.relative_to(mount) for path in mount.rglob("*") if path.is_file()}
     shipped = ship_list(source)
@@ -1151,9 +1146,53 @@ def test_real_repo_tree_lands_exactly_the_ship_list_and_code_py_on_the_mount(
         if entry is not None
     }
     hardware_init = Path("hardware/__init__.py" if use_source else "hardware/__init__.mpy")
-    assert result == 0
     assert {Path("code.py"), Path("boot.py"), hardware_init} <= landed
     assert landed == listed | {Path("code.py")}
+
+
+def test_main_exits_1_with_the_error_line_when_the_mount_is_missing(tmp_path: Path, capsys) -> None:
+    mount = tmp_path / "nonexistent"
+
+    with pytest.raises(SystemExit) as exited:
+        main(["--mount", str(mount)])
+
+    assert exited.value.code == 1
+    assert capsys.readouterr().err == (
+        f"Error: mount path '{mount}' does not exist or is not a directory.\n"
+    )
+
+
+def test_main_exits_1_with_the_error_line_when_the_mount_is_read_only(
+    tmp_path: Path, capsys
+) -> None:
+    mount = tmp_path / "mount"
+    mount.mkdir()
+    mount.chmod(0o555)
+    try:
+        with pytest.raises(SystemExit) as exited:
+            main(["--mount", str(mount)])
+    finally:
+        mount.chmod(0o755)
+
+    assert exited.value.code == 1
+    assert capsys.readouterr().err == (
+        "Error: CIRCUITPY is read-only. Press Ctrl+C on the device to stop code.py first.\n"
+    )
+
+
+def test_main_deploys_source_modules_to_the_mount(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    make_source_tree(source)
+    mount = tmp_path / "mount"
+    mount.mkdir()
+    monkeypatch.chdir(source)
+
+    main(["--mount", str(mount), "--source"])
+
+    assert (mount / "engine" / "timer.py").exists()
 
 
 def test_deploy_runs_as_a_script_file_outside_the_repo_root(tmp_path: Path) -> None:

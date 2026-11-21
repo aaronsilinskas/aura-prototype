@@ -45,6 +45,14 @@ if TYPE_CHECKING:
 DEFAULT_MOUNT: Final = "/Volumes/CIRCUITPY"
 
 
+class DeployError(Exception):
+    """A deploy was refused or failed before anything was written to the mount.
+
+    The message is the line a user sees after ``Error:``. A version mismatch or
+    compile failure is raised from the build module's error.
+    """
+
+
 def _should_skip(src: Path, dest: Path) -> bool:
     """Return True if the destination file is already up to date.
 
@@ -110,8 +118,8 @@ def deploy(
     scene: str | None = None,
     toolchain: Toolchain | None = None,
     use_source: bool = False,
-) -> int:
-    """Deploy to mount. Returns 0 on success, 1 on error.
+) -> None:
+    """Deploy to mount, raising :class:`DeployError` if the deploy can't go ahead.
 
     Syncs the Ship list's entries to *mount*, then prunes each mount file the
     list governs but no longer names, and removes every empty directory under
@@ -134,6 +142,10 @@ def deploy(
         use_source: When True, skip compilation entirely and sync raw ``.py`` files
             directly from the source tree.  Requires no ``mpy-cross`` toolchain.
 
+    Raises:
+        DeployError: The mount is missing, not a directory or read-only, the
+            compiler's version doesn't match, or a module fails to compile.
+
     The list's ``boot.py`` entry, if any, is copied to the mount alongside
     ``code.py`` whenever *example_file* is given -- the
     same force-always, never-pruned handling ``code.py`` gets, since a mount's
@@ -145,18 +157,12 @@ def deploy(
 
     if not dry_run:
         if not mount.is_dir():
-            print(
-                f"Error: mount path '{mount}' does not exist or is not a directory.",
-                file=sys.stderr,
-            )
-            return 1
+            raise DeployError(f"mount path '{mount}' does not exist or is not a directory.")
 
         if not os.access(mount, os.W_OK):
-            print(
-                "Error: CIRCUITPY is read-only. Press Ctrl+C on the device to stop code.py first.",
-                file=sys.stderr,
+            raise DeployError(
+                "CIRCUITPY is read-only. Press Ctrl+C on the device to stop code.py first."
             )
-            return 1
 
     compiled_count = 0
     listed = ship_list(source_root)
@@ -171,8 +177,7 @@ def deploy(
         try:
             toolchain.check_version(None if dry_run else mount)
         except VersionError as exc:
-            print(f"Error: {exc}", file=sys.stderr)
-            return 1
+            raise DeployError(str(exc)) from exc
 
         staging_root = source_root / "build"
         try:
@@ -182,8 +187,7 @@ def deploy(
                 compile=toolchain.compile,
             )
         except BuildError as exc:
-            print(f"Error: {exc}", file=sys.stderr)
-            return 1
+            raise DeployError(str(exc)) from exc
 
         compiled_count = build_result.compiled
         synced = {entry.device: staging_root / entry.device for entry in entries}
@@ -231,10 +235,13 @@ def deploy(
         f"Done. {compiled_count} compiled, "
         f"{len(copied)} copied, {len(skipped)} skipped, {len(pruned)} pruned."
     )
-    return 0
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
+    """Run the deploy from the command line (``sys.argv`` when ``argv`` is ``None``).
+
+    Exits 1 with an ``Error:`` line on stderr when the deploy fails.
+    """
     parser = argparse.ArgumentParser(
         description="Deploy a CircuitPython example and modules to a CIRCUITPY volume."
     )
@@ -279,8 +286,8 @@ def main() -> None:
             "Requires no mpy-cross toolchain."
         ),
     )
-    args = parser.parse_args()
-    sys.exit(
+    args = parser.parse_args(argv)
+    try:
         deploy(
             args.example_file,
             args.mount,
@@ -288,7 +295,9 @@ def main() -> None:
             scene=args.scene,
             use_source=args.source,
         )
-    )
+    except DeployError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
