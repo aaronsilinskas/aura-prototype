@@ -135,6 +135,32 @@ def validate_mpy_cross_version(mount: Path | None, mpy_cross_bin: str = _MPY_CRO
         )
 
 
+class Toolchain:
+    """Compiles device modules to ``.mpy`` for one CircuitPython major version."""
+
+    def compile(self, src: Path, dest: Path) -> None:
+        """Compile *src* to *dest*, raising :class:`BuildError` on failure."""
+        raise NotImplementedError
+
+    def check_version(self, mount: Path | None) -> None:
+        """Raise :class:`VersionError` unless the output would run on the target.
+
+        The target is the device on *mount*, or the repo-pinned CircuitPython
+        major when *mount* is ``None`` (a dry run, or CI).
+        """
+        raise NotImplementedError
+
+
+class MpyCross(Toolchain):
+    """The real CircuitPython ``mpy-cross`` binary."""
+
+    def compile(self, src: Path, dest: Path) -> None:
+        mpy_cross_compile(src, dest)
+
+    def check_version(self, mount: Path | None) -> None:
+        validate_mpy_cross_version(mount)
+
+
 def _hash_path(dest_mpy: Path) -> Path:
     return dest_mpy.with_suffix(_HASH_SUFFIX)
 
