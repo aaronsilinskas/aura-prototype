@@ -27,7 +27,7 @@ jobs:
     permissions:
       contents: read
       issues: write
-    uses: mindwidgets/workflows/.github/workflows/triage.yml@11cfe9c10eda9ad0462de79d36a12a3c2df98cba # v1.0.0
+    uses: mindwidgets/workflows/.github/workflows/triage.yml@c716e9d2ecfa2e4ed19be22728915b2f6b158b51 # v1.0.1
     secrets:
       # API-key fallback: replace the line below with
       # ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
