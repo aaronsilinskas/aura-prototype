@@ -253,7 +253,7 @@ Code-facing terms are defined in [`GLOSSARY.md`](../GLOSSARY.md) — the single 
 
 ## Coding constraints (CircuitPython and MicroPython compatibility)
 
-All code that ships to a device (`effects/`, `engine/`, `magic/`, `packs/`, `hardware/shared/`, `app/`; see the **Ship list**) must run on CPython, CircuitPython 10.x, and MicroPython; only `hardware/circuitpython/` and `app/run_scene.py` may import CircuitPython-only modules. The general CircuitPython/MicroPython rules (no `dataclasses`, `typing.Protocol` unavailable, guarded `typing` imports, no per-frame hot-path allocation) live in the **code-quality skill's embedded-python guidance** (the `embedded-python.md` reference file) — follow it. If that skill isn't installed locally, look it up and copy that file's rules before working on device code. Project-specific deltas on top:
+All code that ships to a device (`effects/`, `engine/`, `magic/`, `packs/`, `hardware/shared/`, `app/`; see the **Ship list**) must run on CPython, CircuitPython 10.x, and MicroPython; only `hardware/circuitpython/` and `app/run_scene.py` may import CircuitPython-only modules. The general CircuitPython/MicroPython rules (no `dataclasses`, `typing.Protocol` unavailable, guarded `typing` imports, no per-frame hot-path allocation) live in the **`embedded-python` skill** — follow it. If that skill isn't installed locally, look it up and copy its rules before working on device code. Project-specific deltas on top:
 
 - **`typing.Protocol` substitute** — use plain base classes with `raise NotImplementedError`; subclass explicitly for type-checker compatibility (ADR-0012)
 - **`PaletteLUT256` is pre-computed** — never construct inside a render loop

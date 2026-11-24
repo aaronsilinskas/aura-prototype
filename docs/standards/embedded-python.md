@@ -1,6 +1,6 @@
 # Embedded Python: aura rules
 
-aura's additions to the `code-quality` skill's `embedded-python.md` reference. Apply both; where they differ, this file wins.
+aura's additions to the `embedded-python` skill. Apply both; where they differ, this file wins.
 
 ## Native Code (`@micropython.native`)
 

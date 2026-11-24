@@ -25,7 +25,7 @@ Single-context: root `GLOSSARY.md` (canonical terms + what to avoid), `docs/doma
 
 ## Working on aura with an agent
 
-The agent skills these docs name (`tdd`, `code-review`, `code-quality`, `test-quality`, `comments-backpressure`, `diagnosing-bugs` and others) are not committed here. Install them into your clone from their public sources (both locations are git-ignored):
+The agent skills these docs name (`tdd`, `code-review`, `code-quality`, `embedded-python`, `test-quality`, `comments-backpressure`, `diagnosing-bugs` and others) are not committed here. Install them into your clone from their public sources (both locations are git-ignored):
 
 ```sh
 npx skills add mattpocock/skills -a claude-code --copy -y
