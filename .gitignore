@@ -48,3 +48,6 @@ skills-lock.json
 
 # Automated triage: the issue input the shared triage workflow writes at the checkout root
 triage-issue-input.md
+
+# Per-machine environment (VS Code loads it into terminals when present)
+.env
