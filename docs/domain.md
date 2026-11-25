@@ -84,11 +84,9 @@ examples/         Runnable CircuitPython entry points; deploy-watch's flash targ
 
 scripts/          Deploy and maintenance scripts (CPython-only)
 
-electronics/      PCB design source (KiCad) — scratch/, pcbs/, libraries/, each with
-                  its own README.md. Distinct from the hardware/ firmware package
-                  above: electronics/ is design source, not Python, contains no
-                  package, and carries no import-linter contracts — it sits outside
-                  the engine ↔ hardware layering described below entirely.
+typings/          Local type stubs for device-only driver libraries, read by mypy
+
+electronics/      PCB design source (KiCad), not Python; outside the module layering below
 ```
 
 ### Module layering
@@ -97,10 +95,10 @@ The `engine` ↔ `hardware` boundary is one-way and enforced by `import-linter`
 (`[tool.importlinter]` in `pyproject.toml`, run via the `lint-imports`
 pre-commit hook on every commit):
 
-- `engine` must never import `hardware` (total, one-way).
+- `engine` must never import `hardware` or `app` (total, one-way).
 - `hardware` must never import engine runtime machinery — `engine.engine`,
-  `engine.scene`, `engine.packs`, `engine.namespace`, `engine.timer`,
-  `engine.effects.manager`. Hardware never resolves effect or clip names; it
+  `engine.scene`, `engine.scene_runtime`, `engine.packs`, `engine.namespace`,
+  `engine.timer`, `engine.effects.admin`, `engine.effects.manager`. Hardware never resolves effect or clip names; it
   plays the path on each event's resolved clip (ADR-0002).
 - `app/` is the sole sanctioned crossing point: the one place allowed to
   import both the engine's runtime machinery and `hardware.*` together (see
@@ -113,6 +111,8 @@ pre-commit hook on every commit):
   `hardware.circuitpython` or the CircuitPython-only modules that package
   imports (`board`, `microcontroller`, the `adafruit_*` drivers and others),
   even indirectly: it also boots the **Simulated device** under CPython.
+- No device package (`effects`, `engine`, `magic`, `packs`, `hardware`, `app`)
+  may import `scripts`, which is CPython-only and never ships.
 
 ---
 
@@ -126,8 +126,8 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `PixelBuffer` | `effects/effect.py` | List-backed in-memory pixel buffer of packed RGB values |
 | `EffectVerb` | `effects/effect.py` | Identity-matched key for `clips` and `patterns`; engine owns `START`/`STOP`, `EffectPixels` subclasses declare custom verbs in `VERBS` |
 | `Effect` | `effects/effect.py` | Descriptor of an effect's modalities (`pixels`, `audio`, `haptic`); builders return plain instances |
-| `Layer` | `effects/layers/layer.py` | Base layer: `update` + `sample` |
-| `Scroll` | `effects/layers/scroll.py` | Scroll base: `update` + `apply` |
+| `Layer` | `effects/layers/layer.py` | Base class of every **Layer** |
+| `Scroll` | `effects/layers/scroll.py` | Base class of the position scroll helpers |
 | `LayerRenderer` | `effects/layers/renderer.py` | Single-layer `Effect` |
 | `AddColorsRenderer` | `effects/layers/add_colors_renderer.py` | Composites layers by summing packed RGB colors |
 | `AddSamplesRenderer` | `effects/layers/add_samples_renderer.py` | Composites layers by summing float samples then sampling a palette |
@@ -139,7 +139,7 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `SceneView` | `engine/effects/admin.py` | The **Scene view** each `EffectAdmin` step installs |
 | `EffectManager` | `engine/effects/manager.py` | Concrete `EffectControls` + `EffectAdmin`; routes effects to outputs by scope |
 | `EffectOutput` | `engine/effects/output.py` | Abstract hardware output port |
-| `EffectBuilder` | `engine/effects/builder.py` | Callable `(name, config) → Effect`; one per effect item |
+| `EffectBuilder` | `engine/effects/builder.py` | Builds one effect item's `Effect`; each effect item exports one as `BUILD` |
 | `ComposedEffectBuilder` | `engine/effects/builder.py` | `EffectBuilder` that composes a base effect's pixels with declared audio and haptic |
 | `EffectReceipt` | `engine/state.py` | Handle for a running effect; `stop` plus `brightness`/`loudness` controls |
 | `ScopeValue` / `Scope` | `engine/state.py` | Output-agnostic routing keys (see glossary) |
@@ -173,7 +173,7 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `MinMaxValue` | `magic/values.py` | Clamped float with dynamic max (via `ValueWithModifiers`) |
 | `ValueWithModifiers` | `magic/values.py` | Base value + temporary multiplier stack |
 | `Duration` | `magic/values.py` | Expiry tracker |
-| `DeviceConfig` | `hardware/shared/device_config.py` | Validated `aura-device.json`: optional `pixels` list, IR/audio/sensor/haptics/radio/SD sections and **Named bus** maps; every pin is recorded as a `PinRef` |
+| `DeviceConfig` | `hardware/shared/device_config.py` | The validated `aura-device.json`; every pin in it is a `PinRef` |
 | `PinRef` | `hardware/shared/device_config.py` | The **Pin reference**; lives with the config so the parser can create it without importing `DeviceParts` |
 | `NeoPixelCurrentBudgetConfig` | `hardware/shared/device_config.py` | The `neopixel_current_budget` policy; its math lives in `hardware/shared/neopixel_current_budget.py` |
 | `DeviceHardware` | `hardware/shared/device_hardware.py` | Board-free bundle the **Device assembly** returns |
@@ -215,13 +215,20 @@ All code that ships to a device (`effects/`, `engine/`, `magic/`, `packs/`, `har
 
 - **`typing.Protocol` substitute** — use plain base classes with `raise NotImplementedError`; subclass explicitly for type-checker compatibility (ADR-0012)
 - **`PaletteLUT256` is pre-computed** — never construct inside a render loop
+- **Line limit: 100 characters** — enforced by `ruff` pre-commit hook (also `ruff format`)
+
+`scripts/` is CPython-only and does not carry these constraints.
+
+---
+
+## Design constraints
+
+Rules an agent must not break, in every package, `scripts/` included.
+
 - **Rules are Game-data-stateless** — a `GameRule` keeps all game data in `GameState`; construction-time config is its only instance state (`engine/engine.py`, `packs/`)
 - **One clock** — only `SceneRuntime.advance_clock` advances the **Timer**, once per tick; rules read time through `GameState` (`engine/timer.py`, `engine/scene_runtime.py`)
 - **The Tag protocol is immutable** — never change its timings or add a CRC; it is a compatibility contract with non-Aura hardware (`hardware/shared/ir_codecs/tag.py`)
 - **One Reboot path between scenes** — rules never load a scene in-process (`engine/scene.py`, ADR-0005)
-- **Line limit: 100 characters** — enforced by `ruff` pre-commit hook (also `ruff format`)
-
-`scripts/` is CPython-only and does not carry these constraints.
 
 ---
 
