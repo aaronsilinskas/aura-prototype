@@ -211,7 +211,7 @@ The example file also shows the `accelerometer`, `magnetometer`, `haptics`, `rad
    EffectOutput           hardware: lights, audio, haptics
 ```
 
-Rules are stateless: all mutable game data lives in the scene's `GameState`.
+Rules keep no game data of their own (see the constraints in [`docs/domain.md`](docs/domain.md)).
 Rules fire effects through `state.effect_controls`, read Settings through
 `state.settings`, and leave or cover the scene through `state.scene_controls`.
 
@@ -269,7 +269,7 @@ A Setting's `type` is `int`, `float`, `bool`, `str` or `list`. One with no
 `state.settings.get_float("scene", "window_seconds")` and its siblings, by
 namespace (`"scene"` or the pack's name).
 
-A **Capability** is hardware a scene can depend on: `button.A` … `button.Z`
+The **Capability** vocabulary (see [`GLOSSARY.md`](GLOSSARY.md)): `button.A` … `button.Z`
 (labelled in the order `buttons` lists them), `ir.line`, `ir.cone`,
 `ir.area_of_effect`, `ir.receive`, `radio`, `storage`, `accelerometer`,
 `magnetometer`. A scene is checked against the device only when it is about to
