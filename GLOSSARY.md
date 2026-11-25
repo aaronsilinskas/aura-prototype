@@ -385,17 +385,9 @@ _Avoid_: network, channel (collide with the network seam and the chip's one chan
 A pixel showing a dimmed version of one colour (the colour scaled toward black, hue unchanged); a strip whose lit pixels are all shades of red shows only red, at any brightness. Dark pixels are no colour's shade.
 _Avoid_: tint, hue (both read as other colour operations); bit-masking a pixel against a channel in a test (ask whether it is a shade instead)
 
-### RadioTransport
-The board-free half-duplex radio **port** `RadioTransceiver` reaches the chip through — one port for both directions because an RFM69-class chip is half-duplex. The live adapter is `Rfm69RadioTransport`.
-_Avoid_: splitting it into send/receive ports; importing `adafruit_rfm69` here (that lives in the adapter)
-
-### RadioTransceiver
-The board-free single owner of a device's whole radio subsystem, exposed as `DeviceHardware.radio`; the network seam's `send_radio` delegates to it. A send is fire-and-forget on the single channel — no emitter to name, unlike IR — and it builds no game event itself.
-_Avoid_: a transmit pump or pump-before-receive order; a value-returning `update()` (read `received`/`last_sender`); building `NetworkEvents.RadioReceived` here (the **Scene boot**'s tick builds it)
-
-### Rfm69RadioTransport
-The live CircuitPython `RadioTransport` adapter wrapping `adafruit_rfm69.RFM69` — the only module importing that library.
-_Avoid_: importing `adafruit_rfm69` anywhere else; reading the driver without checking `payload_ready` first (blocks)
+### Radio
+A device's half-duplex link to every other device on its frequency. A send names no recipient and, unlike IR, no emitter; what arrives each tick is at most one packet and its sender (ADR-0015).
+_Avoid_: "channel" for it (names a **Console channel** or **Data channel**); addressing a send to one device (identity travels in the payload)
 
 ### DeviceStorage
 The board-free device-state storage port: reads/writes small state files under a mount root and resolves real filesystem paths for streamed/scanned consumers. Live adapter `SdCardStorage`; tests and the **Simulated device**'s card run the same storage over a temporary directory.

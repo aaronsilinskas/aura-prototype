@@ -182,8 +182,9 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `PolledSensor` | `hardware/shared/polled_sensor.py` | The **PolledSensor** |
 | `HardwareNetworkControls` | `hardware/shared/network_controls.py` | Concrete, send-only `NetworkControls` adapter |
 | `InfraredTransceiver` | `hardware/shared/ir_transceiver.py` | The **InfraredTransceiver** |
-| `RadioTransport` | `hardware/shared/radio_transport.py` | Board-free half-duplex radio port; live adapter `Rfm69RadioTransport` |
-| `RadioTransceiver` | `hardware/shared/radio_transceiver.py` | The **RadioTransceiver** |
+| `RadioTransport` | `hardware/shared/radio_transport.py` | Board-free half-duplex **Radio** port, one for both directions; live adapter `Rfm69RadioTransport` |
+| `Rfm69RadioTransport` | `hardware/circuitpython/rfm69_radio_transport.py` | Live `RadioTransport` over the RFM69 driver |
+| `RadioTransceiver` | `hardware/shared/radio_transceiver.py` | Board-free owner of a device's whole **Radio** subsystem, exposed as `DeviceHardware.radio` |
 | `build_scene_boot` | `app/scene_composition.py` | The **Scene boot**, the Composition layer's only entry point; shared by `run_scene` and the Simulated device |
 | `SceneBoot` | `app/scene_composition.py` | What `build_scene_boot` returns, including the booted scene's `tick` |
 | `DeviceSceneReboot` | `hardware/shared/device_reboot.py` | Live `SceneReboot` adapter, wired by `build_scene_boot` |
@@ -234,6 +235,8 @@ Rules an agent must not break, in every package, `scripts/` included.
 - **`usb_cdc` stays in device-only wiring** — only `hardware/circuitpython/boot.py` and `examples/sd_sync.py` import it, so `UsbCdcTransport` stays CPython-testable
 - **Host SD sync reads only the Data channel** — `SerialTransport` frames bytes there; deploy-watch's UTF-8 line reader is for the **Console channel** (`scripts/sd_sync_transport.py`, `scripts/deploy_watch.py`)
 - **Port auto-detect never guesses** — no match, or more than one, fails; it never falls back to the only serial device (`scripts/port_auto_detect.py`)
+- **Hardware builds no game events** — IR and radio deliver bytes; only the **Scene boot**'s tick turns them into `NetworkEvents` (`app/scene_composition.py`, `hardware/shared/`)
+- **Driver libraries load in their part** — each per-component driver library, and an adapter that imports one (`Rfm69RadioTransport`, `SdCardStorage`), is imported only inside the `CircuitPythonParts` part that builds it (`hardware/circuitpython/`, ADR-0013)
 
 ---
 
