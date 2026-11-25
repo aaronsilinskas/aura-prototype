@@ -285,21 +285,9 @@ _Avoid_: confusing with `Effect Level`; holding it as rule instance state; a sec
 One red→green cycle at a single Game Level (red warning → red → green warning → green); surviving its green phase advances the Game Level, or wins at `max_level`. A full game is `max_level` Rounds.
 _Avoid_: "phase" (a Round spans several); "level-up" (the celebratory beat between Rounds)
 
-### AudioEffectOutput
-A CircuitPython `EffectOutput` driving audio via I2S and the live `VoiceSink` adapter: it plays the path on each event's **Resolved clip**, owns the hardware (amp, mixer, WAV sources) and delegates voice-slot bookkeeping to a `VoicePool`.
-_Avoid_: stopping playback in `handle_event` on `EffectVerb.STOP`; assuming a fixed voice count or role-assigned slots; putting slot bookkeeping back in the output; resolving clip names (the event already carries the path)
-
-### VoicePool
-A hardware-agnostic owner of audio voice-slot bookkeeping (imports no CircuitPython), driving hardware through a `VoiceSink` port and evicting oldest-first when full. `hold` frees a held effect's voices (a cut-off one-shot that stops its effect, by `stops_effect` or because the effect has no pixels, stops its receipt, as on eviction) and `restore` plays its held loops again from the top.
-_Avoid_: importing CircuitPython audio libs here (hardware lives behind `VoiceSink`); parallel per-slot lists (use the `_Slot` record)
-
-### VoiceSink
-The port through which `VoicePool` reaches audio hardware (live CircuitPython mixer + a recording test fake); applies loudness and owns `max_volume`.
-_Avoid_: passing a pre-multiplied hardware level across the seam (pass `0..1` loudness); leaking receipts through the port
-
-### Drv2605EffectOutput
-A CircuitPython `EffectOutput` driving a DRV2605L haptic driver on all scopes (`receives_pixels = False`); translates `HapticPattern` constants to waveforms, a new event interrupting the current sequence.
-_Avoid_: constructing with a `None` driver; reading `receipt.loudness` (the DRV2605L has no volume control); "motor" for the injected instance (use `driver`)
+### Voice
+One of the sounds a device's audio output can play at once; `voices` in `aura-device.json` sets how many. When every voice is busy, a new sound takes the oldest one's voice.
+_Avoid_: assuming a fixed voice count or voices assigned to roles
 
 ### aura-device.json
 The single **required** on-device file holding all hardware configuration; a missing file raises. Pure hardware config — scene selection lives in **`aura-boot.json`** instead.
@@ -385,63 +373,33 @@ _Avoid_: network, channel (collide with the network seam and the chip's one chan
 A pixel showing a dimmed version of one colour (the colour scaled toward black, hue unchanged); a strip whose lit pixels are all shades of red shows only red, at any brightness. Dark pixels are no colour's shade.
 _Avoid_: tint, hue (both read as other colour operations); bit-masking a pixel against a channel in a test (ask whether it is a shade instead)
 
-### RadioTransport
-The board-free half-duplex radio **port** `RadioTransceiver` reaches the chip through — one port for both directions because an RFM69-class chip is half-duplex. The live adapter is `Rfm69RadioTransport`.
-_Avoid_: splitting it into send/receive ports; importing `adafruit_rfm69` here (that lives in the adapter)
+### Radio
+A device's half-duplex link to every other device on its frequency. A send names no recipient and, unlike IR, no emitter; what arrives each tick is at most one packet and its sender (ADR-0015).
+_Avoid_: "channel" for it (names a **Console channel** or **Data channel**); addressing a send to one device (identity travels in the payload)
 
-### RadioTransceiver
-The board-free single owner of a device's whole radio subsystem, exposed as `DeviceHardware.radio`; the network seam's `send_radio` delegates to it. A send is fire-and-forget on the single channel — no emitter to name, unlike IR — and it builds no game event itself.
-_Avoid_: a transmit pump or pump-before-receive order; a value-returning `update()` (read `received`/`last_sender`); building `NetworkEvents.RadioReceived` here (the **Scene boot**'s tick builds it)
+### Card
+A device's SD card, holding its card **Pack root** and its `aura-state.json`, where the **Persisted scene** lives; a **Reboot** carries it across. A device without one is card-less: it has no `storage` **Capability** and cannot reboot.
+_Avoid_: "flash" for it (flash is the board's own drive, holding `aura-device.json` and `aura-boot.json`); "SD" alone
 
-### Rfm69RadioTransport
-The live CircuitPython `RadioTransport` adapter wrapping `adafruit_rfm69.RFM69` — the only module importing that library.
-_Avoid_: importing `adafruit_rfm69` anywhere else; reading the driver without checking `payload_ready` first (blocks)
-
-### DeviceStorage
-The board-free device-state storage port: reads/writes small state files under a mount root and resolves real filesystem paths for streamed/scanned consumers. Live adapter `SdCardStorage`; tests and the **Simulated device**'s card run the same storage over a temporary directory.
-_Avoid_: escaping the mount root; a second concrete implementation for CPython vs. CircuitPython (one class suffices once mounted); using `path("")` where the clean root is needed (use `mount_root`)
-
-### SdCardStorage
-The live CircuitPython `DeviceStorage` adapter that mounts an SD card at construction — the only module importing `sdcardio`/`storage`.
-_Avoid_: importing `sdcardio`/`storage` anywhere else; wrapping `cs` in `digitalio.DigitalInOut`; presence-probing instead of trusting the config gate
-
-### SdSyncServer
-The board-free device side of the SD-sync protocol; serves file read/write/list requests against a `DeviceStorage` over an injected `Transport`, replying in-band when no SD is configured.
-_Avoid_: raising for "not found"/"no SD configured" (reply in-band instead — both are routine, not programming errors); asserting its wire-format internals in tests (assert only external behaviour: bytes read, responses returned); pinning a real connection to one verb (drive `serve_one` instead)
-
-### SdSyncClient
-The board-free (CPython-only) host side of the SD-sync protocol; drives an `SdSyncServer` over an injected `Transport` to pull, push, and list files, verifying a whole-file CRC-32 and surfacing the server's in-band failures as loud, typed errors.
-_Avoid_: opening the host file before the server confirms the pull will proceed (leaves an empty file on a "not found"); treating a CRC mismatch as chunk-level (it is whole-file, so a retry re-runs the entire transfer)
-
-### SD-sync `Transport`
-The board-free port `SdSyncClient`/`SdSyncServer` exchange base64-framed lines through, one `Frame` at a time. Live adapters are `UsbCdcTransport` (device) and `SerialTransport` (host); an in-memory loopback stands in for CI.
-
-### LineFramer
-The board-free splitter in `sd_sync_protocol` that turns a byte stream into SD-sync frame lines, each ended by `FRAME_DELIMITER` (a newline, which base64 never produces). Both live transports use it, with `delimit_line` on the sending side.
-
-### UsbCdcTransport
-The live device-side `Transport` adapter, framing SD-sync lines over a serial-like stream with the shared `LineFramer`. Duck-typed against any `read`/`write` stream — it imports no `usb_cdc`, so it is CPython-testable against a fake stream.
-_Avoid_: importing `usb_cdc` into this module (the device-only wiring lives in `examples/sd_sync.py`); splitting lines itself (both transports frame through `sd_sync_protocol`, so the two ends can't drift); assuming the wire grammar is a stable contract (it may change, but in `sd_sync_protocol` for both ends at once; a test pins the bytes so a change is deliberate)
-
-### SerialTransport
-The live host-side SD-sync `Transport`, framing lines with the same shared `LineFramer` as `UsbCdcTransport` but over a host serial port. Byte-framed over the **data channel**, distinct from `deploy_watch`'s UTF-8 **console channel**.
-_Avoid_: reusing `deploy_watch`'s `iter_serial_lines` for SD-sync (it decodes UTF-8 and targets the console channel, not the byte-framed data channel)
+### SD sync
+Moving files between a host and a device's SD card over the **Data channel**: the host lists, pulls and pushes files, and the device serves them. Each file is checked whole, and a transfer that fails leaves the file it would have replaced as it was (ADR-0011).
+_Avoid_: mounting the card on the host for it (the card is reachable from the host only through SD sync); "verb" unqualified for its list, pull and push where **EffectVerb**s are nearby
 
 ### Console channel
 The USB-CDC serial channel a board always exposes for REPL and `print` output; what **Deploy-watch** captures.
 _Avoid_: "REPL port", "the usbmodem port", or bare "serial port" (ambiguous once the data channel is enabled)
 
 ### Data channel
-The second USB-CDC serial channel a board exposes when enabled on the device, carrying SD-sync protocol bytes rather than text.
+The second USB-CDC serial channel a board exposes when enabled on the device, carrying **SD sync** bytes rather than text.
 _Avoid_: "CDC2", "the other port", bare "serial port"
 
 ### Port auto-detect
-Resolution of a host serial port for one named channel (**console channel** or **data channel**) by asking which board interface it is: a single match auto-selects, an explicitly named port overrides without scanning, and zero or multiple matches fails loudly.
-_Avoid_: picking a port by device-name pattern (both channels look alike); falling back to "the only usbmodem device" when no channel matches; guessing among multiple matches
+Finding the host serial port for one named channel (**console channel** or **data channel**) by which board interface it is, never by its device name, since both channels look alike. Naming a port skips it.
+_Avoid_: picking a port by device-name pattern (both channels look alike)
 
-### NeoPixelEffectOutput
-A CircuitPython `EffectOutput` driving **one** NeoPixel strip, subdivided into scope **segments** by pixel range; several strips may share a scope and are driven in sync.
-_Avoid_: conflating segment length with `min_resolution`; a brightness field on this output; overlapping segments on one strip
+### Segment
+The pixel range of one NeoPixel strip that shows one **Scope**. Several strips may show the same scope, in sync.
+_Avoid_: conflating segment length with `min_resolution`; overlapping segments on one strip
 
 ### Accelerometer
 A hardware sensor providing 3-axis acceleration readings (x, y, z) in m/s²; optional, absent when hardware is not present.
@@ -472,16 +430,12 @@ A snapshot of button states, each one of `UP`, `DOWN`, `PRESSED` (down this fram
 _Avoid_: reading `_states` directly (use the query methods); assuming `is_down` excludes the `PRESSED` frame
 
 ### IR transport
-The hardware-agnostic infrared send/receive subsystem (no `pulseio`), reached through `PulseReader`/`PulseWriter` ports; moves opaque `bytes` with no game semantics.
-_Avoid_: importing `pulseio` into shared IR code; encoding spell fields in the transport
-
-### InfraredTransceiver
-The board-free single owner of a device's whole IR subsystem, exposed as `DeviceHardware.ir`. It builds its own transmitters (one per wired **IR emitter**), its receiver and the shared **IR transmit gate** from the pulse readers, emitter pins and writer factory the platform hands it. It starts on the Aura wire-frame and reports what is wired. The network seam's `send_ir` delegates to it; a send routes to the named emitter, and it builds no game event.
-_Avoid_: importing `NetworkEvents`/game-event vocabulary here (the event is built in the **Scene boot**'s tick); building its transmitters, receiver or gate anywhere else; a value-returning `update()`; calling it a hardware "driver"; exposing the transmitter map as a public collection
+The hardware-agnostic infrared send and receive subsystem: it moves opaque bytes between devices, with no game meaning.
+_Avoid_: encoding spell fields in the transport
 
 ### Wire-frame codec
-An encoder/decoder pair mapping an opaque payload ↔ IR pulse durations, injected into the IR transport; two coexist — the **Aura wire-frame** and the **Tag protocol** — selected by the scene a device boots; an **Overlay** runs on the codec of the scene it covers. Travels as a class pair, so each receiver reader gets its own fresh decoder. A built device's codec is applied once, at boot, via `InfraredTransceiver.apply_codec`; `InfraredTransceiver.codec` reads the installed pair back.
-_Avoid_: assuming a single global wire-frame; treating wire-frames as interchangeable across scenes; passing codec instances (one decoder must never be shared between readers)
+An encoder and decoder pair mapping an opaque payload to IR pulse timings and back. Two coexist, the **Aura wire-frame** and the **Tag protocol**; the scene a device boots picks one, and an **Overlay** runs on the codec of the scene it covers.
+_Avoid_: assuming a single global wire-frame; treating wire-frames as interchangeable across scenes
 
 ### Aura wire-frame
 Aura's internal IR wire-frame (header mark/space, MSB-first bits, CRC-8, lead-out terminator); carries any-length payloads and is free to change since both ends are Aura devices.
@@ -496,16 +450,16 @@ The game-layer payload of a tag shot — `team`, `player`, `damage` packed into 
 _Avoid_: reading tag fields off the wire-frame; conflating the data codec (`TagData` ↔ byte) with the wire-frame codec (byte ↔ pulses)
 
 ### IR emitter
-A directed infrared transmit channel; constants `LINE`, `CONE`, `AREA_OF_EFFECT` are the `send_ir` vocabulary, each mapped to its own transmitter. `engine.network.IR_EMITTERS` is the single source of the emitter set.
-_Avoid_: importing `magic.CastType` for IR emitters; a default emitter on `send_ir`; restating the emitter key set (derive from `IR_EMITTERS`)
+A directed infrared transmitter: `LINE`, `CONE` or `AREA_OF_EFFECT`. A send always names the one it goes out on.
+_Avoid_: importing `magic.CastType` for IR emitters; a default emitter on a send
 
 ### IR multi-receiver
-Several IR receivers, each on its own data line, returning the packet with the lowest **error margin**; improves reception reliability only (no hit direction). Selected by listing **two or more `rx` pins** in `aura-device.json`. Which receiver won is hardware telemetry only: `NetworkEvents.IRReceived` names no receiver, so rules never see it.
+Several **IR receivers**, each on its own data line, for better reception only: the packet with the lowest **IR error margin** wins, and rules never see which receiver won (ADR-0016). Listing two or more `rx` pins in `aura-device.json` selects it.
 _Avoid_: treating the array as a direction finder; sharing one data line across receivers; a separate config flag to opt in (pin count is the switch)
 
-### InfraredReceiver
-The one board-free receiver the **InfraredTransceiver** builds over every IR receiver on a device, reading each through that receiver's own pulse reader and decoder, for any number of readers; surfaces at most one packet per tick, the one with the lowest **IR error margin**, and names the winning reader only when there was a pick to make. On its own, "IR receiver" means the physical sensor on one data line.
-_Avoid_: constructing one outside the **InfraredTransceiver**; separate single- and multi-receiver classes; branching on reader count to choose a receiver; sharing one decoder between readers
+### IR receiver
+The physical infrared sensor on one data line. A device has any number; with two or more it is an **IR multi-receiver**, and at most one packet a tick reaches the game either way.
+_Avoid_: separate single- and multi-receiver handling (one receiver serves any number of readers)
 
 ### IR error margin
 The worst-case pulse-timing deviation (µs) tolerated while still decoding a packet; lower is better, and it's the key the multi-receiver uses to pick the best receiver.
@@ -516,16 +470,16 @@ A normalized 0.0–1.0 quality metric derived from a packet's error margin — a
 _Avoid_: calling it "RSSI" as if measured; using it to derive hit direction
 
 ### IR receive-path telemetry
-Monotonic-since-boot counters at each receive-path stage (reader, receiver, decoder), each with exactly one declared owner; surfaced as an `IrTelemetrySnapshot` and a change-gated `telemetry_line()`.
-_Avoid_: aggregating hit/gated counts in the scene; per-tick allocation in the no-pulse path; re-listing the counter set in a receiver (walk the sources)
+Counters kept since boot at each stage of IR reception (reader, receiver, decoder), each counted by exactly one stage.
+_Avoid_: aggregating hit or gated counts in the scene
 
 ### Self-echo
 The IR pulses a device's own receiver captures from its own emitter while transmitting; decodes as a CRC-valid phantom self-hit, suppressed by the **IR transmit gate**, never by game rules.
 _Avoid_: suppressing it in a scene; telling it from a real overlapping shot at the pulse level (indistinguishable — drop both)
 
 ### IR transmit gate
-The shared coordination primitive that keeps a device from decoding its own **self-echo**: transmitters mark when they are emitting, and the receiver discards while emission is active plus once more on the falling edge.
-_Avoid_: a second source of truth for "transmitting"; exposing it on `DeviceHardware`; a second gate per device, or one built outside the **InfraredTransceiver**
+The shared signal that keeps a device from decoding its own **self-echo**: transmitters mark when they are emitting, and the receiver discards while emission is active plus once more on the falling edge.
+_Avoid_: a second source of truth for "transmitting"
 
 ### Drain-but-discard
 The receiver's gated-receive contract: while the **IR transmit gate** signals emission, every available pulse is still drained from the reader (so `PulseIn` never overflows) but none is decoded, and any in-progress decode is reset.
@@ -536,12 +490,12 @@ The idle period between two IR shots, delivered by `PulseIn` as a single over-lo
 _Avoid_: trying to "re-arm" or salvage a pulse from an overlapping frame (recognise the gap and start the next frame clean)
 
 ### Ship list
-The one answer to which repo files go on a device and where each lands: the device modules (compiled to `.mpy`, or as source), their data files, each nested package's parent `__init__`, and the board's `boot.py` on the mount root. It never includes tests, `conftest.py`, the **Simulation test harness** or the **Simulated device**. Building and deploying both follow it.
-_Avoid_: excluding or placing files separately in the build or deploy step; "manifest" for it (a **Pack manifest** is `effects.json`/`rules.json`)
+The one answer to which repo files go on a device and where each lands: the device modules, their data files and the board's `boot.py`. It never includes tests, the **Simulation test harness** or the **Simulated device**.
+_Avoid_: "manifest" for it (a **Pack manifest** is `effects.json`/`rules.json`)
 
 ### Deploy plan
-One deploy, validated and resolved before anything is written: where it goes, whether modules ship compiled or as source, whether an example (with the **Ship list**'s `boot.py`) goes too, which scene to record, and whether it is a dry run. Carrying it out never re-decides any of these.
-_Avoid_: "deploy mode", "deploy config" for it; re-checking flags while carrying it out; building it long before it runs (it is validated against the mount as it was when planned)
+One deploy, validated and resolved before anything is written: where it goes, whether modules ship compiled or as source, whether an example goes too, which scene to record, and whether it is a dry run.
+_Avoid_: "deploy mode", "deploy config" for it; building it long before it runs (it is validated against the mount as it was when planned)
 
 ### Deploy-watch
 The host tool that deploys an example and captures the resulting serial run; unlike `deploy.py` it flashes *and* captures.

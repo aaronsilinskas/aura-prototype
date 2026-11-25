@@ -84,11 +84,9 @@ examples/         Runnable CircuitPython entry points; deploy-watch's flash targ
 
 scripts/          Deploy and maintenance scripts (CPython-only)
 
-electronics/      PCB design source (KiCad) — scratch/, pcbs/, libraries/, each with
-                  its own README.md. Distinct from the hardware/ firmware package
-                  above: electronics/ is design source, not Python, contains no
-                  package, and carries no import-linter contracts — it sits outside
-                  the engine ↔ hardware layering described below entirely.
+typings/          Local type stubs for device-only driver libraries, read by mypy
+
+electronics/      PCB design source (KiCad), not Python; outside the module layering below
 ```
 
 ### Module layering
@@ -97,10 +95,10 @@ The `engine` ↔ `hardware` boundary is one-way and enforced by `import-linter`
 (`[tool.importlinter]` in `pyproject.toml`, run via the `lint-imports`
 pre-commit hook on every commit):
 
-- `engine` must never import `hardware` (total, one-way).
+- `engine` must never import `hardware` or `app` (total, one-way).
 - `hardware` must never import engine runtime machinery — `engine.engine`,
-  `engine.scene`, `engine.packs`, `engine.namespace`, `engine.timer`,
-  `engine.effects.manager`. Hardware never resolves effect or clip names; it
+  `engine.scene`, `engine.scene_runtime`, `engine.packs`, `engine.namespace`,
+  `engine.timer`, `engine.effects.admin`, `engine.effects.manager`. Hardware never resolves effect or clip names; it
   plays the path on each event's resolved clip (ADR-0002).
 - `app/` is the sole sanctioned crossing point: the one place allowed to
   import both the engine's runtime machinery and `hardware.*` together (see
@@ -113,6 +111,8 @@ pre-commit hook on every commit):
   `hardware.circuitpython` or the CircuitPython-only modules that package
   imports (`board`, `microcontroller`, the `adafruit_*` drivers and others),
   even indirectly: it also boots the **Simulated device** under CPython.
+- No device package (`effects`, `engine`, `magic`, `packs`, `hardware`, `app`)
+  may import `scripts`, which is CPython-only and never ships.
 
 ---
 
@@ -126,8 +126,8 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `PixelBuffer` | `effects/effect.py` | List-backed in-memory pixel buffer of packed RGB values |
 | `EffectVerb` | `effects/effect.py` | Identity-matched key for `clips` and `patterns`; engine owns `START`/`STOP`, `EffectPixels` subclasses declare custom verbs in `VERBS` |
 | `Effect` | `effects/effect.py` | Descriptor of an effect's modalities (`pixels`, `audio`, `haptic`); builders return plain instances |
-| `Layer` | `effects/layers/layer.py` | Base layer: `update` + `sample` |
-| `Scroll` | `effects/layers/scroll.py` | Scroll base: `update` + `apply` |
+| `Layer` | `effects/layers/layer.py` | Base class of every **Layer** |
+| `Scroll` | `effects/layers/scroll.py` | Base class of the position scroll helpers |
 | `LayerRenderer` | `effects/layers/renderer.py` | Single-layer `Effect` |
 | `AddColorsRenderer` | `effects/layers/add_colors_renderer.py` | Composites layers by summing packed RGB colors |
 | `AddSamplesRenderer` | `effects/layers/add_samples_renderer.py` | Composites layers by summing float samples then sampling a palette |
@@ -139,7 +139,7 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `SceneView` | `engine/effects/admin.py` | The **Scene view** each `EffectAdmin` step installs |
 | `EffectManager` | `engine/effects/manager.py` | Concrete `EffectControls` + `EffectAdmin`; routes effects to outputs by scope |
 | `EffectOutput` | `engine/effects/output.py` | Abstract hardware output port |
-| `EffectBuilder` | `engine/effects/builder.py` | Callable `(name, config) → Effect`; one per effect item |
+| `EffectBuilder` | `engine/effects/builder.py` | Builds one effect item's `Effect`; each effect item exports one as `BUILD` |
 | `ComposedEffectBuilder` | `engine/effects/builder.py` | `EffectBuilder` that composes a base effect's pixels with declared audio and haptic |
 | `EffectReceipt` | `engine/state.py` | Handle for a running effect; `stop` plus `brightness`/`loudness` controls |
 | `ScopeValue` / `Scope` | `engine/state.py` | Output-agnostic routing keys (see glossary) |
@@ -173,26 +173,36 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `MinMaxValue` | `magic/values.py` | Clamped float with dynamic max (via `ValueWithModifiers`) |
 | `ValueWithModifiers` | `magic/values.py` | Base value + temporary multiplier stack |
 | `Duration` | `magic/values.py` | Expiry tracker |
-| `DeviceConfig` | `hardware/shared/device_config.py` | Validated `aura-device.json`: optional `pixels` list, IR/audio/sensor/haptics/radio/SD sections and **Named bus** maps; every pin is recorded as a `PinRef` |
+| `DeviceConfig` | `hardware/shared/device_config.py` | The validated `aura-device.json`; every pin in it is a `PinRef` |
 | `PinRef` | `hardware/shared/device_config.py` | The **Pin reference**; lives with the config so the parser can create it without importing `DeviceParts` |
 | `NeoPixelCurrentBudgetConfig` | `hardware/shared/device_config.py` | The `neopixel_current_budget` policy; its math lives in `hardware/shared/neopixel_current_budget.py` |
 | `DeviceHardware` | `hardware/shared/device_hardware.py` | Board-free bundle the **Device assembly** returns |
 | `assemble_device` | `hardware/shared/device_assembly.py` | The **Device assembly**; reaches hardware only through `DeviceParts` |
 | `DeviceParts` | `hardware/shared/device_parts.py` | Port the Device assembly builds each part through; adapters `CircuitPythonParts` (`hardware/circuitpython/circuitpython_parts.py`) and `SimulatedParts` (`hardware/simulated/simulated_parts.py`) |
+| `VoicePool` | `hardware/shared/voice_pool.py` | Board-free owner of which **Voice** plays what; evicts the oldest when full |
+| `VoiceSink` | `hardware/shared/voice_pool.py` | Port `VoicePool` drives audio hardware through; takes loudness in `0..1` and owns `max_volume` |
+| `AudioEffectOutput` | `hardware/circuitpython/audio_output.py` | Live I2S audio `EffectOutput` and `VoiceSink`; plays each event's **Resolved clip** |
+| `Drv2605EffectOutput` | `hardware/circuitpython/drv2605_output.py` | Live haptic `EffectOutput` on every scope; ignores loudness, as the DRV2605L has no volume control |
+| `NeoPixelEffectOutput` | `hardware/circuitpython/neopixel_output.py` | Live `EffectOutput` for one NeoPixel strip, split into **Segments** |
 | `PolledSensor` | `hardware/shared/polled_sensor.py` | The **PolledSensor** |
 | `HardwareNetworkControls` | `hardware/shared/network_controls.py` | Concrete, send-only `NetworkControls` adapter |
-| `InfraredTransceiver` | `hardware/shared/ir_transceiver.py` | The **InfraredTransceiver** |
-| `RadioTransport` | `hardware/shared/radio_transport.py` | Board-free half-duplex radio port; live adapter `Rfm69RadioTransport` |
-| `RadioTransceiver` | `hardware/shared/radio_transceiver.py` | The **RadioTransceiver** |
+| `InfraredTransceiver` | `hardware/shared/ir_transceiver.py` | Board-free owner of a device's whole IR subsystem (transmitters, receiver, **IR transmit gate**), exposed as `DeviceHardware.ir` |
+| `PulseReader` / `PulseWriter` | `hardware/shared/ir_transport.py` | Ports the **IR transport** reads and writes pulses through; live adapters in `hardware/circuitpython/infrared_io.py` |
+| `IrTelemetrySnapshot` | `hardware/shared/ir_telemetry.py` | One reading of the **IR receive-path telemetry** |
+| `RadioTransport` | `hardware/shared/radio_transport.py` | Board-free half-duplex **Radio** port, one for both directions; live adapter `Rfm69RadioTransport` |
+| `Rfm69RadioTransport` | `hardware/circuitpython/rfm69_radio_transport.py` | Live `RadioTransport` over the RFM69 driver |
+| `RadioTransceiver` | `hardware/shared/radio_transceiver.py` | Board-free owner of a device's whole **Radio** subsystem, exposed as `DeviceHardware.radio` |
 | `build_scene_boot` | `app/scene_composition.py` | The **Scene boot**, the Composition layer's only entry point; shared by `run_scene` and the Simulated device |
 | `SceneBoot` | `app/scene_composition.py` | What `build_scene_boot` returns, including the booted scene's `tick` |
 | `DeviceSceneReboot` | `hardware/shared/device_reboot.py` | Live `SceneReboot` adapter, wired by `build_scene_boot` |
 | `PersistedScene` | `hardware/shared/persisted_scene.py` | Board-free owner of the **Persisted scene** record; a client of the boot's one `DeviceStateStore` (ADR-0009) |
+| `DeviceStorage` | `hardware/shared/device_storage.py` | Board-free storage port over a mounted **Card**; tests and the Simulated device run it over a temporary directory |
+| `SdCardStorage` | `hardware/circuitpython/sdcard_storage.py` | Live `DeviceStorage` that mounts the SD card |
 | `DeviceStateStore` | `hardware/shared/device_state.py` | Board-free, general key/value store over the card's `aura-state.json` (ADR-0009) |
 | `SdSyncServer` | `hardware/shared/sd_sync_server.py` | Board-free device side of the SD-sync protocol (ADR-0011) |
 | `SdSyncClient` | `scripts/sd_sync_client.py` | Board-free (CPython-only) host side of the SD-sync protocol (ADR-0011) |
 | `Transport` (SD sync) | `hardware/shared/sd_sync_protocol.py` | Board-free port `SdSyncClient`/`SdSyncServer` exchange base64-framed lines through (ADR-0011); live adapters `UsbCdcTransport` (device) / `SerialTransport` (host) |
-| `LineFramer` | `hardware/shared/sd_sync_protocol.py` | The **LineFramer**; both live transports frame through it |
+| `LineFramer` | `hardware/shared/sd_sync_protocol.py` | Splits a byte stream into SD-sync frame lines; both live transports frame through it |
 | `UsbCdcTransport` | `hardware/circuitpython/usb_cdc_transport.py` | Live device-side `Transport`; imports no `usb_cdc`, so it is CPython-testable |
 | `SerialTransport` | `scripts/sd_sync_transport.py` | Live host-side `Transport` over a host serial port |
 | `find_port` / `SerialChannel` / `PortAutoDetectError` | `scripts/port_auto_detect.py` | **Port auto-detect** |
@@ -215,13 +225,34 @@ All code that ships to a device (`effects/`, `engine/`, `magic/`, `packs/`, `har
 
 - **`typing.Protocol` substitute** — use plain base classes with `raise NotImplementedError`; subclass explicitly for type-checker compatibility (ADR-0012)
 - **`PaletteLUT256` is pre-computed** — never construct inside a render loop
+- **Line limit: 100 characters** — enforced by `ruff` pre-commit hook (also `ruff format`)
+
+`scripts/` is CPython-only and does not carry these constraints.
+
+---
+
+## Design constraints
+
+Rules an agent must not break, in every package, `scripts/` included.
+
 - **Rules are Game-data-stateless** — a `GameRule` keeps all game data in `GameState`; construction-time config is its only instance state (`engine/engine.py`, `packs/`)
 - **One clock** — only `SceneRuntime.advance_clock` advances the **Timer**, once per tick; rules read time through `GameState` (`engine/timer.py`, `engine/scene_runtime.py`)
 - **The Tag protocol is immutable** — never change its timings or add a CRC; it is a compatibility contract with non-Aura hardware (`hardware/shared/ir_codecs/tag.py`)
 - **One Reboot path between scenes** — rules never load a scene in-process (`engine/scene.py`, ADR-0005)
-- **Line limit: 100 characters** — enforced by `ruff` pre-commit hook (also `ruff format`)
-
-`scripts/` is CPython-only and does not carry these constraints.
+- **SD sync has one wire format** — both ends frame lines through `hardware/shared/sd_sync_protocol.py`, so a change reaches the device and the host at once; one protocol test pins the bytes, and other SD-sync tests assert only what moved (ADR-0011)
+- **Routine SD-sync failures are replies** — `SdSyncServer` answers "not found" and "no SD configured" in-band, never by raising; `SdSyncClient` surfaces them as typed errors (ADR-0011)
+- **`usb_cdc` stays in device-only wiring** — only `hardware/circuitpython/boot.py` and `examples/sd_sync.py` import it, so `UsbCdcTransport` stays CPython-testable
+- **Host SD sync reads only the Data channel** — `SerialTransport` frames bytes there; deploy-watch's UTF-8 line reader is for the **Console channel** (`scripts/sd_sync_transport.py`, `scripts/deploy_watch.py`)
+- **Port auto-detect never guesses** — no match, or more than one, fails; it never falls back to the only serial device (`scripts/port_auto_detect.py`)
+- **Hardware builds no game events** — IR and radio deliver bytes; only the **Scene boot**'s tick turns them into `NetworkEvents` (`app/scene_composition.py`, `hardware/shared/`)
+- **Driver libraries load in their part** — each per-component driver library, and an adapter that imports one (`Rfm69RadioTransport`, `SdCardStorage`), is imported only inside the `CircuitPythonParts` part that builds it (`hardware/circuitpython/`, ADR-0013)
+- **Hardware is built from config, never probed** — the **Device assembly** builds what `aura-device.json` declares and enables, and a declared part that can't be built fails the boot (`hardware/shared/device_assembly.py`, ADR-0014)
+- **Storage stays under the card's mount root** — no path `DeviceStorage` reads, writes or resolves may escape it (`hardware/shared/device_storage.py`)
+- **One owner per network subsystem** — `InfraredTransceiver` alone builds a device's IR transmitters, receiver and **IR transmit gate**, and `RadioTransceiver` owns its radio; `DeviceHardware` exposes none of the raw transmitters, the gate or the `RadioTransport` (`hardware/shared/ir_transceiver.py`, `hardware/shared/radio_transceiver.py`)
+- **One codec per boot, one decoder per reader** — the **Scene boot** applies the booted scene's **Wire-frame codec** once, before the first tick, and an **Overlay** or pop never swaps it; codecs travel as classes, so no two IR readers share a decoder (`app/scene_composition.py`, `hardware/shared/ir_transceiver.py`)
+- **One IR emitter set** — `IR_EMITTERS` in `engine/network.py` is the emitter set; derive from it, never restate it (`hardware/shared/device_config.py`, `hardware/shared/device_assembly.py`)
+- **Build and deploy follow the Ship list** — neither step excludes or places a file of its own (`scripts/ship_list.py`, `scripts/build.py`, `scripts/deploy.py`)
+- **A Deploy plan is decided once** — carrying it out never re-checks a flag or re-decides what the plan holds (`scripts/deploy.py`)
 
 ---
 
