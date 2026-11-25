@@ -246,6 +246,8 @@ Rules an agent must not break, in every package, `scripts/` included.
 - **One owner per network subsystem** — `InfraredTransceiver` alone builds a device's IR transmitters, receiver and **IR transmit gate**, and `RadioTransceiver` owns its radio; `DeviceHardware` exposes none of the raw transmitters, the gate or the `RadioTransport` (`hardware/shared/ir_transceiver.py`, `hardware/shared/radio_transceiver.py`)
 - **One codec per boot, one decoder per reader** — the **Scene boot** applies the booted scene's **Wire-frame codec** once, before the first tick, and an **Overlay** or pop never swaps it; codecs travel as classes, so no two IR readers share a decoder (`app/scene_composition.py`, `hardware/shared/ir_transceiver.py`)
 - **One IR emitter set** — `IR_EMITTERS` in `engine/network.py` is the emitter set; derive from it, never restate it (`hardware/shared/device_config.py`, `hardware/shared/device_assembly.py`)
+- **Build and deploy follow the Ship list** — neither step excludes or places a file of its own (`scripts/ship_list.py`, `scripts/build.py`, `scripts/deploy.py`)
+- **A Deploy plan is decided once** — carrying it out never re-checks a flag or re-decides what the plan holds (`scripts/deploy.py`)
 
 ---
 

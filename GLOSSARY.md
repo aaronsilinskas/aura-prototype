@@ -502,12 +502,12 @@ The idle period between two IR shots, delivered by `PulseIn` as a single over-lo
 _Avoid_: trying to "re-arm" or salvage a pulse from an overlapping frame (recognise the gap and start the next frame clean)
 
 ### Ship list
-The one answer to which repo files go on a device and where each lands: the device modules (compiled to `.mpy`, or as source), their data files, each nested package's parent `__init__`, and the board's `boot.py` on the mount root. It never includes tests, `conftest.py`, the **Simulation test harness** or the **Simulated device**. Building and deploying both follow it.
-_Avoid_: excluding or placing files separately in the build or deploy step; "manifest" for it (a **Pack manifest** is `effects.json`/`rules.json`)
+The one answer to which repo files go on a device and where each lands: the device modules, their data files and the board's `boot.py`. It never includes tests, the **Simulation test harness** or the **Simulated device**.
+_Avoid_: "manifest" for it (a **Pack manifest** is `effects.json`/`rules.json`)
 
 ### Deploy plan
-One deploy, validated and resolved before anything is written: where it goes, whether modules ship compiled or as source, whether an example (with the **Ship list**'s `boot.py`) goes too, which scene to record, and whether it is a dry run. Carrying it out never re-decides any of these.
-_Avoid_: "deploy mode", "deploy config" for it; re-checking flags while carrying it out; building it long before it runs (it is validated against the mount as it was when planned)
+One deploy, validated and resolved before anything is written: where it goes, whether modules ship compiled or as source, whether an example goes too, which scene to record, and whether it is a dry run.
+_Avoid_: "deploy mode", "deploy config" for it; building it long before it runs (it is validated against the mount as it was when planned)
 
 ### Deploy-watch
 The host tool that deploys an example and captures the resulting serial run; unlike `deploy.py` it flashes *and* captures.
