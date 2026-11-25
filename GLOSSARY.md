@@ -442,16 +442,12 @@ A snapshot of button states, each one of `UP`, `DOWN`, `PRESSED` (down this fram
 _Avoid_: reading `_states` directly (use the query methods); assuming `is_down` excludes the `PRESSED` frame
 
 ### IR transport
-The hardware-agnostic infrared send/receive subsystem (no `pulseio`), reached through `PulseReader`/`PulseWriter` ports; moves opaque `bytes` with no game semantics.
-_Avoid_: importing `pulseio` into shared IR code; encoding spell fields in the transport
-
-### InfraredTransceiver
-The board-free single owner of a device's whole IR subsystem, exposed as `DeviceHardware.ir`. It builds its own transmitters (one per wired **IR emitter**), its receiver and the shared **IR transmit gate** from the pulse readers, emitter pins and writer factory the platform hands it. It starts on the Aura wire-frame and reports what is wired. The network seam's `send_ir` delegates to it; a send routes to the named emitter, and it builds no game event.
-_Avoid_: importing `NetworkEvents`/game-event vocabulary here (the event is built in the **Scene boot**'s tick); building its transmitters, receiver or gate anywhere else; a value-returning `update()`; calling it a hardware "driver"; exposing the transmitter map as a public collection
+The hardware-agnostic infrared send and receive subsystem: it moves opaque bytes between devices, with no game meaning.
+_Avoid_: encoding spell fields in the transport
 
 ### Wire-frame codec
-An encoder/decoder pair mapping an opaque payload ↔ IR pulse durations, injected into the IR transport; two coexist — the **Aura wire-frame** and the **Tag protocol** — selected by the scene a device boots; an **Overlay** runs on the codec of the scene it covers. Travels as a class pair, so each receiver reader gets its own fresh decoder. A built device's codec is applied once, at boot, via `InfraredTransceiver.apply_codec`; `InfraredTransceiver.codec` reads the installed pair back.
-_Avoid_: assuming a single global wire-frame; treating wire-frames as interchangeable across scenes; passing codec instances (one decoder must never be shared between readers)
+An encoder and decoder pair mapping an opaque payload to IR pulse timings and back. Two coexist, the **Aura wire-frame** and the **Tag protocol**; the scene a device boots picks one, and an **Overlay** runs on the codec of the scene it covers.
+_Avoid_: assuming a single global wire-frame; treating wire-frames as interchangeable across scenes
 
 ### Aura wire-frame
 Aura's internal IR wire-frame (header mark/space, MSB-first bits, CRC-8, lead-out terminator); carries any-length payloads and is free to change since both ends are Aura devices.
@@ -466,16 +462,16 @@ The game-layer payload of a tag shot — `team`, `player`, `damage` packed into 
 _Avoid_: reading tag fields off the wire-frame; conflating the data codec (`TagData` ↔ byte) with the wire-frame codec (byte ↔ pulses)
 
 ### IR emitter
-A directed infrared transmit channel; constants `LINE`, `CONE`, `AREA_OF_EFFECT` are the `send_ir` vocabulary, each mapped to its own transmitter. `engine.network.IR_EMITTERS` is the single source of the emitter set.
-_Avoid_: importing `magic.CastType` for IR emitters; a default emitter on `send_ir`; restating the emitter key set (derive from `IR_EMITTERS`)
+A directed infrared transmitter: `LINE`, `CONE` or `AREA_OF_EFFECT`. A send always names the one it goes out on.
+_Avoid_: importing `magic.CastType` for IR emitters; a default emitter on a send
 
 ### IR multi-receiver
-Several IR receivers, each on its own data line, returning the packet with the lowest **error margin**; improves reception reliability only (no hit direction). Selected by listing **two or more `rx` pins** in `aura-device.json`. Which receiver won is hardware telemetry only: `NetworkEvents.IRReceived` names no receiver, so rules never see it.
+Several **IR receivers**, each on its own data line, for better reception only: the packet with the lowest **IR error margin** wins, and rules never see which receiver won (ADR-0016). Listing two or more `rx` pins in `aura-device.json` selects it.
 _Avoid_: treating the array as a direction finder; sharing one data line across receivers; a separate config flag to opt in (pin count is the switch)
 
-### InfraredReceiver
-The one board-free receiver the **InfraredTransceiver** builds over every IR receiver on a device, reading each through that receiver's own pulse reader and decoder, for any number of readers; surfaces at most one packet per tick, the one with the lowest **IR error margin**, and names the winning reader only when there was a pick to make. On its own, "IR receiver" means the physical sensor on one data line.
-_Avoid_: constructing one outside the **InfraredTransceiver**; separate single- and multi-receiver classes; branching on reader count to choose a receiver; sharing one decoder between readers
+### IR receiver
+The physical infrared sensor on one data line. A device has any number; with two or more it is an **IR multi-receiver**, and at most one packet a tick reaches the game either way.
+_Avoid_: separate single- and multi-receiver handling (one receiver serves any number of readers)
 
 ### IR error margin
 The worst-case pulse-timing deviation (µs) tolerated while still decoding a packet; lower is better, and it's the key the multi-receiver uses to pick the best receiver.
@@ -486,16 +482,16 @@ A normalized 0.0–1.0 quality metric derived from a packet's error margin — a
 _Avoid_: calling it "RSSI" as if measured; using it to derive hit direction
 
 ### IR receive-path telemetry
-Monotonic-since-boot counters at each receive-path stage (reader, receiver, decoder), each with exactly one declared owner; surfaced as an `IrTelemetrySnapshot` and a change-gated `telemetry_line()`.
-_Avoid_: aggregating hit/gated counts in the scene; per-tick allocation in the no-pulse path; re-listing the counter set in a receiver (walk the sources)
+Counters kept since boot at each stage of IR reception (reader, receiver, decoder), each counted by exactly one stage.
+_Avoid_: aggregating hit or gated counts in the scene
 
 ### Self-echo
 The IR pulses a device's own receiver captures from its own emitter while transmitting; decodes as a CRC-valid phantom self-hit, suppressed by the **IR transmit gate**, never by game rules.
 _Avoid_: suppressing it in a scene; telling it from a real overlapping shot at the pulse level (indistinguishable — drop both)
 
 ### IR transmit gate
-The shared coordination primitive that keeps a device from decoding its own **self-echo**: transmitters mark when they are emitting, and the receiver discards while emission is active plus once more on the falling edge.
-_Avoid_: a second source of truth for "transmitting"; exposing it on `DeviceHardware`; a second gate per device, or one built outside the **InfraredTransceiver**
+The shared signal that keeps a device from decoding its own **self-echo**: transmitters mark when they are emitting, and the receiver discards while emission is active plus once more on the falling edge.
+_Avoid_: a second source of truth for "transmitting"
 
 ### Drain-but-discard
 The receiver's gated-receive contract: while the **IR transmit gate** signals emission, every available pulse is still drained from the reader (so `PulseIn` never overflows) but none is decoded, and any in-progress decode is reset.

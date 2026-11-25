@@ -181,7 +181,9 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `DeviceParts` | `hardware/shared/device_parts.py` | Port the Device assembly builds each part through; adapters `CircuitPythonParts` (`hardware/circuitpython/circuitpython_parts.py`) and `SimulatedParts` (`hardware/simulated/simulated_parts.py`) |
 | `PolledSensor` | `hardware/shared/polled_sensor.py` | The **PolledSensor** |
 | `HardwareNetworkControls` | `hardware/shared/network_controls.py` | Concrete, send-only `NetworkControls` adapter |
-| `InfraredTransceiver` | `hardware/shared/ir_transceiver.py` | The **InfraredTransceiver** |
+| `InfraredTransceiver` | `hardware/shared/ir_transceiver.py` | Board-free owner of a device's whole IR subsystem (transmitters, receiver, **IR transmit gate**), exposed as `DeviceHardware.ir` |
+| `PulseReader` / `PulseWriter` | `hardware/shared/ir_transport.py` | Ports the **IR transport** reads and writes pulses through; live adapters in `hardware/circuitpython/infrared_io.py` |
+| `IrTelemetrySnapshot` | `hardware/shared/ir_telemetry.py` | One reading of the **IR receive-path telemetry** |
 | `RadioTransport` | `hardware/shared/radio_transport.py` | Board-free half-duplex **Radio** port, one for both directions; live adapter `Rfm69RadioTransport` |
 | `Rfm69RadioTransport` | `hardware/circuitpython/rfm69_radio_transport.py` | Live `RadioTransport` over the RFM69 driver |
 | `RadioTransceiver` | `hardware/shared/radio_transceiver.py` | Board-free owner of a device's whole **Radio** subsystem, exposed as `DeviceHardware.radio` |
@@ -241,6 +243,9 @@ Rules an agent must not break, in every package, `scripts/` included.
 - **Driver libraries load in their part** — each per-component driver library, and an adapter that imports one (`Rfm69RadioTransport`, `SdCardStorage`), is imported only inside the `CircuitPythonParts` part that builds it (`hardware/circuitpython/`, ADR-0013)
 - **Hardware is built from config, never probed** — the **Device assembly** builds what `aura-device.json` declares and enables, and a declared part that can't be built fails the boot (`hardware/shared/device_assembly.py`, ADR-0014)
 - **Storage stays under the card's mount root** — no path `DeviceStorage` reads, writes or resolves may escape it (`hardware/shared/device_storage.py`)
+- **One owner per network subsystem** — `InfraredTransceiver` alone builds a device's IR transmitters, receiver and **IR transmit gate**, and `RadioTransceiver` owns its radio; `DeviceHardware` exposes none of the raw transmitters, the gate or the `RadioTransport` (`hardware/shared/ir_transceiver.py`, `hardware/shared/radio_transceiver.py`)
+- **One codec per boot, one decoder per reader** — the **Scene boot** applies the booted scene's **Wire-frame codec** once, before the first tick, and an **Overlay** or pop never swaps it; codecs travel as classes, so no two IR readers share a decoder (`app/scene_composition.py`, `hardware/shared/ir_transceiver.py`)
+- **One IR emitter set** — `IR_EMITTERS` in `engine/network.py` is the emitter set; derive from it, never restate it (`hardware/shared/device_config.py`, `hardware/shared/device_assembly.py`)
 
 ---
 
