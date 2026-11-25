@@ -192,7 +192,7 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `SdSyncServer` | `hardware/shared/sd_sync_server.py` | Board-free device side of the SD-sync protocol (ADR-0011) |
 | `SdSyncClient` | `scripts/sd_sync_client.py` | Board-free (CPython-only) host side of the SD-sync protocol (ADR-0011) |
 | `Transport` (SD sync) | `hardware/shared/sd_sync_protocol.py` | Board-free port `SdSyncClient`/`SdSyncServer` exchange base64-framed lines through (ADR-0011); live adapters `UsbCdcTransport` (device) / `SerialTransport` (host) |
-| `LineFramer` | `hardware/shared/sd_sync_protocol.py` | The **LineFramer**; both live transports frame through it |
+| `LineFramer` | `hardware/shared/sd_sync_protocol.py` | Splits a byte stream into SD-sync frame lines; both live transports frame through it |
 | `UsbCdcTransport` | `hardware/circuitpython/usb_cdc_transport.py` | Live device-side `Transport`; imports no `usb_cdc`, so it is CPython-testable |
 | `SerialTransport` | `scripts/sd_sync_transport.py` | Live host-side `Transport` over a host serial port |
 | `find_port` / `SerialChannel` / `PortAutoDetectError` | `scripts/port_auto_detect.py` | **Port auto-detect** |
@@ -229,6 +229,11 @@ Rules an agent must not break, in every package, `scripts/` included.
 - **One clock** — only `SceneRuntime.advance_clock` advances the **Timer**, once per tick; rules read time through `GameState` (`engine/timer.py`, `engine/scene_runtime.py`)
 - **The Tag protocol is immutable** — never change its timings or add a CRC; it is a compatibility contract with non-Aura hardware (`hardware/shared/ir_codecs/tag.py`)
 - **One Reboot path between scenes** — rules never load a scene in-process (`engine/scene.py`, ADR-0005)
+- **SD sync has one wire format** — both ends frame lines through `hardware/shared/sd_sync_protocol.py`, so a change reaches the device and the host at once; one protocol test pins the bytes, and other SD-sync tests assert only what moved (ADR-0011)
+- **Routine SD-sync failures are replies** — `SdSyncServer` answers "not found" and "no SD configured" in-band, never by raising; `SdSyncClient` surfaces them as typed errors (ADR-0011)
+- **`usb_cdc` stays in device-only wiring** — only `hardware/circuitpython/boot.py` and `examples/sd_sync.py` import it, so `UsbCdcTransport` stays CPython-testable
+- **Host SD sync reads only the Data channel** — `SerialTransport` frames bytes there; deploy-watch's UTF-8 line reader is for the **Console channel** (`scripts/sd_sync_transport.py`, `scripts/deploy_watch.py`)
+- **Port auto-detect never guesses** — no match, or more than one, fails; it never falls back to the only serial device (`scripts/port_auto_detect.py`)
 
 ---
 

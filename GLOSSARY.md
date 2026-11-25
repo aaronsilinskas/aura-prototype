@@ -405,39 +405,21 @@ _Avoid_: escaping the mount root; a second concrete implementation for CPython v
 The live CircuitPython `DeviceStorage` adapter that mounts an SD card at construction — the only module importing `sdcardio`/`storage`.
 _Avoid_: importing `sdcardio`/`storage` anywhere else; wrapping `cs` in `digitalio.DigitalInOut`; presence-probing instead of trusting the config gate
 
-### SdSyncServer
-The board-free device side of the SD-sync protocol; serves file read/write/list requests against a `DeviceStorage` over an injected `Transport`, replying in-band when no SD is configured.
-_Avoid_: raising for "not found"/"no SD configured" (reply in-band instead — both are routine, not programming errors); asserting its wire-format internals in tests (assert only external behaviour: bytes read, responses returned); pinning a real connection to one verb (drive `serve_one` instead)
-
-### SdSyncClient
-The board-free (CPython-only) host side of the SD-sync protocol; drives an `SdSyncServer` over an injected `Transport` to pull, push, and list files, verifying a whole-file CRC-32 and surfacing the server's in-band failures as loud, typed errors.
-_Avoid_: opening the host file before the server confirms the pull will proceed (leaves an empty file on a "not found"); treating a CRC mismatch as chunk-level (it is whole-file, so a retry re-runs the entire transfer)
-
-### SD-sync `Transport`
-The board-free port `SdSyncClient`/`SdSyncServer` exchange base64-framed lines through, one `Frame` at a time. Live adapters are `UsbCdcTransport` (device) and `SerialTransport` (host); an in-memory loopback stands in for CI.
-
-### LineFramer
-The board-free splitter in `sd_sync_protocol` that turns a byte stream into SD-sync frame lines, each ended by `FRAME_DELIMITER` (a newline, which base64 never produces). Both live transports use it, with `delimit_line` on the sending side.
-
-### UsbCdcTransport
-The live device-side `Transport` adapter, framing SD-sync lines over a serial-like stream with the shared `LineFramer`. Duck-typed against any `read`/`write` stream — it imports no `usb_cdc`, so it is CPython-testable against a fake stream.
-_Avoid_: importing `usb_cdc` into this module (the device-only wiring lives in `examples/sd_sync.py`); splitting lines itself (both transports frame through `sd_sync_protocol`, so the two ends can't drift); assuming the wire grammar is a stable contract (it may change, but in `sd_sync_protocol` for both ends at once; a test pins the bytes so a change is deliberate)
-
-### SerialTransport
-The live host-side SD-sync `Transport`, framing lines with the same shared `LineFramer` as `UsbCdcTransport` but over a host serial port. Byte-framed over the **data channel**, distinct from `deploy_watch`'s UTF-8 **console channel**.
-_Avoid_: reusing `deploy_watch`'s `iter_serial_lines` for SD-sync (it decodes UTF-8 and targets the console channel, not the byte-framed data channel)
+### SD sync
+Moving files between a host and a device's SD card over the **Data channel**: the host lists, pulls and pushes files, and the device serves them. Each file is checked whole, and a transfer that fails leaves the file it would have replaced as it was (ADR-0011).
+_Avoid_: mounting the card on the host for it (the card is reachable from the host only through SD sync); "verb" unqualified for its list, pull and push where **EffectVerb**s are nearby
 
 ### Console channel
 The USB-CDC serial channel a board always exposes for REPL and `print` output; what **Deploy-watch** captures.
 _Avoid_: "REPL port", "the usbmodem port", or bare "serial port" (ambiguous once the data channel is enabled)
 
 ### Data channel
-The second USB-CDC serial channel a board exposes when enabled on the device, carrying SD-sync protocol bytes rather than text.
+The second USB-CDC serial channel a board exposes when enabled on the device, carrying **SD sync** bytes rather than text.
 _Avoid_: "CDC2", "the other port", bare "serial port"
 
 ### Port auto-detect
-Resolution of a host serial port for one named channel (**console channel** or **data channel**) by asking which board interface it is: a single match auto-selects, an explicitly named port overrides without scanning, and zero or multiple matches fails loudly.
-_Avoid_: picking a port by device-name pattern (both channels look alike); falling back to "the only usbmodem device" when no channel matches; guessing among multiple matches
+Finding the host serial port for one named channel (**console channel** or **data channel**) by which board interface it is, never by its device name, since both channels look alike. Naming a port skips it.
+_Avoid_: picking a port by device-name pattern (both channels look alike)
 
 ### NeoPixelEffectOutput
 A CircuitPython `EffectOutput` driving **one** NeoPixel strip, subdivided into scope **segments** by pixel range; several strips may share a scope and are driven in sync.
