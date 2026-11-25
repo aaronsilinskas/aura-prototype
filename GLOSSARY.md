@@ -21,7 +21,7 @@ The **Modality** (sound) declaring an effect's audio behaviour, mapping **Effect
 _Avoid_: an `EffectVerb.STOP` clips key (teardown is `flush()`, not `handle_event`; rejected at build with a **VerbKeyError**); string keys (rejected)
 
 ### AudioPlaybackConfig
-A value object for how one clip plays: which clip (a qualified clip name, resolved by the **Active scene namespace** when the effect is built), whether it loops, and whether finishing it stops the whole owning effect (`stops_effect`). Only pixels keep an effect alive past its clip, so an effect without pixels stops when its clip finishes whether or not the flag is set; the flag matters only for an effect with pixels. Being cut off counts as finishing: a clip whose voice is taken by another sound, or that an **Overlay** covers mid-play, stops its effect just as if it had played out. Declared once at module level and shared by every effect built from it.
+A value object for how one clip plays: which clip (a qualified clip name, resolved by the **Active scene namespace** when the effect is built), whether it loops, and whether finishing it stops the whole owning effect (`stops_effect`). Being cut off counts as finishing. Declared once and shared by every effect built from it.
 _Avoid_: `stop_on_finish`, `end_effect`; setting it on an effect without pixels (redundant); reading `stops_effect` as "the sound stops" (it names the effect's end); combining it with `loop=True` (rejected); writing a resolved path onto it (that is a **Resolved clip**)
 
 ### Resolved clip
@@ -74,7 +74,7 @@ An `EffectPixels` that turns one or more **Layers** into pixels every frame. The
 _Avoid_: "compositor"; re-typing a stock render loop in a pack or scene; putting `name` on a renderer (it belongs on `Effect`)
 
 ### GameRule
-An event handler; one of a scene's rules, dispatched by its **SceneRun**. **Game-data-stateless** — all game data lives in `GameState`, never as mutable instance attributes (construction-time config is the only permitted instance state).
+An event handler; one of a scene's rules, dispatched by its **SceneRun**. **Game-data-stateless**: all game data lives in `GameState`.
 
 ### Event
 A game-rule event (`engine/events.py`), grouped by `EventGroup`: what a **SceneRun** dispatches to rules, which handle it by exact class (e.g. `InputEvents.Sensors`, `NetworkEvents.IRReceived`).
@@ -86,7 +86,7 @@ Rules queue events on it and read game time and the dispatch count, but only its
 _Avoid_: `get(key, None)` (use `get_or_none`); storing a **Setting** in it
 
 ### SceneRun
-One run of a scene on the scene stack, from when it is booted or laid on as an **Overlay** until it is popped or the device reboots. It holds the scene's `GameState`, its rules in dispatch order and its game time, and is the only thing that dispatches the scene's queued events: each event goes to every rule in order, events queued during dispatch are dispatched in the same tick, and the dispatch count rises once per event. Only the top run is ticked, so a covered scene's game time stops.
+One run of a scene on the scene stack, from when it is booted or laid on as an **Overlay** until it is popped or the device reboots. It holds the scene's `GameState`, its rules in dispatch order and its game time, and is the only thing that dispatches the scene's queued events. Only the top run is ticked, so a covered scene's game time stops.
 _Avoid_: "engine", "game engine", "session", "instance", "run unit"; adding or swapping its rules after it is built; holding the clock (it is handed each tick's elapsed time)
 
 ### StateSlot
@@ -134,7 +134,7 @@ The immutable helper a scene's rules, or a **Rule pack**'s, build once from the 
 _Avoid_: confusing with `EffectConfig`; calling the Settings themselves the Scene Config; re-deriving it every tick (build once, cache); restating a Setting's default in it (its declaration holds it); a second way to build it from loose values
 
 ### Timer
-The scene's clock. Whoever drives the tick advances it exactly once per tick, before anything reads it (see **SceneRuntime**), so every **Polled part**, rule and effect in that tick sees the same, current elapsed time. Only `SceneRuntime` and the effect system it drives read it; it hands the top **SceneRun** each tick's elapsed time. Rules access time only via `state.elapsed`/`state.total` (or a phase rule's `phase_elapsed`, measured on `state.total`), never by holding a `Timer` reference.
+The scene's clock. It is advanced once per tick, by the **SceneRuntime**, so every **Polled part**, rule and effect in that tick sees the same elapsed time.
 _Avoid_: advancing it anywhere but `SceneRuntime.advance_clock`; a **SceneRun** or rule holding it; reading it before the tick has advanced it
 
 ### Scene
@@ -302,12 +302,12 @@ A CircuitPython `EffectOutput` driving a DRV2605L haptic driver on all scopes (`
 _Avoid_: constructing with a `None` driver; reading `receipt.loudness` (the DRV2605L has no volume control); "motor" for the injected instance (use `driver`)
 
 ### aura-device.json
-The single **required** on-device file holding all hardware configuration; a missing file raises. Sections: `buttons`, `ir`, `pixels`, `audio`, `i2c`, `spi`, `radio`, `sdcard`, `neopixel_current_budget`, `accelerometer`, `magnetometer`, `haptics`. `pixels` and `buttons` are each an optional, possibly-empty list. Pure hardware config — scene selection lives in **`aura-boot.json`** instead.
-_Avoid_: `settings.toml` (removed — unreadable on MicroPython); keying the pixel section `output`; putting `board` pin objects in the file; adding a `scene` field to `DeviceConfig`; a top-level `"scene"` key (moved to `aura-boot.json`); treating a stale `high_current_rail` section as meaningful (the feature was removed; the section is inert); a `scopes` map in a NeoPixel `pixels` entry (removed; use `pin` with `scope_pixels`)
+The single **required** on-device file holding all hardware configuration; a missing file raises. Pure hardware config — scene selection lives in **`aura-boot.json`** instead.
+_Avoid_: `settings.toml` (unreadable on MicroPython); keying the pixel section `output`; putting `board` pin objects in the file; adding a `scene` field to `DeviceConfig`; a top-level `"scene"` key (scene selection lives in `aura-boot.json`)
 
 ### aura-boot.json
 The single **required** on-device flash file holding the device's **boot values**: start-up values, mostly written by `deploy.py`, that choose the boot scene and never reach `GameState`. Drag-editable over USB alongside `aura-device.json`; a missing file raises. Carries the `default_scene` key — named for its *default*-selection role, since the card's **Persisted scene** layers on top of it — and, once `deploy.py --scene` has run, the **Scene deploy token** (`scene_deploy_token`, optional; hand-authored files omit it).
-_Avoid_: reading `default_scene` from `aura-device.json` (moved out); treating a stale `"scene"` key left in an old `aura-device.json` as meaningful (it is inert); hand-editing `default_scene` to change the boot scene (without a new token it does not displace a Persisted scene — `deploy.py --scene` is the supported path); `aura-settings.json` (the old name, read nowhere: a board still carrying only it fails at boot until fixed by hand); "settings" or "device settings" for boot values (those words name a scene's or pack's **Setting**)
+_Avoid_: reading `default_scene` from `aura-device.json`; hand-editing `default_scene` to change the boot scene (without a new token it does not displace a Persisted scene — `deploy.py --scene` is the supported path); `aura-settings.json`; "settings" or "device settings" for boot values (those words name a scene's or pack's **Setting**)
 
 ### DeviceConfig
 The validated value object parsed from an `aura-device.json` mapping — no `board` import, constructs no hardware. Can derive an isolated copy with every isolatable component but one disabled, for single-component bring-up. Never changed once parsed — a different config is a different mapping, parsed again, so every config satisfies its `NeoPixelCurrentBudgetConfig`; `isolate` is the one derivation, because it only narrows.
@@ -330,11 +330,11 @@ The top-level `app/` package — the one place allowed to import both engine run
 _Avoid_: importing `hardware.*` from `engine/`, `effects/`, `magic/`, `packs/`; putting board-only code in `scene_composition.py`
 
 ### Scene boot
-The one boot the device and the **Simulated device** share, and the **Composition layer**'s only way in. From the hardware a device built, it applies a pending **Scene deploy token**, then picks the boot scene (the **Persisted scene**, else the flash `default_scene`), skipping a Persisted scene the device doesn't know or lacks the **Required capabilities** for, and raising when `default_scene` doesn't fit. It applies that scene's wire-frame codec before the first tick, and hands back the booted scene's name, its tick, its **SceneControls**, its **Active scene namespace**, and the boot's one device state store with the **Persisted scene** record over it.
+The one boot the device and the **Simulated device** share, and the **Composition layer**'s only way in. From the hardware a device built, it applies a pending **Scene deploy token**, then picks the boot scene (the **Persisted scene**, else the flash `default_scene`), skipping a Persisted scene the device doesn't know or lacks the **Required capabilities** for, and raising when `default_scene` doesn't fit. It applies that scene's wire-frame codec before the first tick.
 _Avoid_: sequencing the boot's steps at a call site; a second boot for tests or examples; scanning packs or scenes outside it; copying the tick's body into a harness or entry point; building a tick per frame; reading `ir` or `radio` anywhere but `DeviceHardware`; "startup", "init" for it
 
 ### SceneRuntime
-The engine's matched set for running scenes, built once from the **PackCatalog** and what the device offers (its effect outputs, network controls, **Capabilities** and **SceneReboot**): one **Active scene namespace**, the effect system that resolves through it, and the scene manager that drives transitions. Each tick advances its clock first (`advance_clock`, whether or not a scene is active), then queues events on it and updates it once: dispatch, then any pending **Overlay** or pop, then effects.
+The engine's matched set for running scenes, built once from the **PackCatalog** and what the device offers (its effect outputs, network controls, **Capabilities** and **SceneReboot**): one **Active scene namespace**, the effect system that resolves through it, and the scene manager that drives transitions. Each tick advances its clock first, then dispatches events, applies any pending **Overlay** or pop, then updates effects.
 _Avoid_: wiring the namespace, effect manager and scene manager by hand; driving its parts separately within a tick; more than one per device; "engine" or "game engine" for it
 
 ### Device assembly
@@ -350,7 +350,7 @@ A pin name from **aura-device.json** together with the field it was written in (
 _Avoid_: rebuilding a field path outside the parser; passing a bare pin name or a board pin object to **DeviceParts**
 
 ### DeviceParts
-The port **Device assembly** reaches leaf hardware through — one constructor per part (pins, buses, pixels, buttons, sensors, audio, haptics, IR pulse readers and writers, radio transport, storage), taking **Pin references** rather than board pin objects. One adapter per platform, so a new platform (CircuitPython today; MicroPython or a Linux single-board computer later) adds an adapter, not a builder: `CircuitPythonParts` on a board, and the **Simulated device**'s `SimulatedParts`, which also decides which parts persist across a **reboot**.
+The port **Device assembly** reaches leaf hardware through — one constructor per part (pins, buses, pixels, buttons, sensors, audio, haptics, IR pulse readers and writers, radio transport, storage), taking **Pin references** rather than board pin objects. One adapter per platform, so a new platform adds an adapter, not a builder: `CircuitPythonParts` on a board, and the **Simulated device**'s `SimulatedParts`, which also decides which parts persist across a **Reboot**.
 _Avoid_: leaves, leaf factory; deciding enabled/declared or bus requirements in an adapter (that is the assembly's job)
 
 ### device_builder
@@ -362,7 +362,7 @@ The board-free bundle `build_hardware` returns: the built parts, the **Capabilit
 _Avoid_: exposing raw transmitters (use `network_controls`/`ir`); exposing the raw `RadioTransport` (use `network_controls`/`radio`); a bare tuple/dict; downcasting `storage` to `SdCardStorage`
 
 ### Simulated device
-A board-free, test-only stand-in for a physical Aura device: a `DeviceHardware` whose inputs are scripted and whose outputs record what the real device would show, play, buzz and send. Its shape comes from `examples/aura-device.simulated.json`, kept capability-equal to the other example configs by a sync test. It has its own card unless made card-less, and reaches other simulated devices only through the **IR medium** (aimed) and the **radio medium** (broadcast, each device its own radio node). It boots exactly as a device does, from boot values a test seeds, including after a **reboot** or a redeploy with a **Scene deploy token**. Its reboot is instant (no IR is lost while it boots) and keeps module-level state, which a real reset clears, so shipped code keeps none. When real hardware exposes a bug it missed, it is extended until that bug is visible.
+A board-free, test-only stand-in for a physical Aura device: a `DeviceHardware` whose inputs are scripted and whose outputs record what the real device would show, play, buzz and send. Its shape comes from `examples/aura-device.simulated.json`, kept capability-equal to the other example configs by a sync test. It has its own card unless made card-less, and reaches other simulated devices only through the **IR medium** (aimed) and the **radio medium** (broadcast, each device its own radio node). It boots exactly as a device does, from boot values a test seeds, including after a **Reboot** or a redeploy with a **Scene deploy token**.
 _Avoid_: mock device, virtual device, emulator (it does not run CircuitPython); faking the CircuitPython libraries beneath `device_builder`; hard-coding its hardware shape (declare it in the simulated config)
 
 ### Simulation test harness
@@ -441,7 +441,7 @@ _Avoid_: picking a port by device-name pattern (both channels look alike); falli
 
 ### NeoPixelEffectOutput
 A CircuitPython `EffectOutput` driving **one** NeoPixel strip, subdivided into scope **segments** by pixel range; several strips may share a scope and are driven in sync.
-_Avoid_: the old per-scope shape (one strip per `Scope`); conflating segment length with `min_resolution`; a brightness field on this output; overlapping segments on one strip
+_Avoid_: conflating segment length with `min_resolution`; a brightness field on this output; overlapping segments on one strip
 
 ### Accelerometer
 A hardware sensor providing 3-axis acceleration readings (x, y, z) in m/s²; optional, absent when hardware is not present.
@@ -521,7 +521,7 @@ _Avoid_: aggregating hit/gated counts in the scene; per-tick allocation in the n
 
 ### Self-echo
 The IR pulses a device's own receiver captures from its own emitter while transmitting; decodes as a CRC-valid phantom self-hit, suppressed by the **IR transmit gate**, never by game rules.
-_Avoid_: suppressing it in a scene (the old Tag `deafen_until` hack); telling it from a real overlapping shot at the pulse level (indistinguishable — drop both)
+_Avoid_: suppressing it in a scene; telling it from a real overlapping shot at the pulse level (indistinguishable — drop both)
 
 ### IR transmit gate
 The shared coordination primitive that keeps a device from decoding its own **self-echo**: transmitters mark when they are emitting, and the receiver discards while emission is active plus once more on the falling edge.
