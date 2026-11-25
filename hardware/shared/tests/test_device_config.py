@@ -620,7 +620,7 @@ def test_parse_ir_enabled_false_retains_object_not_none(matrix_config):
     assert result.ir.enabled is False
 
 
-def test_parse_disabled_ir_without_rx_or_emitter_parses(matrix_config):
+def test_parse_disabled_ir_without_rx_or_emitter_is_accepted_as_disabled(matrix_config):
     matrix_config["ir"] = {"enabled": False}
 
     result = parse_device_config(matrix_config)
