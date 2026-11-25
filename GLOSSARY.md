@@ -285,21 +285,9 @@ _Avoid_: confusing with `Effect Level`; holding it as rule instance state; a sec
 One red→green cycle at a single Game Level (red warning → red → green warning → green); surviving its green phase advances the Game Level, or wins at `max_level`. A full game is `max_level` Rounds.
 _Avoid_: "phase" (a Round spans several); "level-up" (the celebratory beat between Rounds)
 
-### AudioEffectOutput
-A CircuitPython `EffectOutput` driving audio via I2S and the live `VoiceSink` adapter: it plays the path on each event's **Resolved clip**, owns the hardware (amp, mixer, WAV sources) and delegates voice-slot bookkeeping to a `VoicePool`.
-_Avoid_: stopping playback in `handle_event` on `EffectVerb.STOP`; assuming a fixed voice count or role-assigned slots; putting slot bookkeeping back in the output; resolving clip names (the event already carries the path)
-
-### VoicePool
-A hardware-agnostic owner of audio voice-slot bookkeeping (imports no CircuitPython), driving hardware through a `VoiceSink` port and evicting oldest-first when full. `hold` frees a held effect's voices (a cut-off one-shot that stops its effect, by `stops_effect` or because the effect has no pixels, stops its receipt, as on eviction) and `restore` plays its held loops again from the top.
-_Avoid_: importing CircuitPython audio libs here (hardware lives behind `VoiceSink`); parallel per-slot lists (use the `_Slot` record)
-
-### VoiceSink
-The port through which `VoicePool` reaches audio hardware (live CircuitPython mixer + a recording test fake); applies loudness and owns `max_volume`.
-_Avoid_: passing a pre-multiplied hardware level across the seam (pass `0..1` loudness); leaking receipts through the port
-
-### Drv2605EffectOutput
-A CircuitPython `EffectOutput` driving a DRV2605L haptic driver on all scopes (`receives_pixels = False`); translates `HapticPattern` constants to waveforms, a new event interrupting the current sequence.
-_Avoid_: constructing with a `None` driver; reading `receipt.loudness` (the DRV2605L has no volume control); "motor" for the injected instance (use `driver`)
+### Voice
+One of the sounds a device's audio output can play at once; `voices` in `aura-device.json` sets how many. When every voice is busy, a new sound takes the oldest one's voice.
+_Avoid_: assuming a fixed voice count or voices assigned to roles
 
 ### aura-device.json
 The single **required** on-device file holding all hardware configuration; a missing file raises. Pure hardware config — scene selection lives in **`aura-boot.json`** instead.
@@ -409,9 +397,9 @@ _Avoid_: "CDC2", "the other port", bare "serial port"
 Finding the host serial port for one named channel (**console channel** or **data channel**) by which board interface it is, never by its device name, since both channels look alike. Naming a port skips it.
 _Avoid_: picking a port by device-name pattern (both channels look alike)
 
-### NeoPixelEffectOutput
-A CircuitPython `EffectOutput` driving **one** NeoPixel strip, subdivided into scope **segments** by pixel range; several strips may share a scope and are driven in sync.
-_Avoid_: conflating segment length with `min_resolution`; a brightness field on this output; overlapping segments on one strip
+### Segment
+The pixel range of one NeoPixel strip that shows one **Scope**. Several strips may show the same scope, in sync.
+_Avoid_: conflating segment length with `min_resolution`; overlapping segments on one strip
 
 ### Accelerometer
 A hardware sensor providing 3-axis acceleration readings (x, y, z) in m/s²; optional, absent when hardware is not present.

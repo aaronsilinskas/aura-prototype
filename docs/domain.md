@@ -179,6 +179,11 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `DeviceHardware` | `hardware/shared/device_hardware.py` | Board-free bundle the **Device assembly** returns |
 | `assemble_device` | `hardware/shared/device_assembly.py` | The **Device assembly**; reaches hardware only through `DeviceParts` |
 | `DeviceParts` | `hardware/shared/device_parts.py` | Port the Device assembly builds each part through; adapters `CircuitPythonParts` (`hardware/circuitpython/circuitpython_parts.py`) and `SimulatedParts` (`hardware/simulated/simulated_parts.py`) |
+| `VoicePool` | `hardware/shared/voice_pool.py` | Board-free owner of which **Voice** plays what; evicts the oldest when full |
+| `VoiceSink` | `hardware/shared/voice_pool.py` | Port `VoicePool` drives audio hardware through; takes loudness in `0..1` and owns `max_volume` |
+| `AudioEffectOutput` | `hardware/circuitpython/audio_output.py` | Live I2S audio `EffectOutput` and `VoiceSink`; plays each event's **Resolved clip** |
+| `Drv2605EffectOutput` | `hardware/circuitpython/drv2605_output.py` | Live haptic `EffectOutput` on every scope; ignores loudness, as the DRV2605L has no volume control |
+| `NeoPixelEffectOutput` | `hardware/circuitpython/neopixel_output.py` | Live `EffectOutput` for one NeoPixel strip, split into **Segments** |
 | `PolledSensor` | `hardware/shared/polled_sensor.py` | The **PolledSensor** |
 | `HardwareNetworkControls` | `hardware/shared/network_controls.py` | Concrete, send-only `NetworkControls` adapter |
 | `InfraredTransceiver` | `hardware/shared/ir_transceiver.py` | Board-free owner of a device's whole IR subsystem (transmitters, receiver, **IR transmit gate**), exposed as `DeviceHardware.ir` |
