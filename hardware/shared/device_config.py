@@ -46,6 +46,7 @@ __all__ = [
 _VALID_SCOPE_KEYS: Final = set(Scope.ALL.keys)
 
 _VALID_IR_EMITTER_KEYS: Final = set(IR_EMITTERS)
+_VALID_IR_EMITTER_LIST: Final = ", ".join(sorted(_VALID_IR_EMITTER_KEYS))
 
 _I2S_PIN_FIELDS: Final = ("i2s_bit_clock", "i2s_word_select", "i2s_data")
 
@@ -212,7 +213,9 @@ class IRConfig:
     multi-receiver shape, recorded on ``ir.rx[i]``) — callers deal with one
     representation either way. It is empty only when ``ir.rx`` is left out:
     an emitter-only section with no receiver. ``emitters`` maps each emitter
-    key to its Pin reference, recorded on ``ir.<emitter>``.
+    key to its Pin reference, recorded on ``ir.<emitter>``; it is empty for a
+    receiver-only section. An enabled section has at least one receiver or
+    emitter.
     """
 
     __slots__ = ("emitters", "enabled", "rx")
@@ -770,19 +773,22 @@ def _parse_ir_rx(rx_raw: object) -> list[PinRef]:
 def _parse_ir(ir_raw: dict) -> IRConfig:
     rx = _parse_ir_rx(ir_raw["rx"]) if "rx" in ir_raw else []
 
-    # Every IR item is optional: a prop with no receiver omits rx, and one
-    # that cannot transmit on a given emitter (line/cone/area_of_effect)
-    # omits it.
     emitters: dict[str, PinRef] = {}
     for key in ir_raw:
         if key in ("rx", "enabled"):
             continue
         if key not in _VALID_IR_EMITTER_KEYS:
-            valid = ", ".join(sorted(_VALID_IR_EMITTER_KEYS))
-            raise ValueError(f"ir emitter key '{key}' is not valid; valid keys: {valid}")
+            raise ValueError(
+                f"ir emitter key '{key}' is not valid; valid keys: {_VALID_IR_EMITTER_LIST}"
+            )
         emitters[key] = _parse_pin(ir_raw, key, f"ir.{key}")
 
     enabled = _parse_enabled(ir_raw, "ir.enabled")
+    if enabled and not rx and not emitters:
+        raise ValueError(
+            "ir must declare rx or at least one emitter; valid emitter keys: "
+            + _VALID_IR_EMITTER_LIST
+        )
     return IRConfig(rx=rx, emitters=emitters, enabled=enabled)
 
 

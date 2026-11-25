@@ -175,10 +175,10 @@ To put the code on a board:
   be shown in, to rows of the matrix (`scope_rows`) or to pixel ranges of a strip
   (`scope_pixels`).
 - **`buttons`** is a list of board pin names.
-- **`ir`** takes `rx` (one receiver pin, or a list of them) and at least a `line`
-  emitter; `cone` and `area_of_effect` emitters are optional. Each scene chooses
-  the infrared message format it uses: Aura's own by default, or the `tag` scene's
-  format, which works with off-the-shelf infrared tag gear.
+- **`ir`**, when enabled, needs `rx` (one receiver pin, or a list of them), any of
+  the `line`, `cone` and `area_of_effect` emitters, or both.
+  Each scene chooses the infrared message format it uses: Aura's own by default, or
+  the `tag` scene's format, which works with off-the-shelf infrared tag gear.
 - **`audio`** takes `voices` (how many sounds can play at once), `max_volume`
   (0.0 to 1.0), and the three I2S pins.
 
