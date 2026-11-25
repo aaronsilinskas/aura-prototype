@@ -223,7 +223,7 @@ declaration, so a bad pack or scene fails before anything runs. Pack items are
 imported only when first used.
 
 - **Effect pack**: manifest `effects.json`; each `.py` file exports `BUILD`, a
-  `(config) → Effect` callable. Effects are named `"pack.effect"`, e.g.
+  `(name, config) → Effect` callable. Effects are named `"pack.effect"`, e.g.
   `"elements.fire"`.
 - **Rule pack**: manifest `rules.json`; each `.py` file exports `RULE`, a
   `GameRule` instance. Its manifest can also declare **Settings** and the
