@@ -389,13 +389,9 @@ _Avoid_: tint, hue (both read as other colour operations); bit-masking a pixel a
 A device's half-duplex link to every other device on its frequency. A send names no recipient and, unlike IR, no emitter; what arrives each tick is at most one packet and its sender (ADR-0015).
 _Avoid_: "channel" for it (names a **Console channel** or **Data channel**); addressing a send to one device (identity travels in the payload)
 
-### DeviceStorage
-The board-free device-state storage port: reads/writes small state files under a mount root and resolves real filesystem paths for streamed/scanned consumers. Live adapter `SdCardStorage`; tests and the **Simulated device**'s card run the same storage over a temporary directory.
-_Avoid_: escaping the mount root; a second concrete implementation for CPython vs. CircuitPython (one class suffices once mounted); using `path("")` where the clean root is needed (use `mount_root`)
-
-### SdCardStorage
-The live CircuitPython `DeviceStorage` adapter that mounts an SD card at construction — the only module importing `sdcardio`/`storage`.
-_Avoid_: importing `sdcardio`/`storage` anywhere else; wrapping `cs` in `digitalio.DigitalInOut`; presence-probing instead of trusting the config gate
+### Card
+A device's SD card, holding its card **Pack root** and its `aura-state.json`, where the **Persisted scene** lives; a **Reboot** carries it across. A device without one is card-less: it has no `storage` **Capability** and cannot reboot.
+_Avoid_: "flash" for it (flash is the board's own drive, holding `aura-device.json` and `aura-boot.json`); "SD" alone
 
 ### SD sync
 Moving files between a host and a device's SD card over the **Data channel**: the host lists, pulls and pushes files, and the device serves them. Each file is checked whole, and a transfer that fails leaves the file it would have replaced as it was (ADR-0011).

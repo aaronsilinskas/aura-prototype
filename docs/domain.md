@@ -189,6 +189,8 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 | `SceneBoot` | `app/scene_composition.py` | What `build_scene_boot` returns, including the booted scene's `tick` |
 | `DeviceSceneReboot` | `hardware/shared/device_reboot.py` | Live `SceneReboot` adapter, wired by `build_scene_boot` |
 | `PersistedScene` | `hardware/shared/persisted_scene.py` | Board-free owner of the **Persisted scene** record; a client of the boot's one `DeviceStateStore` (ADR-0009) |
+| `DeviceStorage` | `hardware/shared/device_storage.py` | Board-free storage port over a mounted **Card**; tests and the Simulated device run it over a temporary directory |
+| `SdCardStorage` | `hardware/circuitpython/sdcard_storage.py` | Live `DeviceStorage` that mounts the SD card |
 | `DeviceStateStore` | `hardware/shared/device_state.py` | Board-free, general key/value store over the card's `aura-state.json` (ADR-0009) |
 | `SdSyncServer` | `hardware/shared/sd_sync_server.py` | Board-free device side of the SD-sync protocol (ADR-0011) |
 | `SdSyncClient` | `scripts/sd_sync_client.py` | Board-free (CPython-only) host side of the SD-sync protocol (ADR-0011) |
@@ -237,6 +239,8 @@ Rules an agent must not break, in every package, `scripts/` included.
 - **Port auto-detect never guesses** — no match, or more than one, fails; it never falls back to the only serial device (`scripts/port_auto_detect.py`)
 - **Hardware builds no game events** — IR and radio deliver bytes; only the **Scene boot**'s tick turns them into `NetworkEvents` (`app/scene_composition.py`, `hardware/shared/`)
 - **Driver libraries load in their part** — each per-component driver library, and an adapter that imports one (`Rfm69RadioTransport`, `SdCardStorage`), is imported only inside the `CircuitPythonParts` part that builds it (`hardware/circuitpython/`, ADR-0013)
+- **Hardware is built from config, never probed** — the **Device assembly** builds what `aura-device.json` declares and enables, and a declared part that can't be built fails the boot (`hardware/shared/device_assembly.py`, ADR-0014)
+- **Storage stays under the card's mount root** — no path `DeviceStorage` reads, writes or resolves may escape it (`hardware/shared/device_storage.py`)
 
 ---
 
