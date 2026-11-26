@@ -891,7 +891,8 @@ def test_storage_is_what_the_storage_part_built_on_the_spi_bus():
 
     ((_sdcard, bus, cs),) = parts.args_of("storage")
     assert (bus.kind, cs) == ("spi", PinRef("GP15", "sdcard.cs"))
-    assert hw.storage is not None and hw.storage.mount_root == "/sd"
+    assert hw.storage is not None
+    assert hw.storage.mount_root == "/sd"
 
 
 def test_a_bare_config_builds_no_optional_hardware():

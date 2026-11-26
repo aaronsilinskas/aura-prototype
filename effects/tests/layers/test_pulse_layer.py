@@ -105,10 +105,10 @@ def test_pulse_layer_sample_returns_same_value_for_all_positions() -> None:
 def test_pulse_layer_rejects_a_negative_duration(
     brighten: float, on: float, darken: float, off: float
 ) -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Pulse durations must be non-negative"):
         PulseLayer(brighten, on, darken, off)
 
 
 def test_pulse_layer_rejects_an_all_zero_cycle() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="At least one pulse phase duration must be non-zero"):
         PulseLayer(0.0, 0.0, 0.0, 0.0)

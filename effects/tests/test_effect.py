@@ -190,14 +190,14 @@ def test_resize_to_zero_yields_zero_length() -> None:
 def test_resize_above_capacity_raises_value_error() -> None:
     buf = PixelBuffer(5)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"new_count 6 out of range \[0, 5\]"):
         buf.resize(6)
 
 
 def test_resize_with_negative_count_raises_value_error() -> None:
     buf = PixelBuffer(5)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"new_count -1 out of range \[0, 5\]"):
         buf.resize(-1)
 
 
@@ -331,7 +331,9 @@ def test_audio_playback_config_accepts_stops_effect_true_for_one_shot() -> None:
 
 
 def test_audio_playback_config_raises_when_loop_and_stops_effect_both_true() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(
+        ValueError, match="stops_effect=True is incompatible with loop=True: a loop"
+    ):
         AudioPlaybackConfig(name="bg", loop=True, stops_effect=True)
 
 

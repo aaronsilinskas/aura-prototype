@@ -41,7 +41,7 @@ def test_narrate_step_closes_the_line_failed_when_the_build_thunk_raises():
     def _boom():
         raise ValueError("unknown pin")
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="unknown pin"):
         narrate_step(logger, "widget", _boom)
 
     assert "".join(fragments) == "[hw] widget FAILED\n"
@@ -54,7 +54,7 @@ def test_narrate_step_reraises_the_build_thunks_exception_unchanged():
     def _boom():
         raise original
 
-    with pytest.raises(ValueError) as excinfo:
+    with pytest.raises(ValueError, match="unknown pin") as excinfo:
         narrate_step(logger, "widget", _boom)
 
     assert excinfo.value is original

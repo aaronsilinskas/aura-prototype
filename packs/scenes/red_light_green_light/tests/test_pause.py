@@ -41,7 +41,7 @@ PAUSE = 5.0
 """Longer than all of Red Light, so a pause that used up its time would end it."""
 
 
-@pytest.fixture()
+@pytest.fixture
 def card(tmp_path: Path) -> Path:
     """A card carrying ``pause``: a scene with no rules and no effects."""
     scene_dir = tmp_path / "aura_packs" / "scenes" / "pause"

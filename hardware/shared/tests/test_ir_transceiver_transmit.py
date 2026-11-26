@@ -133,7 +133,7 @@ def test_a_queued_payload_failing_to_encode_raises_from_update_and_the_rest_stil
     transceiver.send(b"\x03", LINE)
 
     writer.finish()
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="unencodable payload"):
         transceiver.update(0.0)
     transceiver.update(0.0)
 

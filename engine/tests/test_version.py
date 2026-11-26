@@ -36,7 +36,7 @@ def test_str_round_trips_parsed_version() -> None:
     "bad", ["1", "1.2.3", "one.two", "-1.0", "1 . 2", "", "\u0661.\u0662", "\u00b2.1"]
 )
 def test_parse_raises_value_error_naming_malformed_string(bad: str) -> None:
-    with pytest.raises(ValueError) as excinfo:
+    with pytest.raises(ValueError, match="Malformed version") as excinfo:
         Version.parse(bad)
 
     assert bad in str(excinfo.value)
@@ -44,7 +44,7 @@ def test_parse_raises_value_error_naming_malformed_string(bad: str) -> None:
 
 @pytest.mark.parametrize("bad", [1.2, None])
 def test_parse_raises_value_error_naming_non_string_value(bad: object) -> None:
-    with pytest.raises(ValueError) as excinfo:
+    with pytest.raises(ValueError, match="Malformed version") as excinfo:
         Version.parse(bad)
 
     assert str(bad) in str(excinfo.value)

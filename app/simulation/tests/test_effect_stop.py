@@ -86,7 +86,7 @@ def _install_card_scene(card: Path, scene: str, on_press: str) -> None:
     (effects / "sting.py").write_text(_audio_effect(_STING, loop=False))
 
 
-@pytest.fixture()
+@pytest.fixture
 def card(tmp_path: Path) -> Path:
     """A card whose scenes hum until A is pressed.
 

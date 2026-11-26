@@ -19,7 +19,7 @@ def _runs_anything(scene: str) -> bool:
 
 
 @pytest.mark.parametrize(
-    "name,expected",
+    ("name", "expected"),
     [
         ("personal", Scope.PERSONAL),
         ("directional", Scope.DIRECTIONAL),
@@ -43,7 +43,7 @@ def test_scope_by_name_raises_naming_the_unknown_scope():
 
 @pytest.mark.parametrize("name", [3, ["personal"]], ids=["int", "list"])
 def test_scope_by_name_raises_value_error_for_a_scope_that_is_not_a_string(name):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Unknown lobby scope name"):
         scope_by_name(name)
 
 

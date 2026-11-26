@@ -42,7 +42,7 @@ def test_encode_decode_round_trips_for_all_valid_field_values(team, player, dama
 
 
 @pytest.mark.parametrize(
-    "team, player, damage",
+    ("team", "player", "damage"),
     [
         (-1, 1, 1),
         (4, 1, 1),
@@ -55,10 +55,10 @@ def test_encode_decode_round_trips_for_all_valid_field_values(team, player, dama
 def test_encode_raises_for_out_of_range_fields(team, player, damage):
     tag = TagData(team=team, player=player, damage=damage)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="must be between"):
         encode_tag_data(tag)
 
 
 def test_decode_raises_for_empty_data():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"Expecting 1 byte of tag data\."):
         decode_tag_data(b"")

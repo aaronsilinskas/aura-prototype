@@ -75,7 +75,7 @@ def test_expect_ack_accepts_the_ack_carrying_the_sequence_number():
     ids=["wrong-seq", "wrong-kind", "a-chunk"],
 )
 def test_expect_ack_names_the_expected_and_received_frame_on_any_other_reply(reply):
-    with pytest.raises(ValueError) as raised:
+    with pytest.raises(ValueError, match="expected SD-sync frame 'ack' '3', got") as raised:
         expect_ack(_ReplyTransport(reply), 3)
 
     assert str(raised.value) == (

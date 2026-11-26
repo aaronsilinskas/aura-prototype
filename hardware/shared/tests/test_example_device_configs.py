@@ -82,7 +82,8 @@ def test_the_simulated_config_lays_out_one_strip_per_scope_for_every_scope():
 def test_the_pico_2_config_puts_the_enabled_radio_on_its_own_spi_bus_apart_from_the_sdcard():
     config = load_device_config(str(_PICO_2_CONFIG))
 
-    assert config.radio is not None and config.radio.enabled
+    assert config.radio is not None
+    assert config.radio.enabled
     assert config.sdcard is not None
     assert (config.radio.spi, config.sdcard.spi) == ("radio", "default")
     assert {

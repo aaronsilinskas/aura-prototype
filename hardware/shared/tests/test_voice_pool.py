@@ -60,12 +60,12 @@ def stop_slots(sink: RecordingSink) -> list:
     return [c[1] for c in sink.calls if c[0] == "stop"]
 
 
-@pytest.fixture()
+@pytest.fixture
 def sink() -> RecordingSink:
     return RecordingSink(num_voices=3)
 
 
-@pytest.fixture()
+@pytest.fixture
 def pool() -> VoicePool:
     return VoicePool(num_voices=3)
 

@@ -276,7 +276,7 @@ def _install_phase_scene(card: Path, scene: str, phase_rule: str) -> None:
     _install_card_scene(card, scene, {"phase": phase_rule, "done": _done_rule(scene)})
 
 
-@pytest.fixture()
+@pytest.fixture
 def card(tmp_path: Path) -> Path:
     """A card with these scenes, all on the default Aura IR codec.
 
@@ -423,7 +423,7 @@ def test_a_phase_declared_to_end_when_its_effect_stops_outlasts_a_cover_that_hol
 def test_popping_a_scene_nothing_covers_raises(simulation, card):
     device = simulation.add_device("red", scene="counter", card=card)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Cannot pop: stack has 1 entry"):
         device.pop()
 
 

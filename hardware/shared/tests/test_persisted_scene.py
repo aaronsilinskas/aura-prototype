@@ -25,7 +25,7 @@ def _persisted_scene(storage: DeviceStorage | None, logger: Logger | None = None
     return PersistedScene(DeviceStateStore(storage, logger), logger)
 
 
-@pytest.fixture()
+@pytest.fixture
 def counting_storage(device_storage) -> WriteCountingStorage:
     """A write-counting storage over the ``device_storage`` card directory."""
     return WriteCountingStorage(device_storage.mount_root)
@@ -65,7 +65,9 @@ def test_neither_a_persisted_nor_a_flash_scene_raises_naming_both_files(device_s
 
 
 def test_a_non_string_flash_default_is_treated_as_absent_and_raises(device_storage):
-    with pytest.raises(ValueError):
+    with pytest.raises(
+        ValueError, match=r"no boot scene: neither a Persisted scene \(aura-state\.json"
+    ):
         _persisted_scene(device_storage).boot_candidates({"default_scene": 42})
 
 

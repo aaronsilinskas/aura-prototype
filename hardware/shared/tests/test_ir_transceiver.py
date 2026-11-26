@@ -84,7 +84,7 @@ def test_constructor_does_not_wire_an_emitter_missing_from_the_pins() -> None:
     )
 
     assert transceiver.emitters == (LINE,)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="No transmitter wired for emitter: cone"):
         transceiver.send(b"\x2a", CONE)
 
 
@@ -127,7 +127,7 @@ def test_no_reader_receives_the_self_echo_of_a_send_on_any_emitter(
 def test_send_raises_with_no_emitter_wired() -> None:
     transceiver = _transceiver_over()
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="No transmitter wired for emitter: line"):
         transceiver.send(b"x", LINE)
 
 
@@ -148,7 +148,7 @@ def test_busy_reports_idle_for_a_blocking_writer() -> None:
 def test_busy_raises_for_unwired_emitter() -> None:
     transceiver = _transceiver_over(writers={LINE: EmitterPulseWriter()})
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="No transmitter wired for emitter: cone"):
         transceiver.busy(CONE)
 
 

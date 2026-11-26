@@ -201,14 +201,14 @@ def test_overlay_raises_immediately_when_stack_is_empty() -> None:
     scene_reg = make_scene_registry(("overlay_scene", make_scene()))
     manager = _make_scene_manager(scene_registry=scene_reg)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Cannot overlay: no active scene on stack"):
         manager.overlay("overlay_scene")
 
 
 def test_pop_raises_immediately_with_zero_entries_on_stack() -> None:
     manager = _make_scene_manager()
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Cannot pop: stack has 0 entries"):
         manager.pop()
 
 
@@ -217,7 +217,7 @@ def test_pop_raises_immediately_with_exactly_one_entry_on_stack() -> None:
     manager = _make_scene_manager(scene_registry=scene_reg)
     manager.activate_boot_scene("main")
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Cannot pop: stack has 1 entry"):
         manager.pop()
 
 

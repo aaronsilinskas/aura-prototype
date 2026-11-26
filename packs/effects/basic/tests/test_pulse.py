@@ -133,27 +133,27 @@ def test_pulse_duration_option_sets_its_phase_length(
 
 
 def test_pulse_negative_brighten_duration_raises_value_error() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Pulse durations must be non-negative"):
         _build(options={"brighten_duration": -0.1})
 
 
 def test_pulse_negative_on_duration_raises_value_error() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Pulse durations must be non-negative"):
         _build(options={"on_duration": -1.0})
 
 
 def test_pulse_negative_darken_duration_raises_value_error() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Pulse durations must be non-negative"):
         _build(options={"darken_duration": -0.5})
 
 
 def test_pulse_negative_off_duration_raises_value_error() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Pulse durations must be non-negative"):
         _build(options={"off_duration": -0.01})
 
 
 def test_pulse_all_zero_durations_raises_value_error() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="At least one pulse phase duration must be non-zero"):
         _build(
             options={
                 "brighten_duration": 0.0,
