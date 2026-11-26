@@ -28,7 +28,8 @@ def _snapshot(**overrides) -> IrTelemetrySnapshot:
 def test_format_line_matches_the_exact_serial_summary_string():
     """Regression pin: this is the exact line ``run_scene`` prints to the
     serial console, asserted byte-for-byte so a refactor cannot silently
-    change what downstream log consumers see."""
+    change what downstream log consumers see.
+    """
     snapshot = _snapshot(
         pulses_seen=10,
         buffer_full_on_poll=1,

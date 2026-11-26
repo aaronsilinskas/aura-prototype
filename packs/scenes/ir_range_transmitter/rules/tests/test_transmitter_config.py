@@ -1,7 +1,8 @@
 """Tests for ``TransmitterConfig``'s derived values and the ``transmitter_config``
 get-or-create accessor.
 
-``packs/tests/test_scene_configs.py`` checks that each Setting lands in its field."""
+``packs/tests/test_scene_configs.py`` checks that each Setting lands in its field.
+"""
 
 from __future__ import annotations
 

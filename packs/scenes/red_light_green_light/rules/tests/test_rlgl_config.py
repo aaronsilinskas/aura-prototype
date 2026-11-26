@@ -2,7 +2,8 @@
 (gravity tracking slower than motion smoothing), and the ``rlgl_config``
 get-or-create accessor.
 
-``packs/tests/test_scene_configs.py`` checks that each Setting lands in its field."""
+``packs/tests/test_scene_configs.py`` checks that each Setting lands in its field.
+"""
 
 from __future__ import annotations
 
@@ -35,7 +36,8 @@ def test_warning_pulse_duration_shortens_to_the_min_at_max_level():
 
 def test_the_declared_gravity_tracking_is_slower_than_motion_smoothing():
     """Gravity must track slower than the motion signal, or real motion is
-    absorbed into the gravity estimate before it ever registers."""
+    absorbed into the gravity estimate before it ever registers.
+    """
     config = RlglConfig(_settings())
 
     assert config.gravity_beta < config.motion_smoothing

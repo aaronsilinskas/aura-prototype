@@ -189,7 +189,8 @@ def test_pack_sounds_qualify_each_effect_pack_clip_with_its_pack_name(pack_tree)
 
 def _item_dir_and_lister(pack_tree, root, owner):
     """Return an item folder of *owner* (a pack, or a scene's rules or effects) and a
-    lister of its scanned items."""
+    lister of its scanned items.
+    """
     if owner == "pack":
         item_dir = pack_tree.effect_pack(root, "basic", items={"glow": "BUILD = 1"})
         return item_dir, lambda catalog: catalog.effect_registry.items("basic")

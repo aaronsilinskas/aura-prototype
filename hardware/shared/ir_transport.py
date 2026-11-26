@@ -454,14 +454,16 @@ class _InfraredReceiver:
     @property
     def last_signal_strength(self) -> "float | None":
         """Normalised signal quality (0.0–1.0) of the last winning packet, or
-        ``None`` before any packet has been received."""
+        ``None`` before any packet has been received.
+        """
         decoder = self._last_winning_decoder
         return decoder.last_signal_strength if decoder is not None else None
 
     @property
     def last_error_margin(self) -> "int | None":
         """Worst-case timing deviation (µs) of the last winning packet, or
-        ``None`` before any packet has been received."""
+        ``None`` before any packet has been received.
+        """
         decoder = self._last_winning_decoder
         return decoder.last_error_margin if decoder is not None else None
 

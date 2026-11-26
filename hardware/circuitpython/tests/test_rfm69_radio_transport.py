@@ -95,7 +95,8 @@ def test_receive_requests_the_radiohead_header_so_the_sender_can_be_identified()
 def test_receive_returns_none_when_payload_ready_but_receive_yields_nothing() -> None:
     """payload_ready can flip false between the check and the read on a real
     chip (interrupt-driven) -- receive() honors a None from the underlying
-    driver rather than crashing on it."""
+    driver rather than crashing on it.
+    """
     mock_radio = MagicMock(name="radio")
     mock_radio.payload_ready.return_value = True
     mock_radio.receive.return_value = None

@@ -48,7 +48,8 @@ class Shape:
     @staticmethod
     def centered_gradient() -> EffectShapeFunc:
         """Return a gamma-corrected ramp that peaks at ``1.0`` in the center
-        and falls to ``0.0`` at both edges."""
+        and falls to ``0.0`` at both edges.
+        """
         gamma = GAMMA_FACTOR
 
         def shape(position: float) -> float:
@@ -91,7 +92,8 @@ class Shape:
     @staticmethod
     def reverse(shape_func: EffectShapeFunc) -> EffectShapeFunc:
         """Return ``shape_func`` sampled in reverse, so position ``0.0`` maps
-        to ``1.0`` and vice versa."""
+        to ``1.0`` and vice versa.
+        """
 
         def shape(position: float) -> float:
             return shape_func(1.0 - (position % 1.0))

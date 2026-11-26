@@ -22,7 +22,8 @@ class _Result:
 def _with_version_probe(handler):
     """Wrap *handler* so the ``ffmpeg -version`` availability probe always
     succeeds, letting callers fake only the volumedetect/normalize calls
-    ``normalize`` actually cares about."""
+    ``normalize`` actually cares about.
+    """
 
     def _run(args, **kwargs):
         if "-version" in args:

@@ -1,6 +1,7 @@
 """Tests for the ``ir_range_config`` get-or-create accessor.
 
-``packs/tests/test_scene_configs.py`` checks that each Setting lands in its field."""
+``packs/tests/test_scene_configs.py`` checks that each Setting lands in its field.
+"""
 
 from __future__ import annotations
 

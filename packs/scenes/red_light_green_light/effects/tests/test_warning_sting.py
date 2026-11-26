@@ -1,5 +1,6 @@
 """The RLGL warning sting's own look: black to yellow, split 0.3 / 0.4 / 0.3
-of its pulse duration, with no off phase."""
+of its pulse duration, with no off phase.
+"""
 
 from __future__ import annotations
 

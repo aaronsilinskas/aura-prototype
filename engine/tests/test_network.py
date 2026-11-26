@@ -13,7 +13,8 @@ def test_emitter_constants_are_distinct_so_routing_is_unambiguous() -> None:
 def test_ir_emitters_contains_exactly_the_three_emitter_constants_in_order() -> None:
     """IR_EMITTERS is the single source every derived valid-key set and wiring
     loop reads from — it must name exactly LINE, CONE, AREA_OF_EFFECT, in that
-    order."""
+    order.
+    """
     assert IR_EMITTERS == (LINE, CONE, AREA_OF_EFFECT)
 
 
@@ -111,7 +112,8 @@ def test_network_controls_send_radio_raises_not_implemented() -> None:
 
 def test_abstract_network_controls_has_no_poll_transmits() -> None:
     """The lifecycle pump is InfraredTransceiver-only — the abstract seam
-    game rules see stays send-only."""
+    game rules see stays send-only.
+    """
     assert not hasattr(NetworkControls(), "poll_transmits")
 
 

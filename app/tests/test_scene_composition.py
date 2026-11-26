@@ -1,6 +1,7 @@
 """Behaviour-driven tests for the Scene boot, ``build_scene_boot``: each boots fake
 hardware and checks which scene it booted, what that scene's rules saw, or what
-the boot logged, persisted or raised."""
+the boot logged, persisted or raised.
+"""
 
 import pytest
 

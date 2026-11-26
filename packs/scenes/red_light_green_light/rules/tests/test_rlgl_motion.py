@@ -1,5 +1,6 @@
 """Tests for ``RlglMotion`` — gravity tracking, re-seeding, EMA smoothing,
-and the ``rlgl_motion`` get-or-create accessor."""
+and the ``rlgl_motion`` get-or-create accessor.
+"""
 
 from __future__ import annotations
 
@@ -23,7 +24,8 @@ def _make_state():
 
 def test_first_update_seeds_gravity_and_reports_no_motion():
     """The first sample after construction seeds gravity rather than starting
-    at zero, so a device held steady reads zero motion immediately."""
+    at zero, so a device held steady reads zero motion immediately.
+    """
     motion = RlglMotion()
 
     ema = motion.update(_AT_REST, gravity_beta=0.1, motion_smoothing=1.0)
@@ -68,7 +70,8 @@ def test_update_smooths_motion_with_the_given_factor():
 
 def test_rlgl_motion_caches_the_same_instance_across_calls():
     """Gravity and EMA tracking must persist across ticks, so the accessor
-    must return the same instance rather than rebuilding it each time."""
+    must return the same instance rather than rebuilding it each time.
+    """
     state = _make_state()
 
     first = rlgl_motion(state)
@@ -80,5 +83,6 @@ def test_rlgl_motion_caches_the_same_instance_across_calls():
 def test_rlgl_motion_is_a_state_slot():
     """rlgl_motion must be a StateSlot so that the key, factory, and
     revalidate cast are owned in one place with no # type: ignore at
-    call sites."""
+    call sites.
+    """
     assert isinstance(rlgl_motion, StateSlot)

@@ -1,5 +1,6 @@
 """Hardware-free fakes for the infrared pulse readers and writers, plus the
-wire-frame encoders and telemetry parser the IR tests share."""
+wire-frame encoders and telemetry parser the IR tests share.
+"""
 
 from __future__ import annotations
 
@@ -82,7 +83,8 @@ class EmitterPulseWriter(PulseWriter):
 class EmitterWriterFactory:
     """A writer factory for ``InfraredTransceiver`` that keeps each emitter's
     :class:`EmitterPulseWriter` in :attr:`writers`, records each
-    ``(emitter, pin)`` call in :attr:`calls`, and reports *kind*."""
+    ``(emitter, pin)`` call in :attr:`calls`, and reports *kind*.
+    """
 
     def __init__(
         self,
