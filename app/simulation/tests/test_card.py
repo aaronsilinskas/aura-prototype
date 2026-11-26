@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from app.simulation import Simulation
-from app.simulation.tests.card_tree import card_pack_dir, card_scene_dir, package
+from app.simulation.tests.card_tree import card_pack_dir, card_scene_dir, make_package
 from engine.capabilities import MissingCapabilityError
 from engine.state import Scope
 
@@ -106,7 +106,7 @@ def install_card_scene(
 ) -> None:
     """Put *scene* on *card*: it lights the personal strip *color* with *effect*."""
     scene_dir = card_scene_dir(card, scene, effect_pack)
-    rules = package(scene_dir / "rules")
+    rules = make_package(scene_dir / "rules")
     (rules / "light.py").write_text(_LIGHTING_RULE.format(effect=effect, color=color))
 
 
@@ -114,7 +114,7 @@ def install_card_scene_effect(
     card: Path, scene: str, effect: str, source: str = _SOLID_EFFECT
 ) -> None:
     """Give card scene *scene* its own effect *effect*, built by *source*."""
-    effects = package(card_pack_dir(card, "scenes", scene) / "effects")
+    effects = make_package(card_pack_dir(card, "scenes", scene) / "effects")
     (effects / f"{effect}.py").write_text(source)
 
 
@@ -152,7 +152,7 @@ def install_card_launcher(card: Path, scene: str, target: str) -> None:
     (scene_dir / "scene.json").write_text(
         json.dumps({"version": "1.0", "effect_packs": [], "rule_packs": []})
     )
-    rules = package(scene_dir / "rules")
+    rules = make_package(scene_dir / "rules")
     (rules / "launch.py").write_text(_REBOOT_ON_A_RULE.format(target=target))
 
 
@@ -263,7 +263,7 @@ def test_a_device_handed_a_card_without_aura_packs_boots_its_flash_scene(simulat
 def test_a_device_handed_a_card_with_an_empty_aura_packs_boots_its_flash_scene(
     simulation, tmp_path
 ):
-    package(tmp_path / "aura_packs")
+    make_package(tmp_path / "aura_packs")
 
     device = simulation.add_device("red", scene="element_browser", card=tmp_path)
 

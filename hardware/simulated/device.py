@@ -29,7 +29,7 @@ to be read.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, TypeVar
+from typing import TypeVar
 
 from hardware.shared.debounced_buttons import DEBOUNCE_INTERVAL
 from hardware.shared.device_assembly import assemble_device, button_label
@@ -40,6 +40,8 @@ from hardware.simulated.simulated_parts import (
     SimulatedParts,
     SimulatedRadioTransport,
 )
+
+TYPE_CHECKING = False
 
 if TYPE_CHECKING:
     from array import array

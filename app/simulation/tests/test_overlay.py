@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from app.simulation import TICK, SimulatedDevice, Simulation
-from app.simulation.tests.card_tree import audio_effect_source, card_scene_dir, package
+from app.simulation.tests.card_tree import audio_effect_source, card_scene_dir, make_package
 from engine.capabilities import MissingCapabilityError
 from engine.network import LINE
 from engine.pack_catalog import SettingOverrides
@@ -236,7 +236,7 @@ _HUM = "basic.blip_echo"
 def _install_card_scene(card: Path, scene: str, rules: dict[str, str]) -> None:
     """Put *scene* on *card*, running *rules*: each rule file's name and module source."""
     scene_dir = card_scene_dir(card, scene)
-    rules_dir = package(scene_dir / "rules")
+    rules_dir = make_package(scene_dir / "rules")
     for name, source in rules.items():
         (rules_dir / f"{name}.py").write_text(source)
 
@@ -268,7 +268,7 @@ def card(tmp_path: Path) -> Path:
     _install_phase_scene(tmp_path, "condition", _CONDITION_PHASE_RULE)
     _install_phase_scene(tmp_path, "hum_phase", _HUM_PHASE_RULE)
     for scene in ("hum", "hum_phase"):
-        effects = package(tmp_path / "aura_packs" / "scenes" / scene / "effects")
+        effects = make_package(tmp_path / "aura_packs" / "scenes" / scene / "effects")
         (effects / "hum.py").write_text(_HUM_EFFECT)
     return tmp_path
 

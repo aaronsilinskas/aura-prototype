@@ -42,20 +42,20 @@ def test_encode_decode_round_trips_for_all_valid_field_values(team, player, dama
 
 
 @pytest.mark.parametrize(
-    ("team", "player", "damage"),
+    ("team", "player", "damage", "field"),
     [
-        (-1, 1, 1),
-        (4, 1, 1),
-        (0, 0, 1),
-        (0, 9, 1),
-        (0, 1, 0),
-        (0, 1, 5),
+        (-1, 1, 1, "Team"),
+        (4, 1, 1, "Team"),
+        (0, 0, 1, "Player"),
+        (0, 9, 1, "Player"),
+        (0, 1, 0, "Damage"),
+        (0, 1, 5, "Damage"),
     ],
 )
-def test_encode_raises_for_out_of_range_fields(team, player, damage):
+def test_encode_raises_for_out_of_range_fields(team, player, damage, field):
     tag = TagData(team=team, player=player, damage=damage)
 
-    with pytest.raises(ValueError, match="must be between"):
+    with pytest.raises(ValueError, match=f"^{field} must be between"):
         encode_tag_data(tag)
 
 

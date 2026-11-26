@@ -1,4 +1,4 @@
-"""The game-over moment every scene shares: its sound plus three strong buzzes."""
+"""A game-over sting for a scene to use as its own effect: the sound plus three strong buzzes."""
 
 from effects.effect import (
     AudioPlaybackConfig,

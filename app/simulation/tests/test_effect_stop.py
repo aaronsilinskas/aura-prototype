@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from app.simulation import TICK, SimulatedDevice, Simulation
-from app.simulation.tests.card_tree import audio_effect_source, card_scene_dir, package
+from app.simulation.tests.card_tree import audio_effect_source, card_scene_dir, make_package
 
 _HUM = "basic.blip_echo"
 """``scene.hum``'s looping clip."""
@@ -44,10 +44,10 @@ _REPLACE = 'state.effect_controls.set_effect(Scope.ALL, "scene.sting", {})'
 def _install_card_scene(card: Path, scene: str, on_press: str) -> None:
     """Put *scene* on *card*: it starts ``scene.hum`` and runs *on_press* on the first A press."""
     scene_dir = card_scene_dir(card, scene)
-    (package(scene_dir / "rules") / "rule.py").write_text(
+    (make_package(scene_dir / "rules") / "rule.py").write_text(
         _HUM_UNTIL_A_RULE.format(on_press=on_press)
     )
-    effects = package(scene_dir / "effects")
+    effects = make_package(scene_dir / "effects")
     (effects / "hum.py").write_text(audio_effect_source(_HUM, loop=True))
     (effects / "sting.py").write_text(audio_effect_source(_STING, loop=False))
 

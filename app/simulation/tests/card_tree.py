@@ -6,19 +6,20 @@ import json
 from pathlib import Path
 
 
-def package(directory: Path) -> Path:
+def make_package(directory: Path) -> Path:
+    """Make ``directory`` a package: create it and an empty ``__init__.py`` in it."""
     directory.mkdir(parents=True, exist_ok=True)
     (directory / "__init__.py").touch()
     return directory
 
 
 def card_pack_dir(card: Path, kind: str, name: str) -> Path:
-    """The package ``aura_packs/<kind>/<name>`` on *card*, made with every level above it."""
-    return package(package(package(card / "aura_packs") / kind) / name)
+    """The package ``aura_packs/<kind>/<name>`` on ``card``, made with every level above it."""
+    return make_package(make_package(make_package(card / "aura_packs") / kind) / name)
 
 
 def card_scene_dir(card: Path, scene: str, effect_pack: tuple[str, str] = ("basic", "1.1")) -> Path:
-    """Card scene *scene*'s package, its ``scene.json`` naming *effect_pack* and no rule packs."""
+    """Card scene ``scene``'s package; its ``scene.json`` names ``effect_pack``, no rule packs."""
     scene_dir = card_pack_dir(card, "scenes", scene)
     (scene_dir / "scene.json").write_text(
         json.dumps(
@@ -33,7 +34,7 @@ def card_scene_dir(card: Path, scene: str, effect_pack: tuple[str, str] = ("basi
 
 
 def audio_effect_source(clip: str, *, loop: bool) -> str:
-    """Source of an effect module whose effect plays *clip* on start."""
+    """Source of an effect module whose effect plays ``clip`` on start."""
     return f"""\
 from effects.effect import AudioPlaybackConfig, Effect, EffectAudio, EffectConfig, EffectVerb
 from engine.effects.builder import EffectBuilder

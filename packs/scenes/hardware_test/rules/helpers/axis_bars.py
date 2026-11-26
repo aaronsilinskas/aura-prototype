@@ -21,17 +21,17 @@ _AXES: Final = (
 )
 
 
-def start_axis_bars(ec: EffectControls) -> None:
+def start_axis_bars(effect_controls: EffectControls) -> None:
     for _field, scope, pos_color, _neg_color in _AXES:
-        ec.set_effect(scope, "basic.progress", {"color": pos_color, "progress": 0.0})
+        effect_controls.set_effect(scope, "basic.progress", {"color": pos_color, "progress": 0.0})
 
 
 def show_axis_bars(
-    ec: EffectControls, reading: AccelerationData | MagneticData, full_scale: float
+    effect_controls: EffectControls, reading: AccelerationData | MagneticData, full_scale: float
 ) -> None:
-    """Fill each axis's bar by its share of *full_scale*, colored by the reading's sign."""
+    """Fill each axis's bar by its share of ``full_scale``, colored by the reading's sign."""
     for field, scope, pos_color, neg_color in _AXES:
         value = getattr(reading, field)
         color = pos_color if value >= 0 else neg_color
         progress = min(1.0, abs(value) / full_scale)
-        ec.set_effect(scope, "basic.progress", {"color": color, "progress": progress})
+        effect_controls.set_effect(scope, "basic.progress", {"color": color, "progress": progress})
