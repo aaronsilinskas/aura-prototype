@@ -74,7 +74,8 @@ def _measure_peak_db(wav: Path) -> float | None:
 
 def normalize(root: Path, dry_run: bool = False) -> int:
     """Normalize every WAV file under a sounds/ folder beneath root. Returns 0 on
-    success, 1 on error."""
+    success, 1 on error.
+    """
     if not root.is_dir():
         print(f"Error: '{root}' is not a directory.", file=sys.stderr)
         return 1

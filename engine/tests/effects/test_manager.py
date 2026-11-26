@@ -1685,14 +1685,14 @@ def test_add_effect_transfers_brightness_from_options(pack_tree) -> None:
 def test_set_effect_rejects_out_of_range_brightness_option(pack_tree) -> None:
     manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[])
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"brightness must be in \[0\.0, 1\.0\], got 1\.5"):
         manager.set_effect(Scope.PERSONAL, "stub.fire", {"brightness": 1.5})
 
 
 def test_set_effect_rejects_out_of_range_loudness_option(pack_tree) -> None:
     manager = _make_manager(registry=_make_stub_registry(pack_tree), outputs=[])
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"loudness must be in \[0\.0, 1\.0\], got -0\.1"):
         manager.set_effect(Scope.PERSONAL, "stub.fire", {"loudness": -0.1})
 
 

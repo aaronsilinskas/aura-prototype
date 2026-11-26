@@ -41,7 +41,8 @@ def test_no_arrivals_ever_reports_none_state_and_red_after_boot():
 
 def test_evaluate_allocates_nothing_on_the_no_packet_path():
     """The common per-tick heartbeat with no packet ever received (the boot
-    state) must not allocate -- it is by far the most frequent tick."""
+    state) must not allocate -- it is by far the most frequent tick.
+    """
     meter = _meter()
     meter.evaluate(now=0.0)  # warm up
 
@@ -77,7 +78,8 @@ def test_clean_in_order_stream_reports_perfect_state_at_full_progress():
 
 def test_interleaved_gaps_report_partial_state_at_the_expected_reception_fraction():
     """Sequences 0,1,3,4,6 arrive (2 and 5 missing) -- span 0..6 is 7 slots,
-    5 arrived, so 2 were dropped and the reception fraction is 5/7."""
+    5 arrived, so 2 were dropped and the reception fraction is 5/7.
+    """
     meter = _meter()
 
     for i, sequence in enumerate([0, 1, 3, 4, 6]):
@@ -95,7 +97,8 @@ def test_interleaved_gaps_report_partial_state_at_the_expected_reception_fractio
 def test_window_scrolling_past_old_drops_recovers_to_perfect():
     """A bad early gap ages out of the 1s rolling window once enough clean,
     contiguous traffic follows -- the meter reports Perfect again without
-    needing a special "reset" signal."""
+    needing a special "reset" signal.
+    """
     meter = _meter(window_seconds=1.0, silence_timeout=0.5)
     meter.record(sequence=0, timestamp=0.0)
     meter.record(sequence=5, timestamp=0.1)  # gap of 5 -- 4 dropped

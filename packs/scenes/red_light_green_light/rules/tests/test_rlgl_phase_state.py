@@ -1,5 +1,6 @@
 """Tests for ``RlglPhaseState`` -- Game Level and music state and the
-``rlgl_phase_state`` get-or-create accessor."""
+``rlgl_phase_state`` get-or-create accessor.
+"""
 
 from __future__ import annotations
 
@@ -17,7 +18,8 @@ def _make_state():
 
 def test_new_phase_state_starts_at_level_one_with_no_music():
     """A freshly constructed phase state begins at level 1 with no music
-    playing -- the bootstrap state the Ready phase's first entry expects."""
+    playing -- the bootstrap state the Ready phase's first entry expects.
+    """
     phase_state = RlglPhaseState()
 
     assert phase_state.level == 1
@@ -45,7 +47,8 @@ def test_stop_music_is_a_no_op_when_nothing_is_playing():
 
 def test_rlgl_phase_state_caches_the_same_instance_across_calls():
     """Game Level and music state must persist across ticks, so the accessor
-    must return the same instance rather than rebuilding it each time."""
+    must return the same instance rather than rebuilding it each time.
+    """
     state = _make_state()
 
     first = rlgl_phase_state(state)
@@ -57,5 +60,6 @@ def test_rlgl_phase_state_caches_the_same_instance_across_calls():
 def test_rlgl_phase_state_is_a_state_slot():
     """rlgl_phase_state must be a StateSlot so that the key, factory,
     and revalidate cast are owned in one place with no # type: ignore at
-    call sites."""
+    call sites.
+    """
     assert isinstance(rlgl_phase_state, StateSlot)

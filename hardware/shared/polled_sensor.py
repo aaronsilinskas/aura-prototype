@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from engine.input import AccelerationData, MagneticData
-from engine.log import Logger
 from hardware.shared.polled_part import PolledPart
 
 TYPE_CHECKING = False
@@ -11,6 +9,9 @@ TYPE_CHECKING = False
 if TYPE_CHECKING:
     from collections.abc import Callable
     from typing import Final, TypeVar
+
+    from engine.input import AccelerationData, MagneticData
+    from engine.log import Logger
 
     Reading = TypeVar("Reading", AccelerationData, MagneticData)
 

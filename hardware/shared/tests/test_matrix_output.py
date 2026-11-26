@@ -26,7 +26,7 @@ _SCOPE_ROWS = {
 _COLS = 8
 
 
-@pytest.fixture()
+@pytest.fixture
 def output() -> SpyMatrixOutput:
     return SpyMatrixOutput(cols=_COLS, scope_rows=_SCOPE_ROWS)
 

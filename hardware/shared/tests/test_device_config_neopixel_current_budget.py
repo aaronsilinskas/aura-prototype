@@ -219,7 +219,9 @@ def test_holding_one_strip_at_the_floor_can_push_a_second_strip_under_it():
 
 def test_limit_unreachable_even_at_the_floor_raises_naming_floor_current_limit_and_floor():
     # 200 px @ 0.1 x 60 mA = 1200 mA at the floor, over the 1000 mA limit.
-    with pytest.raises(ValueError) as excinfo:
+    with pytest.raises(
+        ValueError, match=r"neopixel_current_budget: NeoPixel strips draw 1200\.0 mA"
+    ) as excinfo:
         parse_device_config(
             {
                 "pixels": [_strip("D5", 200, 1.0)],

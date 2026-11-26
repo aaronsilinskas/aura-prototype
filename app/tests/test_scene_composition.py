@@ -1,6 +1,7 @@
 """Behaviour-driven tests for the Scene boot, ``build_scene_boot``: each boots fake
 hardware and checks which scene it booted, what that scene's rules saw, or what
-the boot logged, persisted or raised."""
+the boot logged, persisted or raised.
+"""
 
 import pytest
 
@@ -17,22 +18,7 @@ from hardware.shared.device_storage import DeviceStorage
 from hardware.shared.ir_codecs.aura import AuraInfraredDecoder, AuraInfraredEncoder
 from hardware.shared.ir_codecs.tag import TagInfraredDecoder, TagInfraredEncoder
 from hardware.shared.persisted_scene import PersistedScene
-
-_FULL = frozenset(
-    (
-        "button.A",
-        "button.B",
-        "accelerometer",
-        "magnetometer",
-        "radio",
-        "storage",
-        "ir.line",
-        "ir.cone",
-        "ir.area_of_effect",
-        "ir.receive",
-    )
-)
-"""Every Capability a fully built simulated device has."""
+from hardware.shared.tests.full_capabilities import FULL_CAPABILITIES
 
 _FLASH_SCENE = "hardware_test"
 """A flash scene with no Required capabilities."""
@@ -48,7 +34,7 @@ def _persist(storage: DeviceStorage, scene: str) -> None:
     _record(storage).record_reboot(scene, _FLASH_SCENE)
 
 
-def _hw(storage=None, ir=None, capabilities=_FULL):
+def _hw(storage=None, ir=None, capabilities=FULL_CAPABILITIES):
     """Return a DeviceHardware built entirely from CPython-safe fakes; *ir* is Polled."""
     return DeviceHardware(
         outputs=[],
@@ -174,7 +160,7 @@ def test_a_persisted_scene_the_device_cant_run_is_skipped_for_the_flash_default(
     _persist(probe.storage, PROBE_SCENE)
 
     boot = probe.boot(
-        _hw(probe.storage, capabilities=_FULL - {"accelerometer"}),
+        _hw(probe.storage, capabilities=FULL_CAPABILITIES - {"accelerometer"}),
         scene_json={"requires": ["accelerometer"]},
         boot_mapping={"default_scene": _FLASH_SCENE},
     )
@@ -187,7 +173,7 @@ def test_skipping_a_persisted_scene_logs_one_line_naming_it_and_what_it_lacks(pr
     lines: list[str] = []
 
     probe.boot(
-        _hw(probe.storage, capabilities=_FULL - {"accelerometer"}),
+        _hw(probe.storage, capabilities=FULL_CAPABILITIES - {"accelerometer"}),
         scene_json={"requires": ["accelerometer"]},
         boot_mapping={"default_scene": _FLASH_SCENE},
         logger=Logger("[boot]", sink=lines.append),
@@ -201,7 +187,7 @@ def test_skipping_a_persisted_scene_logs_one_line_naming_it_and_what_it_lacks(pr
 def test_boot_raises_missing_capability_when_no_candidate_fits_the_device(probe):
     with pytest.raises(MissingCapabilityError, match="accelerometer"):
         probe.boot(
-            _hw(probe.storage, capabilities=_FULL - {"accelerometer"}),
+            _hw(probe.storage, capabilities=FULL_CAPABILITIES - {"accelerometer"}),
             scene_json={"requires": ["accelerometer"]},
         )
 

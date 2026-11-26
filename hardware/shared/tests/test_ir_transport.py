@@ -41,7 +41,8 @@ def test_ir_telemetry_field_ownership_partitions_every_snapshot_field_with_no_ov
     """Each IrTelemetrySnapshot field has exactly one declared owner —
     InfraredDecoder, PulseReader, or the receiver. A counter with no
     owner (missing from the union) or two owners (present in more than one
-    tuple) fails this test."""
+    tuple) fails this test.
+    """
     # Receiver seam: the receiver's own field tuple has no transceiver route,
     # and an overlap would silently overwrite a counter in the telemetry line.
     owned_field_tuples = [

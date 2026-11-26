@@ -52,7 +52,8 @@ def test_on_switch_on_the_personal_strip_shows_water_in_shades_of_blue(simulatio
     simulation.advance(0.5)
 
     personal = device.strip(Scope.PERSONAL)
-    assert not personal.dark and personal.shades_of(BLUE)
+    assert not personal.dark
+    assert personal.shades_of(BLUE)
 
 
 @pytest.mark.parametrize("scope", ELEMENT_STRIPS, ids=lambda scope: scope.keys[0])

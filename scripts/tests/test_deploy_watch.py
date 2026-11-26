@@ -1,5 +1,6 @@
 """Tests for deploy_watch: watch_stream, discard_until, exit codes, SplitWriter,
-reading serial lines, and the CLI's deploy step."""
+reading serial lines, and the CLI's deploy step.
+"""
 
 import io
 import itertools

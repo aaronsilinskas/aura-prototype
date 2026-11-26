@@ -22,6 +22,7 @@ dev = [
     # Download the CircuitPython binary via: scripts/setup_mpy_cross.sh
     # Binary lands at tools/mpy-cross (gitignored). Bump version with CircuitPython upgrades.
     "pre-commit>=4.0.0",
+    "pylint>=4.1.4",
     "pyserial>=3.5",
     "pytest>=9.0.2",
     "pytest-cov>=7.0.0",
@@ -52,8 +53,15 @@ select = [
     "SIM", # flake8-simplify (redundant code patterns)
     "RUF", # ruff-native rules
     "ISC", # implicit string concatenation (mpy-cross incompatible)
+    "D",   # pydocstyle: docstring formatting (D1xx, which demand docstrings, are ignored)
+    "PT",  # flake8-pytest-style
+    "PGH", # pygrep-hooks (blanket type: ignore and noqa)
+    "TC",  # flake8-type-checking: checker-only imports go under TYPE_CHECKING
 ]
 ignore = [
+    "D1",     # missing docstrings — comments-backpressure: a docstring only where it holds a contract
+    "D205",   # summary spanning lines — the existing ones need rewording, not a blank line
+    "D417",   # every parameter in Args: — python-docstrings lists only those that need it
     "B905",   # zip() without strict= — not available on CircuitPython
     "N817",   # VG is an established abbreviation for ValueGenerator throughout the codebase
     "RUF002", # mathematical symbols (×, –) in docstrings are intentional
@@ -62,13 +70,29 @@ ignore = [
     "SIM105", # try/except/pass is clearer than contextlib.suppress for CircuitPython compat blocks
 ]
 
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
 [tool.ruff.lint.flake8-implicit-str-concat]
 allow-multiline = false  # mpy-cross rejects implicit concatenation even inside parens
 
 [tool.ruff.lint.per-file-ignores]
 # scripts/ and test dirs are CPython-only; ISC002 only matters for device-compiled code
 "scripts/**" = ["ISC002"]
-"**/tests/**" = ["ISC002"]
+# Tests never ship, so moving their imports under TYPE_CHECKING buys nothing.
+"**/tests/**" = ["ISC002", "TC"]
+
+# pylint runs only its duplicate-code check (R0801): ruff covers the rest.
+[tool.pylint.main]
+disable = ["all"]
+enable = ["duplicate-code"]
+persistent = false
+
+[tool.pylint.reports]
+score = false
+
+[tool.pylint.similarities]
+min-similarity-lines = 8
 
 [tool.importlinter]
 root_packages = ["effects", "engine", "magic", "packs", "hardware", "app", "scripts"]

@@ -1,6 +1,7 @@
 """Behaviour-driven tests for the tick ``build_scene_boot`` hands back, the
 per-tick body the device and the Simulated device share: each test boots the
-probe scene and checks what its rule hears."""
+probe scene and checks what its rule hears.
+"""
 
 from engine.input import AccelerationData, ButtonData, InputEvents, MagneticData
 from engine.log import Logger

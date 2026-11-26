@@ -32,7 +32,7 @@ def test_get_or_none_raises_value_error_when_type_mismatch() -> None:
     state = _make_state()
     state.set("name", 123)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Key 'name' value is not an instance of str"):
         state.get_or_none("name", str)
 
 
@@ -196,14 +196,14 @@ def test_effect_receipt_constructor_accepts_only_effect_id() -> None:
 def test_effect_receipt_brightness_rejects_value_above_one() -> None:
     receipt = EffectReceipt(1)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"brightness must be in \[0\.0, 1\.0\], got 1\.5"):
         receipt.brightness = 1.5
 
 
 def test_effect_receipt_brightness_rejects_value_below_zero() -> None:
     receipt = EffectReceipt(1)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"brightness must be in \[0\.0, 1\.0\], got -0\.1"):
         receipt.brightness = -0.1
 
 
@@ -224,21 +224,21 @@ def test_effect_receipt_brightness_accepts_upper_endpoint() -> None:
 def test_effect_receipt_brightness_rejects_nan() -> None:
     receipt = EffectReceipt(1)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"brightness must be in \[0\.0, 1\.0\], got nan"):
         receipt.brightness = float("nan")
 
 
 def test_effect_receipt_loudness_rejects_value_above_one() -> None:
     receipt = EffectReceipt(1)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"loudness must be in \[0\.0, 1\.0\], got 1\.5"):
         receipt.loudness = 1.5
 
 
 def test_effect_receipt_loudness_rejects_value_below_zero() -> None:
     receipt = EffectReceipt(1)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"loudness must be in \[0\.0, 1\.0\], got -0\.1"):
         receipt.loudness = -0.1
 
 
@@ -259,7 +259,7 @@ def test_effect_receipt_loudness_accepts_upper_endpoint() -> None:
 def test_effect_receipt_loudness_rejects_nan() -> None:
     receipt = EffectReceipt(1)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"loudness must be in \[0\.0, 1\.0\], got nan"):
         receipt.loudness = float("nan")
 
 
@@ -343,7 +343,7 @@ def test_state_slot_raises_when_pre_seeded_value_has_wrong_type() -> None:
     state = _make_state()
     state.set("typed_slot", "wrong type")
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Key 'typed_slot' value is not an instance of _Marker"):
         slot(state)
 
 
@@ -453,7 +453,7 @@ def test_pop_raises_key_error_when_key_is_absent() -> None:
 def test_pop_raises_value_error_on_type_mismatch_and_does_not_remove_key() -> None:
     state = GameState(EffectControls(), SceneControls(), data={"v": "text"})
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Key 'v' value is not an instance of int"):
         state.pop("v", int)
 
     assert "v" in state

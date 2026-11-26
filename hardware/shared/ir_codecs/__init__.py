@@ -11,12 +11,12 @@ from __future__ import annotations
 
 import os
 
-from hardware.shared.ir_codecs.base import InfraredDecoder, InfraredEncoder
-
 TYPE_CHECKING = False
 
 if TYPE_CHECKING:
     from typing import Final
+
+    from hardware.shared.ir_codecs.base import InfraredDecoder, InfraredEncoder
 
 __all__ = ["UnknownCodecError", "codec_for"]
 

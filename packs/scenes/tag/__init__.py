@@ -37,7 +37,6 @@ together by reading every rule.
   ``TagGameOverRule``. Live for the Game Over phase.
 
 Notes:
-
 - ``Global.BUFF``'s ammo bar reads amber (``basic.progress``, ``0xFFBF00``)
   whenever it shows a non-empty value: full on Playing entry, updated after
   each shot that leaves ammo > 0, and full again on reload completion. The
@@ -48,8 +47,7 @@ Notes:
 - ``Global.MAIN``'s ``scene.hit`` and ``DIRECTIONAL``'s ``scene.fire_shot``
   are one-shot felt-feedback effects, not bound to a phase's lifecycle.
 
-See also:
-
+See Also:
 - :class:`~packs.scenes.tag.rules.playing_rule.TagPlayingRule`
 - :class:`~packs.scenes.tag.rules.shooting_rule.TagShootingRule`
 - :class:`~packs.scenes.tag.rules.hit_rule.TagHitRule`

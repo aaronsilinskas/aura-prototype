@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from magic.aura import Spell
-
 TYPE_CHECKING = False
 
 if TYPE_CHECKING:
     from typing import Final
+
+    from magic.aura import Spell
 
 
 class CastType:

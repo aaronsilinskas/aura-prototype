@@ -245,7 +245,8 @@ def test_the_ammo_bar_fills_red_as_the_reload_is_held(simulation):
     later = player.strip(Scope.Global.BUFF)
 
     assert 0 < early.lit < later.lit < later.size
-    assert early.shades_of(RED) and later.shades_of(RED)
+    assert early.shades_of(RED)
+    assert later.shades_of(RED)
 
 
 def test_holding_through_the_reload_refills_the_amber_ammo_bar(simulation):

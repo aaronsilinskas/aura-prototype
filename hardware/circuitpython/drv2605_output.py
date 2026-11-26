@@ -4,13 +4,14 @@ import adafruit_drv2605
 
 from effects.effect import Effect, HapticPattern
 from engine.effects.output import EffectOutput
-from engine.events import EffectEvent
 from engine.state import EffectReceipt, Scope
 
 TYPE_CHECKING = False
 
 if TYPE_CHECKING:
     from typing import Final
+
+    from engine.events import EffectEvent
 
 # HapticPattern constants are offset from the DRV2605L hardware waveform IDs
 # (see effects.effect.HapticPattern), so this table restores the real IDs the

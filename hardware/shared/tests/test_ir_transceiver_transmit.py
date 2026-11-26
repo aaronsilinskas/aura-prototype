@@ -116,7 +116,7 @@ def test_a_queued_payload_is_encoded_once_when_its_write_starts_not_every_tick()
 
 
 class _RejectingEncoder(AuraInfraredEncoder):
-    """An Aura encoder that cannot encode the payload ``b"\\x02"``."""
+    r"""An Aura encoder that cannot encode the payload ``b"\x02"``."""
 
     def encode(self, data: bytes) -> "array[int]":
         if data == b"\x02":
@@ -133,7 +133,7 @@ def test_a_queued_payload_failing_to_encode_raises_from_update_and_the_rest_stil
     transceiver.send(b"\x03", LINE)
 
     writer.finish()
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="unencodable payload"):
         transceiver.update(0.0)
     transceiver.update(0.0)
 
@@ -298,7 +298,8 @@ def test_a_sends_self_echo_is_never_received_and_the_next_frame_is() -> None:
 
 def test_every_frame_arriving_while_a_write_is_in_flight_is_discarded() -> None:
     """A real shot overlapping the self-echo is indistinguishable from it at
-    the pulse level, so both are dropped."""
+    the pulse level, so both are dropped.
+    """
     transceiver, _, reader = _build(blocking=False, echo=True)
     transceiver.send(b"\x01", LINE)
 

@@ -1,5 +1,6 @@
 """Tests for the motion-detection helpers: ``linear_magnitude``, ``low_pass``,
-and the tuned threshold constants."""
+and the tuned threshold constants.
+"""
 
 from __future__ import annotations
 
@@ -28,7 +29,8 @@ def test_linear_magnitude_returns_distance_from_the_gravity_vector():
 
 def test_linear_magnitude_is_orientation_independent():
     """The same physical motion reads the same whether aligned with or
-    perpendicular to gravity — the whole point of subtracting gravity as a vector."""
+    perpendicular to gravity — the whole point of subtracting gravity as a vector.
+    """
     motion_m_per_s2 = 1.0
     along_gravity = AccelerationData(x=0.0, y=0.0, z=_G + motion_m_per_s2)
     across_gravity = AccelerationData(x=motion_m_per_s2, y=0.0, z=_G)

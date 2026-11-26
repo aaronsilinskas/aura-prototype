@@ -1,10 +1,10 @@
+from __future__ import annotations
+
 import audiobusio
 import audiocore
 import audiomixer
 
-from effects.effect import Effect
 from engine.effects.output import EffectOutput
-from engine.events import EffectEvent
 from engine.state import EffectReceipt, Scope
 from hardware.shared.voice_pool import VoicePool, VoiceSink, clip_stops_receipt
 
@@ -14,6 +14,9 @@ if TYPE_CHECKING:
     from typing import BinaryIO
 
     import microcontroller
+
+    from effects.effect import Effect
+    from engine.events import EffectEvent
 
 
 class AudioEffectOutput(EffectOutput, VoiceSink):
@@ -40,9 +43,9 @@ class AudioEffectOutput(EffectOutput, VoiceSink):
         max_volume: float,
         num_voices: int,
         *,
-        i2s_bit_clock: "microcontroller.Pin",
-        i2s_word_select: "microcontroller.Pin",
-        i2s_data: "microcontroller.Pin",
+        i2s_bit_clock: microcontroller.Pin,
+        i2s_word_select: microcontroller.Pin,
+        i2s_data: microcontroller.Pin,
     ) -> None:
         super().__init__(receives_pixels=False)
         self.min_resolution = 1

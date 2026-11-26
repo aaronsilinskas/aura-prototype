@@ -42,6 +42,14 @@ repos:
         entry: uv run mypy
         language: system
         pass_filenames: false
+      - id: duplicate-code
+        name: pylint duplicate-code
+        description: >-
+          Reject 8 or more similar lines repeated across modules, such as a test fake copied
+          between test files; share it instead. pyproject.toml enables only this pylint check.
+        entry: uv run pylint app effects engine hardware magic packs scripts conftest.py
+        language: system
+        pass_filenames: false
       - id: banner-comments
         name: no section-banner comments
         description: >-

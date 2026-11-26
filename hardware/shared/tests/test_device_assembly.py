@@ -14,6 +14,7 @@ from hardware.shared.device_config import DeviceConfig, PinRef, parse_device_con
 from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.polled_sensor import PolledSensor
 from hardware.shared.radio_transceiver import RadioTransceiver
+from hardware.shared.tests.full_capabilities import FULL_CAPABILITIES
 from hardware.shared.tests.recording_parts import Output, PartError, RecordingParts
 
 _NEOPIXEL = {"type": "neopixel", "pin": "GP0", "count": 4, "scope_pixels": {"personal": [0, 4]}}
@@ -891,7 +892,8 @@ def test_storage_is_what_the_storage_part_built_on_the_spi_bus():
 
     ((_sdcard, bus, cs),) = parts.args_of("storage")
     assert (bus.kind, cs) == ("spi", PinRef("GP15", "sdcard.cs"))
-    assert hw.storage is not None and hw.storage.mount_root == "/sd"
+    assert hw.storage is not None
+    assert hw.storage.mount_root == "/sd"
 
 
 def test_a_bare_config_builds_no_optional_hardware():
@@ -916,26 +918,12 @@ _FULL_SECTIONS: dict[str, object] = {
     "sdcard": _SDCARD,
     "ir": _FULL_IR,
 }
-_FULL_CAPABILITIES = frozenset(
-    (
-        "button.A",
-        "button.B",
-        "accelerometer",
-        "magnetometer",
-        "radio",
-        "storage",
-        "ir.line",
-        "ir.cone",
-        "ir.area_of_effect",
-        "ir.receive",
-    )
-)
 
 
 def test_a_fully_built_device_has_every_capability_its_config_builds():
     hw, _parts = _assemble(_config(**_FULL_SECTIONS))
 
-    assert hw.capabilities == _FULL_CAPABILITIES
+    assert hw.capabilities == FULL_CAPABILITIES
 
 
 def test_a_device_has_one_button_capability_per_declared_button():
@@ -972,7 +960,7 @@ def test_a_disabled_component_is_not_a_capability(section, lost):
 
     hw, _parts = _assemble(_config(**sections))
 
-    assert hw.capabilities == _FULL_CAPABILITIES - lost
+    assert hw.capabilities == FULL_CAPABILITIES - lost
 
 
 def test_an_isolated_device_has_only_its_kept_component_and_its_buttons():

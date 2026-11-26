@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import binascii
 
-from hardware.shared.device_storage import DeviceStorage
 from hardware.shared.sd_sync_protocol import (
     CHUNK_SIZE,
     Frame,
@@ -23,6 +22,8 @@ TYPE_CHECKING = False
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
+
+    from hardware.shared.device_storage import DeviceStorage
 
 __all__ = ["SdSyncServer"]
 

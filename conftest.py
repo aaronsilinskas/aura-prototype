@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import sys
-from collections.abc import Callable, Iterator
-from pathlib import Path
 
 import pytest
 
@@ -16,12 +14,15 @@ from hardware.shared.persisted_scene import PersistedScene
 TYPE_CHECKING = False
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Iterator
+    from pathlib import Path
+
     from app.simulation import Simulation
 
 pytest_plugins = ["pytester"]
 
 
-@pytest.fixture()
+@pytest.fixture
 def simulation() -> Iterator[Simulation]:
     """A ``Simulation``, closed after the test so it leaves nothing behind."""
     # Imported here, not at module level, so test trees that never simulate
@@ -32,7 +33,7 @@ def simulation() -> Iterator[Simulation]:
         yield simulation
 
 
-@pytest.fixture()
+@pytest.fixture
 def pack_tree(tmp_path: Path) -> Iterator[PackTree]:
     """Yield a ``PackTree`` building pack roots under *tmp_path*.
 
@@ -52,7 +53,7 @@ def pack_tree(tmp_path: Path) -> Iterator[PackTree]:
     sys.path[:] = saved_path
 
 
-@pytest.fixture()
+@pytest.fixture
 def device_storage(tmp_path: Path) -> Iterator[DeviceStorage]:
     """Yield a real ``DeviceStorage`` over a fresh ``card`` directory in *tmp_path*.
 
@@ -77,7 +78,7 @@ def device_storage(tmp_path: Path) -> Iterator[DeviceStorage]:
         sys.path.remove(storage.mount_root)
 
 
-@pytest.fixture()
+@pytest.fixture
 def persisted_scene_on() -> Callable[[str | Path], PersistedScene]:
     """Return a function giving the Persisted scene record on the card at a directory.
 

@@ -8,7 +8,7 @@ Read at review time (`code-review`), not during implementation. Each source belo
 - **Terms**: `GLOSSARY.md`. Use its canonical terms and flag the terms it says to avoid.
 - **Design decisions**: `docs/adr/`. Flag code that departs from an accepted ADR.
 
-ruff, ruff format, import-linter, mypy, the section-banner comment check, the work-tracking reference check, actionlint and check-dependabot (which validates `.github/dependabot.yml`) run in pre-commit and in `scripts/check.sh` (which also runs pytest, and which CI runs). Skip what they enforce.
+ruff (including docstring formatting, pytest style and checker-only imports), ruff format, import-linter, mypy, pylint's duplicate-code check, the section-banner comment check, the work-tracking reference check, actionlint and check-dependabot (which validates `.github/dependabot.yml`) run in pre-commit and in `scripts/check.sh` (which also runs pytest, and which CI runs). Skip what they enforce.
 
 ## Judgement calls
 

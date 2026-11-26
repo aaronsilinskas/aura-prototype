@@ -39,7 +39,7 @@ def test_codec_for_unknown_name_is_still_catchable_as_a_value_error():
     # UnknownCodecError is a bespoke ValueError subclass (hardware may not
     # import engine.packs, where the analogous UnknownItemError lives), so a
     # caller that only catches ValueError still catches this.
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"Unknown IR codec 'tv_remote'\. Available: aura, tag"):
         codec_for("tv_remote")
 
 

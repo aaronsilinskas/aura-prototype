@@ -8,7 +8,7 @@ from app.tests.probe import HEARD, Probe
 from hardware.shared.device_storage import DeviceStorage
 
 
-@pytest.fixture()
+@pytest.fixture
 def probe(device_storage: DeviceStorage) -> Iterator[Probe]:
     """Yield a ``Probe`` writing its scene onto the ``device_storage`` card.
 

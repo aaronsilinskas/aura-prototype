@@ -292,7 +292,7 @@ def test_redeploying_an_unknown_scene_over_a_persisted_scene_fails_naming_the_kn
 def test_a_valid_redeploy_after_an_unknown_scene_boots_it(simulation):
     device = simulation.add_device("red", scene="example_lobby")
     launch(device, "element_browser")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="unknown scene 'no_such_scene'; known scenes"):
         device.redeploy(scene="no_such_scene")
 
     device.redeploy(scene="hardware_test")

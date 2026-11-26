@@ -25,7 +25,8 @@ _CONFIG_KEY: Final = "rlgl_config"
 
 class RlglConfig:
     """Immutable duration/threshold configuration for the RLGL scene, each
-    field read from the scene Setting of the same name."""
+    field read from the scene Setting of the same name.
+    """
 
     __slots__ = (
         "game_over_duration",

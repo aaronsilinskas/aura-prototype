@@ -236,7 +236,9 @@ def test_scan_overrides_for_an_effect_pack_raise_a_plain_value_error(pack_tree, 
     pack_tree.effect_pack(root, "glow")
     pack_tree.scene(root, "game", effect_packs=[{"name": "glow", "version": "1.0"}])
 
-    with pytest.raises(ValueError) as excinfo:
+    with pytest.raises(
+        ValueError, match="setting overrides for scene 'game' have unknown key"
+    ) as excinfo:
         pack_tree.scan_roots(root, setting_overrides={"game": {"effect_packs": {"glow": glow}}})
 
     assert not isinstance(excinfo.value, PackScanError)
@@ -329,7 +331,7 @@ def test_misshapen_setting_overrides_raise_a_plain_value_error(
 ) -> None:
     root = _scene_with_rule_pack(pack_tree, HOLD)
 
-    with pytest.raises(ValueError) as excinfo:
+    with pytest.raises(ValueError, match="setting override") as excinfo:
         pack_tree.scan_roots(root, setting_overrides=setting_overrides)
 
     assert not isinstance(excinfo.value, PackScanError)

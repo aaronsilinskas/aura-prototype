@@ -70,10 +70,10 @@ class Transport:
 
 
 def encode_frame(frame: Frame) -> bytes:
-    """Encode *frame* as a single base64 line -- plain-ASCII, no embedded newlines.
+    r"""Encode *frame* as a single base64 line -- plain-ASCII, no embedded newlines.
 
     The header (``kind`` + a space + ``text``) and ``payload`` are joined with
-    a single ``\\n`` separator before base64 encoding; that inner newline is
+    a single ``\n`` separator before base64 encoding; that inner newline is
     swallowed by the encoding, so the returned bytes contain none.
     """
     header = (frame.kind + " " + frame.text).encode("utf-8")
@@ -136,9 +136,9 @@ def expect_ack(transport: Transport, seq: int, error: type[ValueError] = ValueEr
 
 
 def encode_listing(entries: list[tuple[str, int]]) -> bytes:
-    """Serialize (path, size) pairs into a ``list`` response frame's payload.
+    r"""Serialize (path, size) pairs into a ``list`` response frame's payload.
 
-    One ``"path\\tsize"`` line per entry, newline-joined, UTF-8 encoded,
+    One ``"path\tsize"`` line per entry, newline-joined, UTF-8 encoded,
     sent whole rather than chunked (ADR-0011).
     """
     return "\n".join(f"{path}\t{size}" for path, size in entries).encode("utf-8")

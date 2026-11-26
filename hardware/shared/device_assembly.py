@@ -12,7 +12,6 @@ from __future__ import annotations
 import time
 
 from engine.capabilities import IR_RECEIVE, button_capability, ir_emitter_capability
-from engine.effects.output import EffectOutput
 from engine.input import AccelerationData, MagneticData
 from engine.log import Logger
 from engine.network import IR_EMITTERS
@@ -34,11 +33,8 @@ from hardware.shared.device_config import (
     SPIConfig,
 )
 from hardware.shared.device_hardware import DeviceHardware
-from hardware.shared.device_parts import DeviceParts
-from hardware.shared.device_storage import DeviceStorage
 from hardware.shared.ir_transceiver import InfraredTransceiver
 from hardware.shared.network_controls import HardwareNetworkControls
-from hardware.shared.polled_part import PolledPart
 from hardware.shared.polled_sensor import PolledSensor
 from hardware.shared.radio_transceiver import RadioTransceiver
 
@@ -48,7 +44,10 @@ if TYPE_CHECKING:
     from collections.abc import Callable
     from typing import Protocol, TypeVar
 
-    from hardware.shared.device_parts import Bus
+    from engine.effects.output import EffectOutput
+    from hardware.shared.device_parts import Bus, DeviceParts
+    from hardware.shared.device_storage import DeviceStorage
+    from hardware.shared.polled_part import PolledPart
     from hardware.shared.polled_sensor import Reading
 
     class _Gated(Protocol):

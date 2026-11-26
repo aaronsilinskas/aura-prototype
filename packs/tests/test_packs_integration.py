@@ -359,7 +359,8 @@ def test_tags_game_over_sting_resolves_through_the_basic_pack(catalog: PackCatal
 def test_tag_scene_every_audio_playing_effects_clip_name_resolves(catalog: PackCatalog) -> None:
     """Every tag effect that plays audio names a clip the active scene resolves --
     the shared basic sting via the declared basic pack, everything else via tag's
-    own sounds/ -- so the scene can run end-to-end with no unresolved clip."""
+    own sounds/ -- so the scene can run end-to-end with no unresolved clip.
+    """
     resolved_clip_names = _resolve_every_local_clip(catalog, "tag")
 
     # Sanity check that the walk actually reached tag's audio-playing effects,
@@ -401,7 +402,8 @@ def test_red_light_green_light_scene_every_audio_playing_effects_clip_name_resol
 ) -> None:
     """Every rlgl effect that plays audio names a clip the active scene resolves --
     the shared basic sting via the declared basic pack, everything else via rlgl's
-    own sounds/ -- so the scene can run end-to-end with no unresolved clip."""
+    own sounds/ -- so the scene can run end-to-end with no unresolved clip.
+    """
     resolved_clip_names = _resolve_every_local_clip(catalog, "red_light_green_light")
 
     # Sanity check that the walk actually reached rlgl's audio-playing effects,

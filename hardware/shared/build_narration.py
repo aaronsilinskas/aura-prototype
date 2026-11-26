@@ -7,13 +7,13 @@ sequence once so a component block reduces to a single call.
 
 from __future__ import annotations
 
-from engine.log import Logger
-
 TYPE_CHECKING = False
 
 if TYPE_CHECKING:
     from collections.abc import Callable
     from typing import TypeVar
+
+    from engine.log import Logger
 
     T = TypeVar("T")
 

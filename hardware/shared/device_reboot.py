@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from engine.log import Logger
 from engine.state import SceneReboot
-from hardware.shared.persisted_scene import PersistedScene
 
 TYPE_CHECKING = False
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+    from hardware.shared.persisted_scene import PersistedScene
 
 __all__ = ["DeviceSceneReboot"]
 

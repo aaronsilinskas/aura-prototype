@@ -148,7 +148,7 @@ def test_a_test_built_scene_the_device_cannot_run_raises_and_activates_nothing()
 
 
 def test_required_capabilities_of_an_unregistered_scene_raises_value_error() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Unknown scene 'nowhere'"):
         make_scene_registry().required_capabilities("nowhere")
 
 

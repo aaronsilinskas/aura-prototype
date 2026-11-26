@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from effects.effect import EffectPixels, PixelBuffer
-from effects.layers.layer import Layer
-from effects.palette import Palette
 
 TYPE_CHECKING = False
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+
+    from effects.layers.layer import Layer
+    from effects.palette import Palette
 
 
 class AddSamplesRenderer(EffectPixels):

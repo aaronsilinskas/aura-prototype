@@ -438,7 +438,8 @@ def test_reader_counters_are_summed_across_readers():
 
 def test_packets_completed_can_exceed_surfaced_when_several_readers_catch_one_shot():
     """Dedup, not loss: each reader's decoder completes the same shot, but
-    only the winner is received."""
+    only the winner is received.
+    """
     transceiver, readers = _receiving(3)
     transceiver.apply_codec(TagInfraredEncoder, TagInfraredDecoder)
     readers[0].load(tag_pulses(b"\x10"))
@@ -465,7 +466,8 @@ def _reordered_snapshot_init(
 ):
     """An ``IrTelemetrySnapshot.__init__`` with ``pulses_seen`` and
     ``packets_surfaced`` swapped relative to ``FIELDS`` — a stand-in for a
-    future ``FIELDS`` reorder."""
+    future ``FIELDS`` reorder.
+    """
     self.pulses_seen = pulses_seen
     self.packets_surfaced = packets_surfaced
     self.buffer_full_on_poll = buffer_full_on_poll
@@ -527,7 +529,8 @@ def test_update_allocates_nothing_when_no_pulse_arrives(reader_count):
 
 def test_update_allocates_nothing_while_draining_during_emission():
     """Readers stay empty, so only the drain loop and the emission check
-    repeat — a growing counter's own int widening would be a false positive."""
+    repeat — a growing counter's own int widening would be a false positive.
+    """
     transceiver, _, _ = _emitting(3, holds=True)
     transceiver.send(b"\x01", LINE)
 

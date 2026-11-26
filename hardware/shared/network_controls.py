@@ -5,8 +5,12 @@ from __future__ import annotations
 from engine.capabilities import MissingCapabilityError, ir_emitter_capability
 from engine.network import IR_EMITTERS
 from engine.state import NetworkControls
-from hardware.shared.ir_transceiver import InfraredTransceiver
-from hardware.shared.radio_transceiver import RadioTransceiver
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from hardware.shared.ir_transceiver import InfraredTransceiver
+    from hardware.shared.radio_transceiver import RadioTransceiver
 
 __all__ = ["HardwareNetworkControls"]
 

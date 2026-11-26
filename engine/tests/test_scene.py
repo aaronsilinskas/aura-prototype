@@ -201,14 +201,14 @@ def test_overlay_raises_immediately_when_stack_is_empty() -> None:
     scene_reg = make_scene_registry(("overlay_scene", make_scene()))
     manager = _make_scene_manager(scene_registry=scene_reg)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Cannot overlay: no active scene on stack"):
         manager.overlay("overlay_scene")
 
 
 def test_pop_raises_immediately_with_zero_entries_on_stack() -> None:
     manager = _make_scene_manager()
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Cannot pop: stack has 0 entries"):
         manager.pop()
 
 
@@ -217,7 +217,7 @@ def test_pop_raises_immediately_with_exactly_one_entry_on_stack() -> None:
     manager = _make_scene_manager(scene_registry=scene_reg)
     manager.activate_boot_scene("main")
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Cannot pop: stack has 1 entry"):
         manager.pop()
 
 
@@ -233,7 +233,8 @@ def test_reboot_into_delegates_to_the_injected_scene_reboot_port() -> None:
 
 def test_reboot_into_rejects_an_unregistered_scene_name_and_persists_nothing() -> None:
     """An unknown target must never reach the port -- a typo persisted there
-    would only be skipped at the next boot."""
+    would only be skipped at the next boot.
+    """
     scene_reboot = RecordingSceneReboot()
     manager = _make_scene_manager(scene_reboot=scene_reboot)
 
@@ -860,7 +861,8 @@ def test_a_flash_scene_runs_a_rule_from_a_card_rule_pack(pack_tree) -> None:
 
 def test_pop_activates_revealed_entry_with_both_rules_and_its_view(pack_tree) -> None:
     """After boot → overlay → pop, the revealed entry runs its rules again
-    AND has its own view handed to uncover (invariant: no half-activation)."""
+    AND has its own view handed to uncover (invariant: no half-activation).
+    """
     base_local_registry = SceneLocalRegistry()
     rule_registry = pack_tree.scan(
         rule_packs={"stubs": {"base_rule": _GAME_RULE_SOURCE}}

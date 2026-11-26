@@ -208,7 +208,7 @@ def test_sequence_longer_than_8_raises() -> None:
     )
     receipt = _make_receipt()
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"HapticPattern\.sequence length 9 exceeds maximum 8"):
         output.handle_event(
             EffectEvent("rlgl", "haptic", EffectVerb.START), frozenset({"all"}), effect, receipt
         )

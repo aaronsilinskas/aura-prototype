@@ -71,7 +71,7 @@ def test_lut_with_no_stops_returns_black_for_any_value() -> None:
 
 
 def test_lut_raises_when_stops_length_is_not_a_multiple_of_four() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Color stops length must be a multiple of 4"):
         PaletteLUT256(bytes([0, 255, 0]))
 
 

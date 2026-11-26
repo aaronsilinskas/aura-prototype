@@ -56,7 +56,7 @@ def test_read_bytes_propagates_an_open_error_other_than_missing_file(tmp_path, m
 
     monkeypatch.setattr(builtins, "open", flaky_open)
 
-    with pytest.raises(OSError):
+    with pytest.raises(OSError, match=r"\[Errno 13\] permission denied"):
         storage.read_bytes("state.json")
 
 
@@ -90,7 +90,7 @@ def test_read_chunks_yields_multiple_chunks_when_content_exceeds_chunk_size(tmp_
 def test_read_chunks_rejects_a_name_that_escapes_the_mount_root(tmp_path, escaping_name):
     storage = DeviceStorage(str(tmp_path))
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="path escapes mount root"):
         storage.read_chunks(escaping_name, chunk_size=8)
 
 
@@ -176,7 +176,7 @@ def test_failed_write_bytes_leaves_prior_content_intact(tmp_path, monkeypatch):
 
     _break_temp_file_writes(monkeypatch)
 
-    with pytest.raises(OSError):
+    with pytest.raises(OSError, match="simulated disk full"):
         storage.write_bytes("state.json", b"content-that-never-lands")
 
     monkeypatch.undo()
@@ -200,7 +200,7 @@ def test_write_bytes_propagates_a_remove_error_other_than_missing_target(tmp_pat
 
     monkeypatch.setattr(os, "remove", flaky_remove)
 
-    with pytest.raises(OSError):
+    with pytest.raises(OSError, match=r"\[Errno 13\] permission denied"):
         storage.write_bytes("state.json", b"content-that-never-lands")
 
     monkeypatch.undo()
@@ -215,7 +215,7 @@ def test_write_bytes_propagates_a_mkdir_error_other_than_already_exists(tmp_path
 
     monkeypatch.setattr(os, "mkdir", flaky_mkdir)
 
-    with pytest.raises(OSError):
+    with pytest.raises(OSError, match=r"\[Errno 13\] permission denied"):
         storage.write_bytes("scenes/tag/state.json", b"data")
 
 
@@ -240,7 +240,7 @@ def test_write_bytes_tolerates_already_present_parent_directories(tmp_path):
 def test_read_bytes_rejects_a_name_that_escapes_the_mount_root(tmp_path, escaping_name):
     storage = DeviceStorage(str(tmp_path))
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="path escapes mount root"):
         storage.read_bytes(escaping_name)
 
 
@@ -248,7 +248,7 @@ def test_read_bytes_rejects_a_name_that_escapes_the_mount_root(tmp_path, escapin
 def test_write_bytes_rejects_a_name_that_escapes_the_mount_root(tmp_path, escaping_name):
     storage = DeviceStorage(str(tmp_path))
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="path escapes mount root"):
         storage.write_bytes(escaping_name, b"data")
 
 
@@ -256,7 +256,7 @@ def test_write_bytes_rejects_a_name_that_escapes_the_mount_root(tmp_path, escapi
 def test_path_rejects_a_subpath_that_escapes_the_mount_root(tmp_path, escaping_subpath):
     storage = DeviceStorage(str(tmp_path))
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="path escapes mount root"):
         storage.path(escaping_subpath)
 
 
@@ -273,14 +273,14 @@ def test_path_rejects_a_subpath_that_escapes_the_mount_root(tmp_path, escaping_s
 def test_a_dot_dot_segment_is_rejected_even_when_the_path_stays_under_the_mount_root(tmp_path, use):
     storage = DeviceStorage(str(tmp_path))
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"path escapes mount root: 'scenes/\.\./state\.json'"):
         use(storage, "scenes/../state.json")
 
 
 def test_write_bytes_rejecting_an_escaping_name_leaves_no_file_written(tmp_path):
     storage = DeviceStorage(str(tmp_path))
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"path escapes mount root: '\.\./secret\.txt'"):
         storage.write_bytes("../secret.txt", b"data")
 
     assert os.listdir(tmp_path) == []
@@ -350,7 +350,7 @@ def test_read_json_raises_on_malformed_content(tmp_path):
 def test_read_json_rejects_a_name_that_escapes_the_mount_root(tmp_path, escaping_name):
     storage = DeviceStorage(str(tmp_path))
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="path escapes mount root"):
         storage.read_json(escaping_name)
 
 
@@ -358,7 +358,7 @@ def test_read_json_rejects_a_name_that_escapes_the_mount_root(tmp_path, escaping
 def test_write_json_rejects_a_name_that_escapes_the_mount_root(tmp_path, escaping_name):
     storage = DeviceStorage(str(tmp_path))
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="path escapes mount root"):
         storage.write_json(escaping_name, {"scene": "tag"})
 
 
@@ -368,7 +368,7 @@ def test_failed_write_json_leaves_prior_content_intact(tmp_path, monkeypatch):
 
     _break_temp_file_writes(monkeypatch)
 
-    with pytest.raises(OSError):
+    with pytest.raises(OSError, match="simulated disk full"):
         storage.write_json("state.json", {"scene": "rlgl"})
 
     monkeypatch.undo()
@@ -427,5 +427,5 @@ def test_walk_returns_an_empty_list_for_a_subtree_that_does_not_exist(tmp_path):
 def test_walk_rejects_a_subpath_that_escapes_the_mount_root(tmp_path, escaping_subpath):
     storage = DeviceStorage(str(tmp_path))
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="path escapes mount root"):
         storage.walk(escaping_subpath)
