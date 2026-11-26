@@ -9,14 +9,18 @@ graph (the catalog imports the scene module). Imports nothing from
 from __future__ import annotations
 
 from engine.effects.manager import EffectManager
-from engine.effects.output import EffectOutput
-from engine.events import Event
-from engine.log import Logger
 from engine.namespace import ActiveSceneNamespace
-from engine.pack_catalog import PackCatalog
 from engine.scene import SceneManager
-from engine.state import NetworkControls, SceneControls, SceneReboot
 from engine.timer import Timer
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from engine.effects.output import EffectOutput
+    from engine.events import Event
+    from engine.log import Logger
+    from engine.pack_catalog import PackCatalog
+    from engine.state import NetworkControls, SceneControls, SceneReboot
 
 __all__ = ["SceneRuntime"]
 

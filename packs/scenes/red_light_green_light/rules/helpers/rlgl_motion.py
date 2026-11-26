@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from engine.input import AccelerationData
 from engine.state import StateSlot
 from packs.scenes.red_light_green_light.rules.helpers.motion_detector import (
     linear_magnitude,
@@ -11,6 +10,8 @@ TYPE_CHECKING = False
 
 if TYPE_CHECKING:
     from typing import Final
+
+    from engine.input import AccelerationData
 
 _MOTION_KEY: Final = "rlgl_motion"
 

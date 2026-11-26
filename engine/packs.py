@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import engine._path as _path
-from engine.settings import SettingDeclaration
-from engine.version import Version
 
 TYPE_CHECKING = False
 
 if TYPE_CHECKING:
     from typing import TypeVar
+
+    from engine.settings import SettingDeclaration
+    from engine.version import Version
 
     T = TypeVar("T")
 

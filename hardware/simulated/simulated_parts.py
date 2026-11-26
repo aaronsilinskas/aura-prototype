@@ -17,25 +17,13 @@ from __future__ import annotations
 
 import math
 import wave
-from array import array
 from collections import deque
-from collections.abc import Callable
 from typing import TypeVar
 
 from effects.effect import Effect, PixelBuffer
 from engine.effects.output import EffectOutput
-from engine.events import EffectEvent
 from engine.input import AccelerationData
 from engine.state import EffectReceipt, Scope, ScopeValue
-from hardware.shared.device_config import (
-    AudioConfig,
-    I2CDeviceConfig,
-    MatrixPixelsConfig,
-    NeoPixelStripConfig,
-    PinRef,
-    RadioConfig,
-    SDCardConfig,
-)
 from hardware.shared.device_parts import DeviceParts
 from hardware.shared.device_storage import DeviceStorage
 from hardware.shared.ir_transport import PulseReader, PulseWriter
@@ -45,6 +33,19 @@ from hardware.shared.voice_pool import VoicePool, VoiceSink, clip_stops_receipt
 TYPE_CHECKING = False
 
 if TYPE_CHECKING:
+    from array import array
+    from collections.abc import Callable
+
+    from engine.events import EffectEvent
+    from hardware.shared.device_config import (
+        AudioConfig,
+        I2CDeviceConfig,
+        MatrixPixelsConfig,
+        NeoPixelStripConfig,
+        PinRef,
+        RadioConfig,
+        SDCardConfig,
+    )
     from hardware.shared.device_parts import Bus
     from hardware.simulated.device import SimulatedHardware
 

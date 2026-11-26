@@ -4,13 +4,14 @@ import time
 
 from engine.engine import GameRule
 from engine.input import InputEvents
-from engine.state import GameState
 from packs.rules.debug import NAMESPACE
 
 TYPE_CHECKING = False
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+    from engine.state import GameState
 
 
 class FpsLoggerRule(GameRule):

@@ -10,9 +10,7 @@ from effects.effect import (
 )
 from engine.effects.admin import EffectAdmin, HeldEffects, SceneView
 from engine.effects.merge import SPLIT
-from engine.effects.output import EffectOutput
 from engine.events import EffectEvent
-from engine.namespace import ActiveSceneNamespace
 from engine.state import (
     EffectControls,
     EffectReceipt,
@@ -20,13 +18,16 @@ from engine.state import (
     Scope,
     ScopeValue,
 )
-from engine.timer import Timer
 
 TYPE_CHECKING = False
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
     from typing import Any
+
+    from engine.effects.output import EffectOutput
+    from engine.namespace import ActiveSceneNamespace
+    from engine.timer import Timer
 
 _DEFAULT_RESOLUTION = 16
 

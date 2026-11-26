@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from engine.settings import Settings
 from engine.state import Scope, ScopeValue
 
 TYPE_CHECKING = False
@@ -8,6 +7,8 @@ TYPE_CHECKING = False
 if TYPE_CHECKING:
     from collections.abc import Callable
     from typing import Final
+
+    from engine.settings import Settings
 
 NAMESPACE: Final = "lobby"
 

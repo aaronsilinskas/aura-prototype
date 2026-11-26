@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from engine.input import InputEvents
 from engine.state import GameState, Scope
 from packs.scenes.hardware_test.rules.helpers.hw_mode_rule import HwModeRule
 from packs.scenes.hardware_test.rules.helpers.phases import MODE_MAGNETOMETER
@@ -9,6 +8,8 @@ TYPE_CHECKING = False
 
 if TYPE_CHECKING:
     from typing import Final
+
+    from engine.input import InputEvents
 
 # Sensitivity, not a calibrated resting point: raw MagneticData carries a
 # per-axis hard-iron/chip offset, so bars are only reliable as a "did it

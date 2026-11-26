@@ -10,25 +10,26 @@ import engine._path as _path
 from engine.capabilities import MissingCapabilityError, describe_capabilities
 from engine.input import InputEvents
 from engine.log import Logger
-from engine.namespace import ActiveSceneNamespace
 from engine.network import NetworkEvents
 from engine.pack_catalog import PackCatalog, SettingOverrides, scan_pack_roots
-from engine.scene import SceneRegistry
 from engine.scene_runtime import SceneRuntime
-from engine.state import SceneControls, SceneReboot
-from engine.timer import Timer
-from hardware.shared.device_hardware import DeviceHardware
 from hardware.shared.device_reboot import DeviceSceneReboot
 from hardware.shared.device_state import DeviceStateStore
-from hardware.shared.device_storage import DeviceStorage
 from hardware.shared.ir_codecs import codec_for
-from hardware.shared.ir_codecs.base import InfraredDecoder, InfraredEncoder
 from hardware.shared.persisted_scene import PersistedScene
 
 TYPE_CHECKING = False
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+    from engine.namespace import ActiveSceneNamespace
+    from engine.scene import SceneRegistry
+    from engine.state import SceneControls, SceneReboot
+    from engine.timer import Timer
+    from hardware.shared.device_hardware import DeviceHardware
+    from hardware.shared.device_storage import DeviceStorage
+    from hardware.shared.ir_codecs.base import InfraredDecoder, InfraredEncoder
 
 __all__ = ["SceneBoot", "build_scene_boot"]
 

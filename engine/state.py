@@ -14,9 +14,7 @@ __all__ = [
     "StateSlot",
 ]
 
-from effects.effect import PixelBuffer
 from engine.capabilities import Capabilities
-from engine.events import Event
 from engine.settings import Settings
 
 TYPE_CHECKING = False
@@ -24,6 +22,9 @@ TYPE_CHECKING = False
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
     from typing import Final, Protocol, TypeVar
+
+    from effects.effect import PixelBuffer
+    from engine.events import Event
 
     # What SceneRun needs of a GameRule, typed structurally so this module
     # takes no import edge, even a checker-only one, on engine.engine: the

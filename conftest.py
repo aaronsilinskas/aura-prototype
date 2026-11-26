@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import sys
-from collections.abc import Callable, Iterator
-from pathlib import Path
 
 import pytest
 
@@ -16,6 +14,9 @@ from hardware.shared.persisted_scene import PersistedScene
 TYPE_CHECKING = False
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Iterator
+    from pathlib import Path
+
     from app.simulation import Simulation
 
 pytest_plugins = ["pytester"]

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from engine.input import InputEvents
 from engine.state import GameState, Scope
 from packs.scenes.hardware_test.rules.helpers.hw_mode_rule import HwModeRule
 from packs.scenes.hardware_test.rules.helpers.phases import MODE_ACCELEROMETER
@@ -9,6 +8,8 @@ TYPE_CHECKING = False
 
 if TYPE_CHECKING:
     from typing import Final
+
+    from engine.input import InputEvents
 
 ACCEL_MAX: Final = 9.8
 

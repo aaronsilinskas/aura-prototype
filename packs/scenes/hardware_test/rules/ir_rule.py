@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 from engine.capabilities import ir_emitter_capability
-from engine.input import InputEvents
 from engine.network import LINE, NetworkEvents
 from engine.state import GameState, Scope
 from packs.scenes.hardware_test.rules.helpers.flash import ir_flash
 from packs.scenes.hardware_test.rules.helpers.hw_mode_rule import HwModeRule
 from packs.scenes.hardware_test.rules.helpers.mode import HW_TEST_PAYLOAD, RECEIVE_FLASH_COLOR
 from packs.scenes.hardware_test.rules.helpers.phases import MODE_IR
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from engine.input import InputEvents
 
 
 class HwTestIrRule(HwModeRule):

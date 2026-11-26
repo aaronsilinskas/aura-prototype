@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from effects.effect import PixelBuffer
 from engine.state import EffectReceipt, MergeStrategy
 
 TYPE_CHECKING = False
 
 if TYPE_CHECKING:
     from typing import Final
+
+    from effects.effect import PixelBuffer
 
 _FULL_BRIGHTNESS: Final = 1.0
 

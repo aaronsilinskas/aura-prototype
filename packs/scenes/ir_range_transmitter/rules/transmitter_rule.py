@@ -16,7 +16,6 @@ from __future__ import annotations
 from engine.engine import GameRule
 from engine.input import InputEvents
 from engine.network import LINE
-from engine.state import GameState
 from packs.scenes.ir_range_transmitter.rules.helpers.transmitter_config import (
     transmitter_config,
 )
@@ -25,6 +24,8 @@ TYPE_CHECKING = False
 
 if TYPE_CHECKING:
     from typing import Final
+
+    from engine.state import GameState
 
 _SEQUENCE_KEY: Final = "irtx_sequence"
 _LAST_SEND_KEY: Final = "irtx_last_send_total"

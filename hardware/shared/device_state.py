@@ -10,7 +10,11 @@ from __future__ import annotations
 import json
 
 from engine.log import Logger
-from hardware.shared.device_storage import DeviceStorage
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from hardware.shared.device_storage import DeviceStorage
 
 __all__ = ["DeviceStateStore"]
 

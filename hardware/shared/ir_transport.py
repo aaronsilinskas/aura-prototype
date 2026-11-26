@@ -7,13 +7,12 @@ transmit gate that only ``InfraredTransceiver`` builds and drives.
 ``PulseReader`` and ``PulseWriter`` are plain base classes (ADR-0012).
 """
 
-from array import array
-
 from hardware.shared.ir_codecs.base import InfraredDecoder, InfraredEncoder
 from hardware.shared.ir_telemetry import IrTelemetryGate, IrTelemetrySnapshot
 
 TYPE_CHECKING = False
 if TYPE_CHECKING:
+    from array import array
     from collections.abc import Callable
 
 

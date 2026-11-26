@@ -16,13 +16,13 @@ __all__ = [
     "UndeclaredPackError",
 ]
 
-from engine.effects.admin import SceneView
 from engine.effects.builder import EffectBuilder
 from engine.packs import PackRegistry, RegistryError, UnknownItemError, UnknownPackError
 
 TYPE_CHECKING = False
 
 if TYPE_CHECKING:
+    from engine.effects.admin import SceneView
     from engine.scene import SceneLocalRegistry
 
 _SCENE_PREFIX = "scene"

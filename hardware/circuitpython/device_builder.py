@@ -9,12 +9,16 @@ from __future__ import annotations
 
 import board
 
-from engine.log import Logger
 from hardware.circuitpython.circuitpython_parts import CircuitPythonParts, SdCardMountError
 from hardware.shared.device_assembly import assemble_device
 from hardware.shared.device_config import DeviceConfig
 from hardware.shared.device_config import load_device_config as _load_shared_device_config
-from hardware.shared.device_hardware import DeviceHardware
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from engine.log import Logger
+    from hardware.shared.device_hardware import DeviceHardware
 
 __all__ = [
     "SdCardMountError",

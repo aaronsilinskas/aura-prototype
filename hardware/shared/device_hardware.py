@@ -2,19 +2,18 @@
 
 from __future__ import annotations
 
-from engine.effects.output import EffectOutput
-from engine.state import NetworkControls
-from hardware.shared.debounced_buttons import DebouncedButtons
-from hardware.shared.device_storage import DeviceStorage
-from hardware.shared.ir_transceiver import InfraredTransceiver
-from hardware.shared.polled_part import PolledPart
-from hardware.shared.polled_sensor import PolledSensor
-from hardware.shared.radio_transceiver import RadioTransceiver
-
 TYPE_CHECKING = False
 
 if TYPE_CHECKING:
+    from engine.effects.output import EffectOutput
     from engine.input import AccelerationData, MagneticData
+    from engine.state import NetworkControls
+    from hardware.shared.debounced_buttons import DebouncedButtons
+    from hardware.shared.device_storage import DeviceStorage
+    from hardware.shared.ir_transceiver import InfraredTransceiver
+    from hardware.shared.polled_part import PolledPart
+    from hardware.shared.polled_sensor import PolledSensor
+    from hardware.shared.radio_transceiver import RadioTransceiver
 
 __all__ = ["DeviceHardware"]
 

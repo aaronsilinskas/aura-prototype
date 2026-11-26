@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 from engine.engine import GameRule
-from engine.events import Event
-from engine.state import GameState
 from packs.rules.debug import NAMESPACE
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from engine.events import Event
+    from engine.state import GameState
 
 
 class EventLoggerRule(GameRule):

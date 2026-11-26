@@ -10,12 +10,13 @@ from __future__ import annotations
 
 from engine.engine import GameRule
 from engine.input import InputEvents
-from engine.state import GameState
 
 TYPE_CHECKING = False
 
 if TYPE_CHECKING:
     from typing import Final
+
+    from engine.state import GameState
 
 NAMESPACE: Final = "return_to_lobby"
 _HELD_KEY: Final = "return_to_lobby_held"

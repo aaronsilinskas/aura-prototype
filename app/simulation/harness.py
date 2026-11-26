@@ -27,16 +27,12 @@ from __future__ import annotations
 import secrets
 import sys
 import tempfile
-from collections.abc import Callable, Collection, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from types import TracebackType
 
 from app.scene_composition import build_scene_boot
 from engine.capabilities import IR_RECEIVE, button_label_of, ir_emitter_of, unknown_capabilities
 from engine.log import Logger
-from engine.pack_catalog import SettingOverrides
-from engine.state import ScopeValue
 from engine.timer import Timer
 from hardware.shared.device_assembly import button_label
 from hardware.shared.device_config import (
@@ -55,6 +51,15 @@ from hardware.simulated.device import (
     Strip,
 )
 from hardware.simulated.simulated_parts import wav_length
+
+TYPE_CHECKING = False
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Collection, Sequence
+    from types import TracebackType
+
+    from engine.pack_catalog import SettingOverrides
+    from engine.state import ScopeValue
 
 __all__ = ["TICK", "SimulatedDevice", "Simulation"]
 

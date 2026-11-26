@@ -28,16 +28,11 @@ to be read.
 
 from __future__ import annotations
 
-from array import array
-from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import TypeVar
+from typing import TYPE_CHECKING, TypeVar
 
-from engine.log import Logger
-from engine.state import ScopeValue
 from hardware.shared.debounced_buttons import DEBOUNCE_INTERVAL
 from hardware.shared.device_assembly import assemble_device, button_label
-from hardware.shared.device_config import DeviceConfig
 from hardware.simulated.simulated_parts import (
     DEFAULT_SWAY_STRENGTH,
     SimulatedAccelerometer,
@@ -45,6 +40,14 @@ from hardware.simulated.simulated_parts import (
     SimulatedParts,
     SimulatedRadioTransport,
 )
+
+if TYPE_CHECKING:
+    from array import array
+    from collections.abc import Callable, Sequence
+
+    from engine.log import Logger
+    from engine.state import ScopeValue
+    from hardware.shared.device_config import DeviceConfig
 
 __all__ = [
     "DEFAULT_SWAY_STRENGTH",

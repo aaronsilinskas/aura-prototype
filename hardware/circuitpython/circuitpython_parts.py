@@ -12,22 +12,11 @@ import time
 import board
 import busio
 import digitalio
-import microcontroller
 
 from hardware.circuitpython.infrared_io import PulseInReader, PulseOutWriter
 from hardware.circuitpython.is31fl3741_output import IS31FL3741EffectOutput
 from hardware.circuitpython.neopixel_output import NeoPixelEffectOutput
-from hardware.shared.device_config import (
-    AudioConfig,
-    I2CDeviceConfig,
-    MatrixPixelsConfig,
-    NeoPixelStripConfig,
-    PinRef,
-    RadioConfig,
-    SDCardConfig,
-)
 from hardware.shared.device_parts import DeviceParts
-from hardware.shared.ir_transport import PulseWriter
 
 TYPE_CHECKING = False
 
@@ -35,6 +24,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
     from typing import Final, TypeVar
 
+    import microcontroller
     from adafruit_drv2605 import DRV2605
     from adafruit_is31fl3741.adafruit_rgbmatrixqt import Adafruit_RGBMatrixQT
     from adafruit_lis3dh import LIS3DH_I2C
@@ -44,6 +34,16 @@ if TYPE_CHECKING:
     from hardware.circuitpython.drv2605_output import Drv2605EffectOutput
     from hardware.circuitpython.rfm69_radio_transport import Rfm69RadioTransport
     from hardware.circuitpython.sdcard_storage import SdCardStorage
+    from hardware.shared.device_config import (
+        AudioConfig,
+        I2CDeviceConfig,
+        MatrixPixelsConfig,
+        NeoPixelStripConfig,
+        PinRef,
+        RadioConfig,
+        SDCardConfig,
+    )
+    from hardware.shared.ir_transport import PulseWriter
 
     Driver = TypeVar("Driver")
 

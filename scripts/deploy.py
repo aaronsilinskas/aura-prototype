@@ -26,7 +26,6 @@ import os
 import secrets
 import shutil
 import sys
-from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -42,6 +41,7 @@ from scripts.ship_list import MODULE_DIRS, governed_mount_files, ship_list
 TYPE_CHECKING = False
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from typing import Final
 
 DEFAULT_MOUNT: Final = "/Volumes/CIRCUITPY"

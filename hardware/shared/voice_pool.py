@@ -9,13 +9,13 @@ clip, whether its release stops the effect's receipt.  All hardware lives behind
 
 from __future__ import annotations
 
-from effects.effect import AudioPlaybackConfig, Effect
-from engine.state import EffectReceipt
-
 TYPE_CHECKING = False
 
 if TYPE_CHECKING:
     from typing import Any
+
+    from effects.effect import AudioPlaybackConfig, Effect
+    from engine.state import EffectReceipt
 
     # A platform's opaque voice source: the pool only passes it from
     # open_source to play, and each adapter narrows it to what it opens.

@@ -6,11 +6,12 @@ by USB interface: ``repl_comports()`` for the console channel and
 workaround).
 """
 
-from collections.abc import Sequence
 from enum import Enum
 
 TYPE_CHECKING = False
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from serial.tools.list_ports_common import ListPortInfo
 
 __all__ = ["PortAutoDetectError", "SerialChannel", "find_port"]

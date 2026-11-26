@@ -5,12 +5,12 @@ Builders interpolate across it with ``engine.lerp.level_lerp``, passing
 
 from __future__ import annotations
 
-from effects.effect import EffectConfig
-
 TYPE_CHECKING = False
 
 if TYPE_CHECKING:
     from typing import Final
+
+    from effects.effect import EffectConfig
 
 EFFECT_TOP_LEVEL: Final = 10
 

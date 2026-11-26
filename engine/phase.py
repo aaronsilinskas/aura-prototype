@@ -42,7 +42,6 @@ in game time, so like the phase itself it pauses under an Overlay.
 from __future__ import annotations
 
 from engine.engine import GameRule
-from engine.events import Event
 from engine.input import InputEvents
 from engine.state import EffectReceipt, GameState, StateSlot
 
@@ -51,6 +50,8 @@ TYPE_CHECKING = False
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
     from typing import TypeVar
+
+    from engine.events import Event
 
     T = TypeVar("T", bound=Event)
 

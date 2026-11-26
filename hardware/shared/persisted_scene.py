@@ -10,13 +10,14 @@ ignored.
 from __future__ import annotations
 
 from engine.log import Logger
-from hardware.shared.device_state import DeviceStateStore
 from hardware.shared.scene_selection import SCENE_DEPLOY_TOKEN_KEY, non_empty_string_or_none
 
 TYPE_CHECKING = False
 
 if TYPE_CHECKING:
     from typing import Final
+
+    from hardware.shared.device_state import DeviceStateStore
 
 __all__ = ["PersistedScene"]
 

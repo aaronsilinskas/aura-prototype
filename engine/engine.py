@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from engine.events import Event
-from engine.state import GameState
 from engine.version import Version
 
 TYPE_CHECKING = False
@@ -9,6 +7,9 @@ TYPE_CHECKING = False
 if TYPE_CHECKING:
     from collections.abc import Callable
     from typing import TypeVar
+
+    from engine.events import Event
+    from engine.state import GameState
 
     T = TypeVar("T", bound="Event")
 
