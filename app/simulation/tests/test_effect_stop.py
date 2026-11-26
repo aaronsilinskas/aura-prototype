@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
 
 from app.simulation import TICK, SimulatedDevice, Simulation
+from app.simulation.tests.card_tree import audio_effect_source, card_scene_dir, package
 
 _HUM = "basic.blip_echo"
 """``scene.hum``'s looping clip."""
@@ -41,49 +41,15 @@ _STOP = "state.effect_controls.stop_effect(Scope.ALL)"
 _REPLACE = 'state.effect_controls.set_effect(Scope.ALL, "scene.sting", {})'
 
 
-def _audio_effect(clip: str, *, loop: bool) -> str:
-    return f"""\
-from effects.effect import AudioPlaybackConfig, Effect, EffectAudio, EffectConfig, EffectVerb
-from engine.effects.builder import EffectBuilder
-
-_AUDIO = EffectAudio(
-    clips={{EffectVerb.START: AudioPlaybackConfig(name={clip!r}, loop={loop!r})}}
-)
-
-
-class _Builder(EffectBuilder):
-    def __call__(self, name: str, config: EffectConfig) -> Effect:
-        return Effect(name=name, audio=_AUDIO)
-
-
-BUILD = _Builder()
-"""
-
-
-def _package(directory: Path) -> Path:
-    directory.mkdir(parents=True, exist_ok=True)
-    (directory / "__init__.py").touch()
-    return directory
-
-
 def _install_card_scene(card: Path, scene: str, on_press: str) -> None:
     """Put *scene* on *card*: it starts ``scene.hum`` and runs *on_press* on the first A press."""
-    scene_dir = _package(_package(_package(card / "aura_packs") / "scenes") / scene)
-    (scene_dir / "scene.json").write_text(
-        json.dumps(
-            {
-                "version": "1.0",
-                "effect_packs": [{"name": "basic", "version": "1.1"}],
-                "rule_packs": [],
-            }
-        )
-    )
-    (_package(scene_dir / "rules") / "rule.py").write_text(
+    scene_dir = card_scene_dir(card, scene)
+    (package(scene_dir / "rules") / "rule.py").write_text(
         _HUM_UNTIL_A_RULE.format(on_press=on_press)
     )
-    effects = _package(scene_dir / "effects")
-    (effects / "hum.py").write_text(_audio_effect(_HUM, loop=True))
-    (effects / "sting.py").write_text(_audio_effect(_STING, loop=False))
+    effects = package(scene_dir / "effects")
+    (effects / "hum.py").write_text(audio_effect_source(_HUM, loop=True))
+    (effects / "sting.py").write_text(audio_effect_source(_STING, loop=False))
 
 
 @pytest.fixture

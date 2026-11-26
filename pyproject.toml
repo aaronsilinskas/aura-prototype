@@ -22,6 +22,7 @@ dev = [
     # Download the CircuitPython binary via: scripts/setup_mpy_cross.sh
     # Binary lands at tools/mpy-cross (gitignored). Bump version with CircuitPython upgrades.
     "pre-commit>=4.0.0",
+    "pylint>=4.1.4",
     "pyserial>=3.5",
     "pytest>=9.0.2",
     "pytest-cov>=7.0.0",
@@ -80,6 +81,18 @@ allow-multiline = false  # mpy-cross rejects implicit concatenation even inside 
 "scripts/**" = ["ISC002"]
 # Tests never ship, so moving their imports under TYPE_CHECKING buys nothing.
 "**/tests/**" = ["ISC002", "TC"]
+
+# pylint runs only its duplicate-code check (R0801): ruff covers the rest.
+[tool.pylint.main]
+disable = ["all"]
+enable = ["duplicate-code"]
+persistent = false
+
+[tool.pylint.reports]
+score = false
+
+[tool.pylint.similarities]
+min-similarity-lines = 8
 
 [tool.importlinter]
 root_packages = ["effects", "engine", "magic", "packs", "hardware", "app", "scripts"]

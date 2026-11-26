@@ -18,21 +18,8 @@ from engine.pack_catalog import scan_pack_roots
 from hardware.shared.device_state import DeviceStateStore
 from hardware.shared.device_storage import DeviceStorage
 from hardware.shared.persisted_scene import PersistedScene
+from hardware.shared.tests.full_capabilities import FULL_CAPABILITIES
 
-_FULL = frozenset(
-    (
-        "button.A",
-        "button.B",
-        "accelerometer",
-        "magnetometer",
-        "radio",
-        "storage",
-        "ir.line",
-        "ir.cone",
-        "ir.area_of_effect",
-        "ir.receive",
-    )
-)
 _IR = frozenset(("ir.line", "ir.cone", "ir.area_of_effect", "ir.receive"))
 RADIO_MODE = 4
 """Presses of B from switch-on that reach hardware_test's radio mode, where A sends."""
@@ -48,7 +35,7 @@ def _boots(without: str) -> str:
 def test_a_fully_built_simulated_device_has_every_capability(simulation):
     device = simulation.add_device("red", scene="hardware_test")
 
-    assert device.capabilities == _FULL
+    assert device.capabilities == FULL_CAPABILITIES
 
 
 @pytest.mark.parametrize(
@@ -70,13 +57,13 @@ def test_a_fully_built_simulated_device_has_every_capability(simulation):
 def test_without_a_capability_the_device_lacks_it_and_keeps_the_rest(simulation, without, lost):
     device = simulation.add_device("red", scene=_boots(without), without={without})
 
-    assert device.capabilities == _FULL - lost
+    assert device.capabilities == FULL_CAPABILITIES - lost
 
 
 def test_without_every_ir_item_the_device_has_no_ir(simulation):
     device = simulation.add_device("red", scene="hardware_test", without=_IR)
 
-    assert device.capabilities == _FULL - _IR
+    assert device.capabilities == FULL_CAPABILITIES - _IR
 
 
 def test_without_a_name_outside_the_vocabulary_raises(simulation):

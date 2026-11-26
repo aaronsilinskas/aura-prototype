@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
 
 from app.simulation import TICK, SimulatedDevice, Simulation
+from app.simulation.tests.card_tree import audio_effect_source, card_scene_dir, package
 from engine.capabilities import MissingCapabilityError
 from engine.network import LINE
 from engine.pack_catalog import SettingOverrides
@@ -227,46 +227,16 @@ RULE = _Done(DONE, PHASE)
 """
 
 
-_HUM_EFFECT = """\
-from effects.effect import AudioPlaybackConfig, Effect, EffectAudio, EffectConfig, EffectVerb
-from engine.effects.builder import EffectBuilder
-
-_AUDIO = EffectAudio(
-    clips={EffectVerb.START: AudioPlaybackConfig(name="basic.blip_echo", loop=True)}
-)
-
-
-class _Builder(EffectBuilder):
-    def __call__(self, name: str, config: EffectConfig) -> Effect:
-        return Effect(name=name, audio=_AUDIO)
-
-
-BUILD = _Builder()
-"""
+_HUM_EFFECT = audio_effect_source("basic.blip_echo", loop=True)
 
 _HUM = "basic.blip_echo"
 """``hum``'s looping clip; a shared pack clip, so it resolves the same under the overlay."""
 
 
-def _package(directory: Path) -> Path:
-    directory.mkdir(parents=True, exist_ok=True)
-    (directory / "__init__.py").touch()
-    return directory
-
-
 def _install_card_scene(card: Path, scene: str, rules: dict[str, str]) -> None:
     """Put *scene* on *card*, running *rules*: each rule file's name and module source."""
-    scene_dir = _package(_package(_package(card / "aura_packs") / "scenes") / scene)
-    (scene_dir / "scene.json").write_text(
-        json.dumps(
-            {
-                "version": "1.0",
-                "effect_packs": [{"name": "basic", "version": "1.1"}],
-                "rule_packs": [],
-            }
-        )
-    )
-    rules_dir = _package(scene_dir / "rules")
+    scene_dir = card_scene_dir(card, scene)
+    rules_dir = package(scene_dir / "rules")
     for name, source in rules.items():
         (rules_dir / f"{name}.py").write_text(source)
 
@@ -298,7 +268,7 @@ def card(tmp_path: Path) -> Path:
     _install_phase_scene(tmp_path, "condition", _CONDITION_PHASE_RULE)
     _install_phase_scene(tmp_path, "hum_phase", _HUM_PHASE_RULE)
     for scene in ("hum", "hum_phase"):
-        effects = _package(tmp_path / "aura_packs" / "scenes" / scene / "effects")
+        effects = package(tmp_path / "aura_packs" / "scenes" / scene / "effects")
         (effects / "hum.py").write_text(_HUM_EFFECT)
     return tmp_path
 
