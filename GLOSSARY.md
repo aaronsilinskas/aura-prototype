@@ -5,7 +5,7 @@ The canonical code-facing vocabulary for the Aura animation and game-logic engin
 ## Glossary
 
 ### Effect
-A descriptor declaring which **Modalities** an effect has (pixels, audio, haptic). Builders return plain `Effect` instances — subclass only when there is genuine logic to add.
+A descriptor declaring which **Modalities** an effect has (pixels, audio, haptic).
 _Avoid_: `renders_pixels` (use `effect.pixels is not None`); calling `update()`/`render()` directly; an `Effect` subclass that only holds a name; "capabilities" for its modalities (a **Capability** is hardware a device has)
 
 ### Modality
@@ -52,7 +52,7 @@ A directory whose own name is its top-level import package (flash `packs`, the c
 _Avoid_: pairing a root path with a hand-written import prefix (the prefix is the folder name); two roots with the same folder name; "pack dir" for a root (a pack dir is one pack inside it)
 
 ### PackCatalog
-Everything installed under a device's **Pack roots**, discovered and checked in one scan (`scan_pack_roots`): every scene's pack declarations and **Setting overrides** are checked and its **Settings** resolved before it is returned, so a misconfigured pack or scene stops boot; item code is still imported lazily, at first use.
+Everything installed under a device's **Pack roots**, discovered and checked in one scan: every scene's pack declarations and **Setting overrides** are checked and its **Settings** resolved before it is returned, so a misconfigured pack or scene stops boot; item code is still imported lazily, at first use.
 _Avoid_: scanning packs, scenes or sounds anywhere else; re-checking scene declarations at load time
 
 ### PackScanError
@@ -60,10 +60,10 @@ The typed `ValueError` family raised while building a `PackCatalog` when the fil
 _Avoid_: confusing with **Registry lookup errors** (a name not registered, after a good scan); classifying by message text; raising one because the device lacks a scene's **Required capabilities** (the scan never looks at hardware)
 
 ### DynamicValue
-`float | Callable[[], float]` — a value that may be constant or computed fresh each sample.
+A value that may be constant or computed fresh each sample.
 
 ### EffectShapeFunc
-`Callable[[float], float]` — maps a normalized position in `[0, 1]` to an output value.
+A function mapping a normalized position in `[0, 1]` to an output value.
 
 ### Layer
 A composable simulation unit used by `EffectPixels` subclasses; **Renderers** turn layers into pixel output.
@@ -90,7 +90,7 @@ One run of a scene on the scene stack, from when it is booted or laid on as an *
 _Avoid_: "engine", "game engine", "session", "instance", "run unit"; adding or swapping its rules after it is built; holding the clock (it is handed each tick's elapsed time)
 
 ### StateSlot
-A typed, get-or-create accessor for one key of `GameState`'s game data (`engine/state.py`): the first read builds the value with its factory, later reads return it checked against its class. How a scene keeps per-scene state and caches its **Scene Config**.
+A typed accessor for one key of `GameState`'s game data: how a scene keeps per-scene state and caches its **Scene Config**.
 _Avoid_: bare `state.get`/`state.set` with a repeated string key for typed per-scene state
 
 ### Phase
@@ -102,7 +102,7 @@ An opaque, identity-typed constant naming one phase; compared by identity, so a 
 _Avoid_: bare `str`/`int` phase values; comparing a phase against a string literal
 
 ### PhaseMachine
-The mutable per-scene holder of the current `PhaseKey`, the phase-start time, the dispatch the phase was entered on (so its handlers skip that event), and at most one pending end a `PhaseRule` declared, dropped on every transition; reached through a scene's `PhaseSlot`.
+The mutable per-scene holder of the current `PhaseKey`, when the phase started and at most one pending end a `PhaseRule` declared, dropped on every transition; reached through a scene's `PhaseSlot`.
 _Avoid_: storing receipts or per-phase scratch on it beyond the declared end; stopping effects inside `enter()`, including the effect a dropped end was waiting on
 
 ### PhaseSlot
@@ -182,7 +182,7 @@ The **Registry lookup errors** the **Active scene namespace** raises (a grouping
 _Avoid_: reporting an undeclared pack as unknown, or the reverse; confusing `UndeclaredPackError` (a name uses a pack its scene did not declare) with `UnknownDeclaredPackError` (a scan-time **PackScanError**: a scene declares a pack that is not installed)
 
 ### NetworkControls
-The **game-facing**, send-only network seam a rule holds via `GameState.network_controls` (`send_ir`, `send_radio`); the runtime-facing per-tick IR pump lives entirely on `InfraredTransceiver.update()` instead. Both sends raise `MissingCapabilityError` when the emitter or radio is absent.
+The **game-facing**, send-only network seam a rule holds via `GameState.network_controls`, for IR and radio sends; the runtime-facing per-tick IR pump lives on `InfraredTransceiver` instead. Both sends raise `MissingCapabilityError` when the emitter or radio is absent.
 _Avoid_: putting `poll_transmits()` or any per-tick pump on it (keep the seam send-only); a send that silently does nothing on missing hardware (a rule that copes asks `state.capabilities.has` first)
 
 ### SceneRegistry
@@ -190,7 +190,7 @@ The installed **Scenes**, keyed by name: built from the scenes the **PackCatalog
 _Avoid_: a second way to add scenes (an in-memory factory, a `register` call); copying a **Scene** on lookup; changing a scene's Settings after the scan (pass **Setting overrides** to the catalog scan); importing codec classes here (the engine stores only the name — see **Wire-frame codec**)
 
 ### SceneControls
-The scene-transition seam rules use (`overlay`, `pop`, `reboot_into`, `reboot_to_previous`, `can_run`); `SceneManager` is the live implementation. The **Scene boot** hands the same seam to the **Simulation test harness** and the reboot example, which use it as a rule would. Every transition into a scene first checks its **Required capabilities** against the device, and rules can ask whether the device can run a scene before offering it.
+The scene-transition seam rules use: lay on an **Overlay**, pop it, **Reboot** into a scene or the previous one, and ask whether the device can run a scene. `SceneManager` is the live implementation. The **Scene boot** hands the same seam to the **Simulation test harness** and the reboot example, which use it as a rule would. Every transition into a scene first checks its **Required capabilities** against the device, and rules can ask whether the device can run a scene before offering it.
 _Avoid_: a rule-facing `load` (a rule changes scene by **Reboot**, which starts the new scene clean)
 
 ### Overlay
@@ -218,7 +218,7 @@ The board-free port `SceneManager` reaches to persist a scene switch and reboot 
 _Avoid_: validating the target here (that is `SceneManager.reboot_into`'s job); calling `microcontroller.reset()` anywhere but the device's entry points (`run_scene` and the on-device reboot example), which pass it to the **Scene boot**
 
 ### EffectControls
-The **rule-facing** effect seam a rule holds via `GameState.effect_controls`: `set_effect`, `add_effect`, `stop_effect`, `set_merge_strategy`; scene-transition operations live on `EffectAdmin`.
+The **rule-facing** effect seam a rule holds via `GameState.effect_controls`: start, add and stop effects and set a scope's **Merge strategy**; scene-transition operations live on `EffectAdmin`.
 _Avoid_: adding `set_local_effects` or the merge-strategy snapshot lifecycle back onto it
 
 ### EffectAdmin
@@ -246,7 +246,7 @@ The `ValueError` that `set_effect`/`add_effect` raise, before anything in scope 
 _Avoid_: confusing with **Registry lookup errors** (every name resolved; the key is wrong); rejecting a `STOP` haptic pattern (allowed: an effect may buzz as it ends)
 
 ### Merge strategy
-The per-scope policy deciding how a scope's stack of layered effect buffers becomes shown pixels; set per rule via `EffectControls.set_merge_strategy`, defaulting to **Split**. A booted scene and every **Overlay** start on Split; popping an overlay puts back the strategies of the scene it covered. Two ship: **Split** and **Additive**.
+The per-scope policy deciding how a scope's stack of layered effect buffers becomes shown pixels; set per rule via `EffectControls.set_merge_strategy`, defaulting to **Split**. A booted scene and every **Overlay** start on Split; popping an overlay puts back the strategies of the scene it covered. **Split** and **Additive** are the strategies.
 _Avoid_: making it a per-output or `aura-device.json` choice; holding merge state on the output; a global (non-per-scope) strategy
 
 ### Split
@@ -262,7 +262,7 @@ The mathematical detail level at which an effect generates animation data, indep
 _Avoid_: conflating resolution with pixel count
 
 ### EffectReceipt
-A handle returned when an effect starts; `stop()` marks it for removal next tick. Carries `brightness` and `loudness` (validating, `[0.0, 1.0]`) that rules set directly to vary intensity without restarting.
+A handle returned when an effect starts; `stop()` marks it for removal next tick. Carries `brightness` and `loudness`, each in `[0.0, 1.0]`, that rules set directly to vary intensity without restarting.
 _Avoid_: using `options["brightness"]` as a runtime control (change `receipt.brightness`); values outside `[0.0, 1.0]` (raises `ValueError`)
 
 ### Idle effect
@@ -274,11 +274,11 @@ A linear fill effect (`basic.progress`) lighting pixels from first toward last i
 _Avoid_: confusing `progress` with `Game Level` or receipt `brightness`; treating `progress` as runtime-mutable
 
 ### Effect Level
-A 1–10 integer `level` option controlling an effect's visual/audio intensity; a build-time parameter, not a game concept. A missing level is 1, and one outside 1–10 is clamped to the nearest end. Values scale across it the same way they scale across a **Game Level**, through the one interpolation both share: `level_lerp` in `engine/lerp.py`.
+A 1–10 integer `level` option controlling an effect's visual/audio intensity; a build-time parameter, not a game concept. A missing level is 1, and one outside 1–10 is clamped to the nearest end. Values scale across it the same way they scale across a **Game Level**, through the one interpolation both share.
 _Avoid_: using `level` as a runtime control; conflating with `Game Level`; reading or clamping the `level` option in each builder (read it once, the Effect Level's way); a second level interpolation for effects
 
 ### Game Level
-A player's progression through a game session, stored in `GameState`; integer from 1 up to a top level the game chooses (Red Light Green Light reads its top level from one of its own Settings), starting at 1, advancing one per surviving Round, resetting on game over or win. Values scale across it through `level_lerp` in `engine/lerp.py`, the one interpolation it shares with the **Effect Level**.
+A player's progression through a game session, stored in `GameState`; integer from 1 up to a top level the game chooses (Red Light Green Light reads its top level from one of its own Settings), starting at 1, advancing one per surviving Round, resetting on game over or win. Values scale across it through the one interpolation it shares with the **Effect Level**.
 _Avoid_: confusing with `Effect Level`; holding it as rule instance state; a second level interpolation (Game and Effect Levels scale values the same way, from level 1 up to their top level)
 
 ### Round
@@ -406,11 +406,11 @@ A hardware sensor providing 3-axis acceleration readings (x, y, z) in m/s²; opt
 _Avoid_: "IMU" (the LIS3DH has no gyroscope or magnetometer)
 
 ### Polled part
-A built part the tick refreshes exactly once per tick by calling `update(elapsed)`, after which it holds its own state for the tick to read: buttons, accelerometer and magnetometer hold a standing `reading`; IR and radio hold this tick's `received` packet, or `None`. **Device assembly** lists each Polled part as it builds it, and the tick polls that list rather than naming parts, so a part that is built is a part that is polled. Polled parts never depend on the order they are polled in within a tick.
+A built part the tick refreshes exactly once per tick, after which it holds its own state for the tick to read: buttons, accelerometer and magnetometer hold a standing reading; IR and radio hold this tick's received packet, if any. **Device assembly** lists each Polled part as it builds it, and the tick polls that list rather than naming parts, so a part that is built is a part that is polled. Polled parts never depend on the order they are polled in within a tick.
 _Avoid_: passing a caller-owned buffer into `update` (the part owns its state); polling a part by name in the tick; one Polled part reading another's state within the same poll
 
 ### PolledSensor
-The board-free **Polled part** wrapping one sensor's raw read: each poll refreshes its `reading` in place from the raw read, and a failed read keeps the last good reading; the start and end of a run of failed reads are logged. It does not know the reading's shape — the reading assigns a raw read to itself — so one PolledSensor serves the accelerometer and the magnetometer alike. A device with no such hardware has no PolledSensor in its place, which is distinct from a failed read.
+The board-free **Polled part** wrapping one sensor's raw read: each poll refreshes its reading, and a failed read keeps the last good reading. It does not know the reading's shape, so one PolledSensor serves the accelerometer and the magnetometer alike. A device with no such hardware has no PolledSensor in its place, which is distinct from a failed read.
 _Avoid_: `Sensor` (buttons and IR receivers are sensors too); swallowing read failures at the call site; allocating a new reading per poll
 
 ### AccelerationData
@@ -426,7 +426,7 @@ A snapshot of 3-axis magnetometer readings in microteslas (µT), in the magnetom
 _Avoid_: "IMU" (magnetometer is a separate sensor from the accelerometer)
 
 ### ButtonData
-A snapshot of button states, each one of `UP`, `DOWN`, `PRESSED` (down this frame), `RELEASED` (up this frame); query methods return `bool`, and `is_down` is `True` on both `PRESSED` and `DOWN`.
+A snapshot of button states, each one of up, down, pressed (down this frame) or released (up this frame); a button counts as down on both its pressed and its down frames.
 _Avoid_: reading `_states` directly (use the query methods); assuming `is_down` excludes the `PRESSED` frame
 
 ### IR transport
@@ -434,7 +434,7 @@ The hardware-agnostic infrared send and receive subsystem: it moves opaque bytes
 _Avoid_: encoding spell fields in the transport
 
 ### Wire-frame codec
-An encoder and decoder pair mapping an opaque payload to IR pulse timings and back. Two coexist, the **Aura wire-frame** and the **Tag protocol**; the scene a device boots picks one, and an **Overlay** runs on the codec of the scene it covers.
+An encoder and decoder pair mapping an opaque payload to IR pulse timings and back. The **Aura wire-frame** and the **Tag protocol** coexist; the scene a device boots picks one, and an **Overlay** runs on the codec of the scene it covers.
 _Avoid_: assuming a single global wire-frame; treating wire-frames as interchangeable across scenes
 
 ### Aura wire-frame
@@ -486,7 +486,7 @@ The receiver's gated-receive contract: while the **IR transmit gate** signals em
 _Avoid_: leaving pulses in the buffer to overflow (drain even when discarding); decoding during emission "to catch a real shot"
 
 ### Inter-frame gap
-The idle period between two IR shots, delivered by `PulseIn` as a single over-long "space" pulse (≈6500 µs+); treated as a frame terminator that abandons a stalled partial decode and returns the decoder to idle.
+The idle period between two IR shots, seen by the receiver as one over-long space; treated as a frame terminator that abandons a stalled partial decode and returns the decoder to idle.
 _Avoid_: trying to "re-arm" or salvage a pulse from an overlapping frame (recognise the gap and start the next frame clean)
 
 ### Ship list
