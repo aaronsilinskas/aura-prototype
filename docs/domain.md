@@ -6,7 +6,7 @@
 
 This repo implements:
 - A composable LED animation engine (`effects/`) that runs on both CPython and CircuitPython
-- Game rules for a magic system built around ten elements (Fire, Water, Earth, Ice, Air, Lightning, Light, Dark, Time, Gravity)
+- Game rules for a magic system built around elements
 - An event-driven game engine (`engine/`)
 - Spell and aura logic (`magic/`)
 
@@ -124,7 +124,7 @@ A map of where the major types live. Authoritative term meanings are in [`GLOSSA
 |------|----------|------|
 | `EffectConfig` | `effects/effect.py` | Resolution, options, and listeners for one render pass |
 | `PixelBuffer` | `effects/effect.py` | List-backed in-memory pixel buffer of packed RGB values |
-| `EffectVerb` | `effects/effect.py` | Identity-matched key for `clips` and `patterns`; engine owns `START`/`STOP`, `EffectPixels` subclasses declare custom verbs in `VERBS` |
+| `EffectVerb` | `effects/effect.py` | Key for an effect's clips and patterns; the engine owns `START`/`STOP`, and each effect declares its own custom verbs |
 | `Effect` | `effects/effect.py` | Descriptor of an effect's modalities (`pixels`, `audio`, `haptic`); builders return plain instances |
 | `Layer` | `effects/layers/layer.py` | Base class of every **Layer** |
 | `Scroll` | `effects/layers/scroll.py` | Base class of the position scroll helpers |
@@ -251,6 +251,8 @@ Rules an agent must not break, in every package, `scripts/` included.
 - **One owner per network subsystem** — `InfraredTransceiver` alone builds a device's IR transmitters, receiver and **IR transmit gate**, and `RadioTransceiver` owns its radio; `DeviceHardware` exposes none of the raw transmitters, the gate or the `RadioTransport` (`hardware/shared/ir_transceiver.py`, `hardware/shared/radio_transceiver.py`)
 - **One codec per boot, one decoder per reader** — the **Scene boot** applies the booted scene's **Wire-frame codec** once, before the first tick, and an **Overlay** or pop never swaps it; codecs travel as classes, so no two IR readers share a decoder (`app/scene_composition.py`, `hardware/shared/ir_transceiver.py`)
 - **One IR emitter set** — `IR_EMITTERS` in `engine/network.py` is the emitter set; derive from it, never restate it (`hardware/shared/device_config.py`, `hardware/shared/device_assembly.py`)
+- **Scene transitions reach effects only through `EffectAdmin`** — a `GameRule` never calls one of its steps, and `SceneManager` never routes transition calls through `EffectControls` (`engine/effects/admin.py`, `engine/scene.py`)
+- **Self-echo is gated in hardware** — the **IR transmit gate** suppresses a device's own IR pulses; no scene or rule does (`hardware/shared/ir_transceiver.py`)
 - **Build and deploy follow the Ship list** — neither step excludes or places a file of its own (`scripts/ship_list.py`, `scripts/build.py`, `scripts/deploy.py`)
 - **A Deploy plan is decided once** — carrying it out never re-checks a flag or re-decides what the plan holds (`scripts/deploy.py`)
 
